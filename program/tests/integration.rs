@@ -29,5 +29,9 @@ fn test_validator_transaction() {
     );
     transaction.sign(&[&payer], recent_blockhash);
 
-    assert_matches!(rpc_client.send_and_confirm_transaction(&transaction), Ok(_));
+    // TODO
+    assert_matches!(
+        rpc_client.send_and_confirm_transaction(&transaction),
+        Err(_)
+    );
 }

@@ -3,10 +3,7 @@
 
 use {
     borsh::{BorshDeserialize, BorshSchema, BorshSerialize},
-    solana_program::{
-        msg,
-        pubkey::Pubkey,
-    },
+    solana_program::pubkey::Pubkey,
 };
 
 mod entrypoint;
@@ -14,30 +11,59 @@ pub mod instruction;
 pub mod processor;
 pub mod state;
 
+// ==== crypto placeholders ====
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
-pub struct ElGamalPK;
+pub struct ElGamalPK {
+    data: [u8; 32],
+}
+impl Default for ElGamalPK {
+    fn default() -> Self {
+        Self { data: [0; 32] }
+    }
+}
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
-pub struct ElGamalCT;
+pub struct ElGamalCT {
+    data: [u8; 64],
+}
+impl Default for ElGamalCT {
+    fn default() -> Self {
+        Self { data: [0; 64] }
+    }
+}
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
-pub struct TransDataCTValidity;
+pub struct TransDataCTValidity {
+    crypto_stuff: bool,
+}
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
-pub struct TransDataRangeProof;
+pub struct TransDataRangeProof {
+    crypto_stuff: bool,
+}
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
-pub struct UpdateEncKeyData;
+pub struct UpdateEncKeyData {
+    crypto_stuff: bool,
+}
+// ==== fin crypto placeholders ====
 
 solana_program::declare_id!("Gcat1YXHhH6t1juaWF74WLcfv4XoNocjXA6sPWHNgAse"); // TODO: grind a `CToken...` keypair
 
 pub(crate) fn get_omnibus_token_address_with_seed(spl_token_mint: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[&spl_token_mint.to_bytes(), br"omnibus"], &id())
+    Pubkey::find_program_address(&[spl_token_mint.as_ref(), br"omnibus"], &id())
 }
 
 pub(crate) fn get_transfer_auditor_address_with_seed(spl_token_mint: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[&spl_token_mint.to_bytes(), br"transfer auditor"], &id())
+    Pubkey::find_program_address(&[spl_token_mint.as_ref(), br"transfer auditor"], &id())
 }
 
-pub(crate) fn get_confidential_token_address_with_seed(spl_token_mint: &Pubkey, spl_token_account: &Pubkey) -> (Pubkey, u8) {
+pub(crate) fn get_confidential_address_with_seed(
+    spl_token_mint: &Pubkey,
+    spl_token_account: &Pubkey,
+) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[&spl_token_mint.to_bytes(), &spl_token_account.to_bytes(), br"confidential"],
+        &[
+            spl_token_mint.as_ref(),
+            spl_token_account.as_ref(),
+            br"confidential",
+        ],
         &id(),
     )
 }
@@ -62,10 +88,10 @@ pub fn get_transfer_auditor_address(spl_token_mint: &Pubkey) -> Pubkey {
     get_transfer_auditor_address_with_seed(spl_token_mint).0
 }
 
-/// Derive the confidential token account address for a given SPL Token account address
+/// Derive the confidential account address for a given SPL Token account address
 ///
 /// This account is created when the token holder executes
 /// `ConfidentialTokenInstruction::CreateAccount` to disclose their ElGamal public key
-pub fn get_confidential_token_address(spl_token_mint: &Pubkey, spl_token_account: &Pubkey) -> Pubkey {
-    get_confidential_token_address_with_seed(spl_token_mint, spl_token_account).0
+pub fn get_confidential_address(spl_token_mint: &Pubkey, spl_token_account: &Pubkey) -> Pubkey {
+    get_confidential_address_with_seed(spl_token_mint, spl_token_account).0
 }
