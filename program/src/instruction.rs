@@ -21,6 +21,7 @@ pub enum TransferProof {
 
 /// Instructions supported by the Feature Proposal program
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub enum ConfidentialTokenInstruction {
     /// Configures confidential transfers for a given SPL Token mint
     ///
@@ -114,7 +115,7 @@ pub enum ConfidentialTokenInstruction {
     CloseAccount {
         /// TODO: Proof that the encrypted balance is 0
         #[allow(dead_code)] // not dead code
-        crypto_empty_balance_proof: bool,
+        crypto_empty_balance_proof: (),
     },
 
     /// Updates the confidential token account's ElGamal public key. This instruction will fail the
@@ -151,7 +152,7 @@ pub enum ConfidentialTokenInstruction {
 
         /// TODO: Proof that the encrypted balances are equivalent
         #[allow(dead_code)] // not dead code
-        crypto_balance_equality_proof: bool,
+        crypto_balance_equality_proof: (),
     },
 
     /// Deposit SPL Tokens into the pending balance of a confidential token account.
@@ -210,7 +211,7 @@ pub enum ConfidentialTokenInstruction {
         decimals: u8,
         /// TODO: Proof that the encrypted balance is >= `amount`
         #[allow(dead_code)] // not dead code
-        crypto_sufficient_balance_proof: bool,
+        crypto_sufficient_balance_proof: (),
     },
 
     /// Submits a transfer proof. The two proof submissions required before the `Transfer`
@@ -267,24 +268,20 @@ pub enum ConfidentialTokenInstruction {
         receiver_pk: ElGamalPK,
 
         /// Transfer amount split into two 32 values and encrypted so only the receiver can view it
-        ///
-        /// TODO: This tuple should be two 32 values instead of two 64 byte values
         #[allow(dead_code)] // not dead code
-        receiver_transfer_split_amount: (ElGamalCT, ElGamalCT),
+        receiver_transfer_split_amount: ElGamalSplitCT,
 
-        /// Transfer auditor's encryption key
+        /// If a transfer auditor is installed then the transfer must include:
+        /// 1. Transfer auditor's: encryption key
+        /// 2. Transfer amount encrypted and split into two 32 values so only the optional transfer
+        ///    auditor can view it
+        /// 3. TODO: Proof that the previous transfer amount is equal to `receiver_transfer_split_amount`
         #[allow(dead_code)] // not dead code
-        transfer_auditor_pk: Option<ElGamalPK>,
-
-        /// Transfer amount encrypted and split into two 32 values so only the optional transfer auditor can view it
-        ///
-        /// TODO: This tuple should be two 32 values instead of two 64 byte values
-        #[allow(dead_code)] // not dead code
-        transfer_auditor_split_amount: Option<(ElGamalCT, ElGamalCT)>,
-
-        /// TODO: Proof that `transfer_auditor_split_amount` is equal to `receiver_transfer_split_amount`
-        #[allow(dead_code)] // not dead code
-        crypto_auditor_amount_equality_proof: bool,
+        transfer_audit: Option<(
+            ElGamalPK,
+            ElGamalSplitCT,
+            /*crypto_auditor_amount_equality_proof*/ (),
+        )>,
     },
 
     /// Applies the pending balance to the available balance then clears the pending balance from a
@@ -330,7 +327,7 @@ pub enum ConfidentialTokenInstruction {
 
 impl Sealed for ConfidentialTokenInstruction {}
 impl Pack for ConfidentialTokenInstruction {
-    const LEN: usize = 324; // see `test_get_packed_len()`
+    const LEN: usize = 321; // see `test_get_packed_len()`
 
     fn pack_into_slice(&self, dst: &mut [u8]) {
         let data = self.pack_into_vec();
@@ -362,5 +359,39 @@ mod tests {
             ConfidentialTokenInstruction::get_packed_len(),
             solana_program::borsh::get_packed_len::<ConfidentialTokenInstruction>()
         )
+    }
+
+    #[test]
+    fn test_instruction_size() {
+        assert_eq!(
+            ConfidentialTokenInstruction::SubmitTransferProof {
+                receiver_pk: ElGamalPK::default(),
+                receiver_pending_balance: ElGamalCT::default(),
+                transfer_proof: TransferProof::CiphertextValidity(TransDataCTValidity::default()),
+            }
+            .pack_into_vec()
+            .len(),
+            99,
+        );
+        assert_eq!(
+            ConfidentialTokenInstruction::SubmitTransferProof {
+                receiver_pk: ElGamalPK::default(),
+                receiver_pending_balance: ElGamalCT::default(),
+                transfer_proof: TransferProof::Range(TransDataRangeProof::default()),
+            }
+            .pack_into_vec()
+            .len(),
+            99,
+        );
+        assert_eq!(
+            ConfidentialTokenInstruction::Transfer {
+                receiver_pk: ElGamalPK::default(),
+                receiver_transfer_split_amount: ElGamalSplitCT::default(),
+                transfer_audit: Some((ElGamalPK::default(), ElGamalSplitCT::default(), ())),
+            }
+            .pack_into_vec()
+            .len(),
+            194,
+        );
     }
 }
