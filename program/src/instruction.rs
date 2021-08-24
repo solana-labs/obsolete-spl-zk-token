@@ -47,8 +47,6 @@ pub enum ConfidentialTokenInstruction {
     ///   6. `[]` Rent sysvar (remove once https://github.com/solana-labs/solana-program-library/pull/2282 is deployed)
     ///   7. `[signer]` (optional) The SPL Token mint freeze authority, if not `None`
     ///
-    /// TODO: allow signer to be multisig
-    ///
     Configure {
         /// `transfer_auditor` must be `None` if the SPL Token mint has no freeze authority
         #[allow(dead_code)] // not dead code
@@ -107,9 +105,9 @@ pub enum ConfidentialTokenInstruction {
     ///   0. `[writable]` The CToken account to close
     ///   1. `[]` Corresponding SPL Token account
     ///   2. `[writable]` The destination account
-    ///   3. `[signer]` The single account close authority or owner
+    ///   3. `[signer]` The single account owner
     /// or:
-    ///   3. `[]` The multisig account close authority or owner
+    ///   3. `[]` The multisig account owner
     ///   4.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     CloseAccount {
