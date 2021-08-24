@@ -806,11 +806,11 @@ pub fn process_instruction(
         ConfidentialTokenInstruction::Transfer {
             receiver_pk,
             receiver_transfer_split_amount: _, /* TODO */
-            transfer_auditor_pk,
-            transfer_auditor_split_amount: _,        /* TODO */
-            crypto_auditor_amount_equality_proof: _, /* TODO */
+            transfer_audit,
         } => {
             msg!("Transfer");
+
+            // TODO: Ensure the proof in `transfer_audit` is valid
 
             // TODO: use `combine_u32_ciphertexts()`...
             /*
@@ -825,7 +825,7 @@ pub fn process_instruction(
                 accounts,
                 receiver_pk,
                 receiver_transfer_amount,
-                transfer_auditor_pk,
+                transfer_audit.map(|ta| ta.0),
             )
         }
         ConfidentialTokenInstruction::ApplyPendingBalance => {

@@ -31,10 +31,24 @@ impl Default for ElGamalCT {
     }
 }
 #[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
+pub struct ElGamalSplitCT {
+    data_high: [u8; 32],
+    data_low: [u8; 32],
+}
+impl Default for ElGamalSplitCT {
+    fn default() -> Self {
+        Self {
+            data_high: [0; 32],
+            data_low: [0; 32],
+        }
+    }
+}
+
+#[derive(Clone, Default, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
 pub struct TransDataCTValidity {
     crypto_stuff: bool,
 }
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
+#[derive(Clone, Default, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
 pub struct TransDataRangeProof {
     crypto_stuff: bool,
 }
