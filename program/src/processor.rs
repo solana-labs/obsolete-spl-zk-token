@@ -431,8 +431,18 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
     let owner_info = next_account_info(account_info_iter)?;
     let signers = account_info_iter.as_slice();
 
-    let (confidential_account, _token_account) =
+    let (confidential_account, token_account) =
         validate_confidential_account(confidential_account_info, token_account_info)?;
+
+    if token_account.is_frozen() {
+        msg!("Error: Account frozen");
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    if !confidential_account.accept_incoming_transfers {
+        msg!("Error: Incoming transfers are disabled");
+        return Err(ProgramError::InvalidArgument);
+    }
 
     // Ensure omnibus token account address derivation is correct
     if get_omnibus_token_address(&mint_info.key) != *omnibus_info.key {
@@ -485,12 +495,17 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
     let spl_token_program_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
-    let (confidential_account, _token_account) = validate_confidential_account_is_signer(
+    let (confidential_account, token_account) = validate_confidential_account_is_signer(
         confidential_account_info,
         token_account_info,
         owner_info,
         account_info_iter.as_slice(),
     )?;
+
+    if token_account.is_frozen() {
+        msg!("Error: Account frozen");
+        return Err(ProgramError::InvalidAccountData);
+    }
 
     // Ensure omnibus token account address derivation is correct
     let (omnibus_token_address, omnibus_token_bump_seed) =
@@ -645,7 +660,7 @@ fn process_transfer(
     }
 
     if !receiver_confidential_account.accept_incoming_transfers {
-        msg!("Error: Receiver has disabled incoming transfers");
+        msg!("Error: Incoming transfers are disabled");
         return Err(ProgramError::InvalidArgument);
     }
 

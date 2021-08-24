@@ -74,23 +74,22 @@ pub enum ConfidentialTokenInstruction {
 
     /// Create a confidential token account
     ///
-    /// this is a PDA, derived from the token mint and linked token account.  Ownership resides in
-    /// the linked token account. This instruction fails if the confidential token account already
-    /// exists.
+    /// This is a PDA, derived from the token mint and linked token account. Ownership is held in
+    /// the linked SPL Token account. The new account will be rent-exempt.
     ///
-    /// The instruction fails if the confidential token account already exists
+    /// The instruction fails if the confidential token account already exists.
     ///
     /// Accounts expected by this instruction:
     ///
-    ///   0. `[writeable,signer]` Funding account (must be a system account)
+    ///   0. `[writeable,signer]` Funding account for rent (must be a system account)
     ///   1. `[writable]` The new confidential token account to create, as computed by `get_confidential_token_address()`
     ///   2. `[]` Corresponding SPL Token account
     ///   3. `[]` System program
-    ///   5. `[]` Rent sysvar (remove once https://github.com/solana-labs/solana-program-library/pull/2282 is deployed)
-    ///   6. `[signer]` The single source account owner
+    ///   4. `[]` Rent sysvar (remove once https://github.com/solana-labs/solana-program-library/pull/2282 is deployed)
+    ///   5. `[signer]` The single source account owner
     /// or:
-    ///   6. `[]` The multisig source account owner
-    ///   7.. `[signer]` Required M signer accounts for the SPL Token Multisig account
+    ///   5. `[]` The multisig source account owner
+    ///   6.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     CreateAccount {
         /// The public key associated with the account
@@ -98,9 +97,9 @@ pub enum ConfidentialTokenInstruction {
         elgaml_pk: ElGamalPK,
     },
 
-    /// Close a confidential token account by transferring all its SOL to the destination account.
-    /// The account must not hold any confidential tokens in its pending or available balances.
-    /// Use `DisableInboundTransfers` to block inbound transfers first if necessary.
+    /// Close a confidential token account by transferring all lamports it holds to the destination
+    /// account. The account must not hold any confidential tokens in its pending or available
+    /// balances. Use `DisableInboundTransfers` to block inbound transfers first if necessary.
     ///
     ///   0. `[writable]` The CToken account to close
     ///   1. `[]` Corresponding SPL Token account
@@ -116,13 +115,13 @@ pub enum ConfidentialTokenInstruction {
         crypto_empty_balance_proof: (),
     },
 
-    /// Updates the confidential token account's ElGamal public key. This instruction will fail the
-    /// pending balance is not empty.
+    /// Update the confidential token account's ElGamal public key.
     ///
-    /// As such in a separate transaction it's suggested to execute the `DisableInboundTransfers`
-    /// and `ApplyPendingBalance` instructions first.  Once `UpdatePublicKey` is successfully,
-    /// execute `EnableInboundTransfers` to re-enable inbouard transfers (which could be in the
-    /// same transaction as `UpdatePublicKey`)
+    /// This instruction will fail the pending balance is not empty, so invoking
+    /// `ApplyPendingBalance` first is recommended.
+    ///
+    /// If the account is heavily used, consider invoking `DisableInboundTransfers` in a separate
+    /// transaction first to avoid new inbound transfers from causing this instruction to fail.
     ///
     /// Accounts expected by this instruction:
     ///
@@ -184,8 +183,7 @@ pub enum ConfidentialTokenInstruction {
 
     /// Withdraw SPL Tokens from the available balance of a confidential token account.
     ///
-    /// Fails if the source or destination accounts are frozen, and will implicitly cancel a
-    /// pending outbound transfer from the source account if present.
+    /// Fails if the source or destination accounts are frozen.
     ///
     /// Accounts expected by this instruction:
     ///
@@ -212,8 +210,8 @@ pub enum ConfidentialTokenInstruction {
         crypto_sufficient_balance_proof: (),
     },
 
-    /// Submits a transfer proof. The two proof submissions required before the `Transfer`
-    /// instruction will succeed are:
+    /// Submits a confidential transfer proof. The two proof submissions required before the
+    /// `Transfer` instruction will succeed are:
     /// * `TransferProof::CiphertextValidity`
     /// * `TransferProof::Range`
     ///
@@ -243,11 +241,11 @@ pub enum ConfidentialTokenInstruction {
     /// instruction to succeed.
     ///
     /// A transfer will fail if:
-    /// * Either the source or the destination is frozen by the Token Mint's freeze authority
+    /// * Either the source or the destination is frozen
     /// * The destination has disabled incoming transfers by invoking `DisableInboundTransfers`
-    /// * The destination received a transfer from another source that invalidates the previously
-    ///   submitted transfer proofs
-    /// * All prerequisite `TransferProof`s have not been submitted
+    /// * Prerequisite `TransferProof`s have not been submitted
+    /// * The destination received a transfer from another source causing the previously
+    ///   submitted transfer proofs for this transfer to be invalidated
     ///
     ///   0. `[writable]` The source confidential token account
     ///   1. `[]` The source's corresponding SPL Token account
@@ -282,8 +280,7 @@ pub enum ConfidentialTokenInstruction {
         )>,
     },
 
-    /// Applies the pending balance to the available balance then clears the pending balance from a
-    /// confidential token account.
+    /// Applies the pending balance to the available balance then clears the pending balance.
     ///
     /// Account expected by this instruction:
     ///
