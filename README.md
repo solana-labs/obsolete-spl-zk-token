@@ -95,4 +95,4 @@ race during a transfer to the same recipient. In this case, one of the senders
 will lose the race and will need to retry the entire transfer sequence. This
 condition will be reported via a specific program error code.
 
-Confidential transfers are not be supported as cross-program invocations.
+Confidential transfers are not supported in cross-program invocations.
