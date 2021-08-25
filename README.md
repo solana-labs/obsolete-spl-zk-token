@@ -12,11 +12,11 @@ to confidential token accounts.
 
 ### Enabling confidential transfers for an SPL Token mint
 Before a confidential transfers may be used on a given SPL Token, the
-`ConfidentialTokenInstruction::Configure` instruction must be executed.
+`ConfidentialTokenInstruction::ConfigureMint` instruction must be executed.
 Depending on the configuration of the SPL Token, this instruction may either be
 permissionless or require the Mint's freeze authority to sign.
 
-`ConfidentialTokenInstruction::Configure` notably creates the single omnibus
+`ConfidentialTokenInstruction::ConfigureMint` notably creates the single omnibus
 token account used to store all SPL Tokens deposited into the confidential token
 accounts.
 

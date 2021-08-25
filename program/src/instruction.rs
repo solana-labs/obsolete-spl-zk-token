@@ -4,12 +4,12 @@ use {
     crate::*,
     borsh::{BorshDeserialize, BorshSchema, BorshSerialize},
     solana_program::{
-        //instruction::{AccountMeta, Instruction},
+        instruction::{AccountMeta, Instruction},
         msg,
         program_error::ProgramError,
         program_pack::{Pack, Sealed},
-        //pubkey::Pubkey,
-        //sysvar,
+        pubkey::Pubkey,
+        sysvar,
     },
 };
 
@@ -47,7 +47,7 @@ pub enum ConfidentialTokenInstruction {
     ///   6. `[]` Rent sysvar (remove once https://github.com/solana-labs/solana-program-library/pull/2282 is deployed)
     ///   7. `[signer]` (optional) The SPL Token mint freeze authority, if not `None`
     ///
-    Configure {
+    ConfigureMint {
         /// `transfer_auditor` must be `None` if the SPL Token mint has no freeze authority
         #[allow(dead_code)] // not dead code
         transfer_auditor_pk: Option<ElGamalPK>,
@@ -341,6 +341,39 @@ impl Pack for ConfidentialTokenInstruction {
 impl ConfidentialTokenInstruction {
     fn pack_into_vec(&self) -> Vec<u8> {
         self.try_to_vec().expect("try_to_vec")
+    }
+}
+
+/// Create a `ConfidentialTokenInstruction::ConfigureMint` instruction
+pub fn configure_mint(
+    funding_address: Pubkey,
+    token_mint_address: Pubkey,
+    transfer_auditor_pk: Option<ElGamalPK>,
+    freeze_authority: Option<Pubkey>,
+) -> Instruction {
+    let omnibus_token_address = get_omnibus_token_address(&token_mint_address);
+    let transfer_auditor_address = get_transfer_auditor_address(&token_mint_address);
+
+    let mut accounts = vec![
+        AccountMeta::new(funding_address, true),
+        AccountMeta::new_readonly(token_mint_address, false),
+        AccountMeta::new(omnibus_token_address, false),
+        AccountMeta::new(transfer_auditor_address, false),
+        AccountMeta::new_readonly(solana_program::system_program::id(), false),
+        AccountMeta::new_readonly(spl_token::id(), false),
+        AccountMeta::new_readonly(sysvar::rent::id(), false),
+    ];
+    if let Some(freeze_authority) = freeze_authority {
+        accounts.push(AccountMeta::new(freeze_authority, true))
+    }
+
+    Instruction {
+        program_id: id(),
+        accounts,
+        data: ConfidentialTokenInstruction::ConfigureMint {
+            transfer_auditor_pk,
+        }
+        .pack_into_vec(),
     }
 }
 
