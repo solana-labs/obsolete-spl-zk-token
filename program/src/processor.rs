@@ -34,7 +34,7 @@ fn validate_spl_token_owner(
 }
 
 fn validate_account_owner(account_info: &AccountInfo, owner: &Pubkey) -> ProgramResult {
-    if account_info.key == owner {
+    if account_info.owner == owner {
         Ok(())
     } else {
         Err(ProgramError::InvalidArgument)
@@ -129,8 +129,8 @@ fn create_pda_account<'a>(
     )
 }
 
-/// Processes an [Configure] instruction.
-fn process_configure(
+/// Processes an [ConfigureMint] instruction.
+fn process_configure_mint(
     accounts: &[AccountInfo],
     transfer_auditor_pk: Option<ElGamalPK>,
 ) -> ProgramResult {
@@ -171,6 +171,7 @@ fn process_configure(
     // Ensure omnibus token account address derivation is correct
     let (omnibus_token_address, omnibus_token_bump_seed) =
         get_omnibus_token_address_with_seed(&mint_info.key);
+
     if omnibus_token_address != *omnibus_info.key {
         msg!("Error: Omnibus token address does not match seed derivation");
         return Err(ProgramError::InvalidSeeds);
@@ -185,8 +186,8 @@ fn process_configure(
     // Ensure transfer auditor account address derivation is correct
     let (transfer_auditor_address, transfer_auditor_bump_seed) =
         get_transfer_auditor_address_with_seed(&mint_info.key);
-    if transfer_auditor_address != *omnibus_info.key {
-        msg!("Error: Omnibus token address does not match seed derivation");
+    if transfer_auditor_address != *transfer_auditor_info.key {
+        msg!("Error: Transfer auditor address does not match seed derivation");
         return Err(ProgramError::InvalidSeeds);
     }
 
@@ -751,11 +752,11 @@ pub fn process_instruction(
     input: &[u8],
 ) -> ProgramResult {
     match ConfidentialTokenInstruction::unpack_from_slice(input)? {
-        ConfidentialTokenInstruction::Configure {
+        ConfidentialTokenInstruction::ConfigureMint {
             transfer_auditor_pk,
         } => {
-            msg!("Configure");
-            process_configure(accounts, transfer_auditor_pk)
+            msg!("ConfigureMint");
+            process_configure_mint(accounts, transfer_auditor_pk)
         }
         ConfidentialTokenInstruction::UpdateTransferAuditor {
             new_transfer_auditor_pk,
