@@ -1,18 +1,19 @@
 //#![deny(missing_docs)]
 #![forbid(unsafe_code)]
 
-use {
-    borsh::{BorshDeserialize, BorshSchema, BorshSerialize},
-    solana_program::pubkey::Pubkey,
-};
+use {solana_program::pubkey::Pubkey, zeroable::Zeroable};
+#[macro_use]
+extern crate bytemuck_derive;
 
 mod entrypoint;
 pub mod instruction;
+pub mod pod;
 pub mod processor;
 pub mod state;
 
 // ==== crypto placeholders ====
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
+#[derive(Clone, Copy, Debug, Pod, Zeroable, PartialEq)]
+#[repr(C)]
 pub struct ElGamalPK {
     data: [u8; 32],
 }
@@ -21,7 +22,8 @@ impl Default for ElGamalPK {
         Self { data: [0; 32] }
     }
 }
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
+#[derive(Clone, Copy, Debug, Pod, Zeroable, PartialEq)]
+#[repr(C)]
 pub struct ElGamalCT {
     data: [u8; 64],
 }
@@ -30,7 +32,8 @@ impl Default for ElGamalCT {
         Self { data: [0; 64] }
     }
 }
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
+#[derive(Clone, Copy, Debug, Pod, Zeroable, PartialEq)]
+#[repr(C)]
 pub struct ElGamalSplitCT {
     data_high: [u8; 32],
     data_low: [u8; 32],
@@ -44,15 +47,17 @@ impl Default for ElGamalSplitCT {
     }
 }
 
-#[derive(Clone, Default, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct TransDataCTValidity {
-    crypto_stuff: bool,
+    crypto_stuff: [u8; 512], // TODO
 }
-#[derive(Clone, Default, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct TransDataRangeProof {
-    crypto_stuff: bool,
+    crypto_stuff: [u8; 512], // TODO
 }
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct UpdateEncKeyData {
     crypto_stuff: bool,
 }

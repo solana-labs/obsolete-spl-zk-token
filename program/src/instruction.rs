@@ -1,27 +1,133 @@
 //! Program instructions
 
 use {
-    crate::*,
-    borsh::{BorshDeserialize, BorshSchema, BorshSerialize},
+    crate::{pod::*, *},
+    bytemuck::Pod,
+    num_derive::{FromPrimitive, ToPrimitive},
+    num_traits::{FromPrimitive, ToPrimitive},
     solana_program::{
         instruction::{AccountMeta, Instruction},
-        msg,
         program_error::ProgramError,
-        program_pack::{Pack, Sealed},
         pubkey::Pubkey,
         sysvar,
     },
+    zeroable::Zeroable,
 };
 
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
-pub enum TransferProof {
-    CiphertextValidity(TransDataCTValidity),
-    Range(TransDataRangeProof),
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(transparent)]
+pub struct ConfigureMintInstructionData {
+    /// The `transfer_auditor` public key.
+    pub transfer_auditor_pk: ElGamalPK,
 }
 
-/// Instructions supported by the Feature Proposal program
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema, PartialEq)]
-#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(transparent)]
+pub struct UpdateTransferAuditorInstructionData {
+    /// The new `transfer_auditor` public key.
+    pub new_transfer_auditor_pk: ElGamalPK,
+}
+
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(transparent)]
+pub struct CreateAccountInstructionData {
+    /// The public key associated with the account
+    pub elgaml_pk: ElGamalPK,
+}
+
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub struct CloseAccountInstructionData {
+    // TODO: Proof that the encrypted balance is 0
+    pub crypto_zero_balance_proof: [u8; 256],
+}
+
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub struct UpdateAccountPkInstructionData {
+    pub elgaml_pk: ElGamalPK,
+    pub pending_balance: ElGamalCT,
+    pub available_balance: ElGamalCT,
+
+    pub new_elgaml_pk: ElGamalPK,
+    pub new_pending_balance: ElGamalCT,
+    pub new_available_balance: ElGamalCT,
+
+    /// TODO: Proof that the encrypted balances are equivalent
+    pub crypto_balance_equality_proof: [u8; 256],
+}
+
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub struct DepositInstructionData {
+    /// The amount of tokens to deposit
+    pub amount: PodU64,
+    /// Expected number of base 10 digits to the right of the decimal place.
+    pub decimals: u8,
+}
+
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub struct WithdrawInstructionData {
+    /// The amount of tokens to withdraw
+    pub amount: PodU64,
+    /// Expected number of base 10 digits to the right of the decimal place.
+    pub decimals: u8,
+    // TODO: Proof that the encrypted balance is >= `amount`
+    pub crypto_sufficient_balance_proof: [u8; 256],
+}
+
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub struct SubmitCiphertextValidityProofInstructionData {
+    /// The receiver's ElGamal public key
+    pub receiver_pk: ElGamalPK,
+
+    /// The receiver's pending balance, encrypted with `receiver_pk`
+    pub receiver_pending_balance: ElGamalCT,
+
+    pub proof: TransDataCTValidity,
+}
+
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub struct SubmitRangeProofInstructionData {
+    /// The receiver's ElGamal public key
+    pub receiver_pk: ElGamalPK,
+
+    /// The receiver's pending balance, encrypted with `receiver_pk`
+    pub receiver_pending_balance: ElGamalCT,
+
+    pub proof: TransDataRangeProof,
+}
+
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub struct TransferInstructionData {
+    /// Receiver's encryption key
+    pub receiver_pk: ElGamalPK,
+
+    /// Transfer amount split into two 32 values and encrypted so only the receiver can view it
+    pub receiver_transfer_split_amount: ElGamalSplitCT,
+}
+
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub struct TransferWithAuditorInstructionData {
+    pub transfer_data: TransferInstructionData,
+
+    /// Transfer Auditor's encryption key
+    pub transfer_auditor_pk: ElGamalPK,
+
+    /// Transfer amount split into two 32 values and encrypted so only the transfer auditor can view it
+    pub transfer_auditor_split_amount: ElGamalSplitCT,
+
+    /// TODO: Proof that `transfer_auditor_split_amount` is equal to `receiver_transfer_split_amount`
+    pub crypto_auditor_amount_equality_proof: (),
+}
+
+#[derive(Clone, Copy, Debug, Zeroable, FromPrimitive, ToPrimitive)]
+#[repr(u8)]
 pub enum ConfidentialTokenInstruction {
     /// Configures confidential transfers for a given SPL Token mint
     ///
@@ -31,13 +137,13 @@ pub enum ConfidentialTokenInstruction {
     /// * Creates the TransferAuditor account.
     ///
     /// If the SPL Token has a freeze authority configured, the freeze authority must be a signer
-    /// and a transfer auditor may be optionally configured.
-    /// Otherwise this instruction requires no signers, and a transfer auditor is cannot be
-    /// configured.
+    /// and a transfer auditor may be optionally configured.  Otherwise this instruction requires
+    /// no signers, and a transfer auditor is cannot be configured.
     ///
     /// The instruction fails if the confidential transfers are already configured for the mint.
     ///
     /// Accounts expected by this instruction:
+    ///
     ///   0. `[writeable,signer]` Funding account (must be a system account)
     ///   1. `[]` The SPL Token mint account to enable confidential transfers on
     ///   2. `[writable]` The omnibus SPL Token account to create, computed by `get_omnibus_token_address()`
@@ -47,11 +153,12 @@ pub enum ConfidentialTokenInstruction {
     ///   6. `[]` Rent sysvar (remove once https://github.com/solana-labs/solana-program-library/pull/2282 is deployed)
     ///   7. `[signer]` (optional) The SPL Token mint freeze authority, if not `None`
     ///
-    ConfigureMint {
-        /// `transfer_auditor` must be `None` if the SPL Token mint has no freeze authority
-        #[allow(dead_code)] // not dead code
-        transfer_auditor_pk: Option<ElGamalPK>,
-    },
+    //
+    /// Data expected by this instruction:
+    ///   `ConfigureMintInstructionData` (optional) if not provided then the transfer auditor is
+    ///   permanently disabled for this SPL Token mint
+    ///
+    ConfigureMint,
 
     /// Updates the transfer auditor ElGamal public key.
     /// This instruction fails if a transfer auditor is currently `None` for this Token mint.
@@ -65,12 +172,11 @@ pub enum ConfidentialTokenInstruction {
     ///   2. `[]` The multisig SPL Token freeze authority.
     ///   3.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
-    UpdateTransferAuditor {
-        /// The new `transfer_auditor` public key. Use `None` to disable the transfer auditor
-        /// feature.
-        #[allow(dead_code)] // not dead code
-        new_transfer_auditor_pk: Option<ElGamalPK>,
-    },
+    /// Data expected by this instruction:
+    ///   `UpdateTransferAuditorInstructionData` (optional) if not provided then the transfer auditor is
+    ///   permanently disabled for this SPL Token mint
+    ///
+    UpdateTransferAuditor,
 
     /// Create a confidential token account
     ///
@@ -91,11 +197,10 @@ pub enum ConfidentialTokenInstruction {
     ///   5. `[]` The multisig source account owner
     ///   6.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
-    CreateAccount {
-        /// The public key associated with the account
-        #[allow(dead_code)] // not dead code
-        elgaml_pk: ElGamalPK,
-    },
+    /// Data expected by this instruction:
+    ///   `CreateAccountInstructionData`
+    ///
+    CreateAccount,
 
     /// Close a confidential token account by transferring all lamports it holds to the destination
     /// account. The account must not hold any confidential tokens in its pending or available
@@ -109,11 +214,10 @@ pub enum ConfidentialTokenInstruction {
     ///   3. `[]` The multisig account owner
     ///   4.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
-    CloseAccount {
-        /// TODO: Proof that the encrypted balance is 0
-        #[allow(dead_code)] // not dead code
-        crypto_empty_balance_proof: (),
-    },
+    /// Data expected by this instruction:
+    ///   `CloseAccountInstructionData`
+    ///
+    CloseAccount,
 
     /// Update the confidential token account's ElGamal public key.
     ///
@@ -132,25 +236,10 @@ pub enum ConfidentialTokenInstruction {
     ///   2. `[]` The multisig account owner
     ///   3.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
-    UpdateAccountPk {
-        #[allow(dead_code)] // not dead code
-        elgaml_pk: ElGamalPK,
-        #[allow(dead_code)] // not dead code
-        pending_balance: ElGamalCT,
-        #[allow(dead_code)] // not dead code
-        available_balance: ElGamalCT,
-
-        #[allow(dead_code)] // not dead code
-        new_elgaml_pk: ElGamalPK,
-        #[allow(dead_code)] // not dead code
-        new_pending_balance: ElGamalCT,
-        #[allow(dead_code)] // not dead code
-        new_available_balance: ElGamalCT,
-
-        /// TODO: Proof that the encrypted balances are equivalent
-        #[allow(dead_code)] // not dead code
-        crypto_balance_equality_proof: (),
-    },
+    /// Data expected by this instruction:
+    ///   `UpdateAccountPkInstructionData`
+    ///
+    UpdateAccountPk,
 
     /// Deposit SPL Tokens into the pending balance of a confidential token account.
     ///
@@ -172,14 +261,10 @@ pub enum ConfidentialTokenInstruction {
     ///   6. `[]` The multisig source account owner or delegate.
     ///   7.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
-    Deposit {
-        /// The amount of tokens to deposit.
-        #[allow(dead_code)] // not dead code
-        amount: u64,
-        /// Expected number of base 10 digits to the right of the decimal place.
-        #[allow(dead_code)] // not dead code
-        decimals: u8,
-    },
+    /// Data expected by this instruction:
+    ///   `DepositInstructionData`
+    ///
+    Deposit,
 
     /// Withdraw SPL Tokens from the available balance of a confidential token account.
     ///
@@ -198,22 +283,13 @@ pub enum ConfidentialTokenInstruction {
     ///   6. `[]` The multisig  source account owner
     ///   7.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
-    Withdraw {
-        /// The amount of tokens to withdraw.
-        #[allow(dead_code)] // not dead code
-        amount: u64,
-        /// Expected number of base 10 digits to the right of the decimal place.
-        #[allow(dead_code)] // not dead code
-        decimals: u8,
-        /// TODO: Proof that the encrypted balance is >= `amount`
-        #[allow(dead_code)] // not dead code
-        crypto_sufficient_balance_proof: (),
-    },
+    /// Data expected by this instruction:
+    ///   `WithdrawInstructionData`
+    ///
+    Withdraw,
 
-    /// Submits a confidential transfer proof. The two proof submissions required before the
-    /// `Transfer` instruction will succeed are:
-    /// * `TransferProof::CiphertextValidity`
-    /// * `TransferProof::Range`
+    /// Submits a confidential transfer ciphertext validity proof. The two proof submissions required before the
+    /// `Transfer` instruction will succeed are `SubmitCiphertextValidityProof` and `SubmitRangeProof`.
     ///
     ///   0. `[writable]` The source confidential token account
     ///   1. `[]` The source's corresponding SPL Token account
@@ -223,27 +299,35 @@ pub enum ConfidentialTokenInstruction {
     ///   3. `[]` The multisig  source account owner
     ///   4.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
-    SubmitTransferProof {
-        /// The receiver's ElGamal public key
-        #[allow(dead_code)] // not dead code
-        receiver_pk: ElGamalPK,
+    /// Data expected by this instruction:
+    ///   `SubmitCiphertextValidityProofInstructionData`
+    ///
+    SubmitCiphertextValidityProof,
 
-        /// The receiver's pending balance, encrypted with `receiver_pk`
-        #[allow(dead_code)] // not dead code
-        receiver_pending_balance: ElGamalCT,
-
-        #[allow(dead_code)] // not dead code
-        transfer_proof: TransferProof,
-    },
+    /// Submits a confidential transfer range proof. The two proof submissions required before the
+    /// `Transfer` instruction will succeed are `SubmitCiphertextValidityProof` and `SubmitRangeProof`.
+    ///
+    ///   0. `[writable]` The source confidential token account
+    ///   1. `[]` The source's corresponding SPL Token account
+    ///   2. `[]` The destination confidential token account
+    ///   3. `[signer]` The single source account owner
+    /// or:
+    ///   3. `[]` The multisig  source account owner
+    ///   4.. `[signer]` Required M signer accounts for the SPL Token Multisig account
+    ///
+    /// Data expected by this instruction:
+    ///   `SubmitRangeProofInstructionData
+    ///
+    SubmitRangeProof,
 
     /// Transfers tokens confidentially from one account to another. The prerequisite transfer
-    /// proofs must have already been successfully submitted using `SubmitTransferProof` for this
-    /// instruction to succeed.
+    /// proofs must have already been successfully submitted using `SubmitCiphertextValidityProof`
+    /// and `SubmitRangeProof` for this instruction to succeed.
     ///
     /// A transfer will fail if:
     /// * Either the source or the destination is frozen
     /// * The destination has disabled incoming transfers by invoking `DisableInboundTransfers`
-    /// * Prerequisite `TransferProof`s have not been submitted
+    /// * Prerequisite proofs have not been submitted
     /// * The destination received a transfer from another source causing the previously
     ///   submitted transfer proofs for this transfer to be invalidated
     ///
@@ -258,27 +342,11 @@ pub enum ConfidentialTokenInstruction {
     /// instruction data and the status of the encompassing transaction (that is, access to
     /// on-chain account data is not required).
     ///
-    Transfer {
-        /// Receiver's encryption key
-        #[allow(dead_code)] // not dead code
-        receiver_pk: ElGamalPK,
-
-        /// Transfer amount split into two 32 values and encrypted so only the receiver can view it
-        #[allow(dead_code)] // not dead code
-        receiver_transfer_split_amount: ElGamalSplitCT,
-
-        /// If a transfer auditor is installed then the transfer must include:
-        /// 1. Transfer auditor's: encryption key
-        /// 2. Transfer amount encrypted and split into two 32 values so only the optional transfer
-        ///    auditor can view it
-        /// 3. TODO: Proof that the previous transfer amount is equal to `receiver_transfer_split_amount`
-        #[allow(dead_code)] // not dead code
-        transfer_audit: Option<(
-            ElGamalPK,
-            ElGamalSplitCT,
-            /*crypto_auditor_amount_equality_proof*/ (),
-        )>,
-    },
+    /// Data expected by this instruction:
+    ///   `TransferInstructionData` or `TransferWithAuditorInstructionData` depending on whether
+    ///   the transfer auditor feature is enabled for the SPL Token mint
+    ///
+    Transfer,
 
     /// Applies the pending balance to the available balance then clears the pending balance.
     ///
@@ -290,6 +358,9 @@ pub enum ConfidentialTokenInstruction {
     /// or:
     ///   2. `[]` The multisig account owner
     ///   3.. `[signer]` Required M signer accounts for the SPL Token Multisig account
+    ///
+    /// Data expected by this instruction:
+    ///   None
     ///
     ApplyPendingBalance,
 
@@ -304,6 +375,9 @@ pub enum ConfidentialTokenInstruction {
     ///   2. `[]` The multisig account owner
     ///   3.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
+    /// Data expected by this instruction:
+    ///   None
+    ///
     DisableInboundTransfers,
 
     /// Enable incoming transfers for a confidential token account.
@@ -317,39 +391,58 @@ pub enum ConfidentialTokenInstruction {
     ///   2. `[]` The multisig account owner
     ///   3.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
+    /// Data expected by this instruction:
+    ///   None
+    ///
     EnableInboundTransfers,
 }
 
-impl Sealed for ConfidentialTokenInstruction {}
-impl Pack for ConfidentialTokenInstruction {
-    const LEN: usize = 321; // see `test_get_packed_len()`
-
-    fn pack_into_slice(&self, dst: &mut [u8]) {
-        let data = self.pack_into_vec();
-        dst[..data.len()].copy_from_slice(&data);
-    }
-
-    fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
-        let mut mut_src: &[u8] = src;
-        Self::deserialize(&mut mut_src).map_err(|err| {
-            msg!("Error: failed to deserialize instruction: {}", err);
-            ProgramError::InvalidInstructionData
-        })
+pub(crate) fn decode_instruction_type(
+    input: &[u8],
+) -> Result<ConfidentialTokenInstruction, ProgramError> {
+    if input.is_empty() {
+        Err(ProgramError::InvalidInstructionData)
+    } else {
+        FromPrimitive::from_u8(input[0]).ok_or(ProgramError::InvalidInstructionData)
     }
 }
 
-impl ConfidentialTokenInstruction {
-    fn pack_into_vec(&self) -> Vec<u8> {
-        self.try_to_vec().expect("try_to_vec")
+pub(crate) fn decode_instruction_data<T: Pod>(input: &[u8]) -> Result<&T, ProgramError> {
+    if input.is_empty() {
+        Err(ProgramError::InvalidInstructionData)
+    } else {
+        pod_from_bytes(&input[1..])
     }
 }
 
-/// Create a `ConfidentialTokenInstruction::ConfigureMint` instruction
-pub fn configure_mint(
+pub(crate) fn decode_optional_instruction_data<T: Pod>(
+    input: &[u8],
+) -> Result<Option<&T>, ProgramError> {
+    if input.is_empty() {
+        Err(ProgramError::InvalidInstructionData)
+    } else {
+        pod_maybe_from_bytes(&input[1..])
+    }
+}
+
+pub(crate) fn encode_instruction<T: Pod>(
+    accounts: Vec<AccountMeta>,
+    instruction_type: ConfidentialTokenInstruction,
+    instruction_data: &T,
+) -> Instruction {
+    let mut data = vec![ToPrimitive::to_u8(&instruction_type).unwrap()];
+    data.extend_from_slice(pod_bytes_of(instruction_data));
+    Instruction {
+        program_id: id(),
+        accounts,
+        data,
+    }
+}
+
+fn _configure_mint(
     funding_address: Pubkey,
     token_mint_address: Pubkey,
-    transfer_auditor_pk: Option<ElGamalPK>,
-    freeze_authority: Option<Pubkey>,
+    transfer_auditor_pk_and_freeze_authority: Option<(ElGamalPK, Pubkey)>,
 ) -> Instruction {
     let omnibus_token_address = get_omnibus_token_address(&token_mint_address);
     let transfer_auditor_address = get_transfer_auditor_address(&token_mint_address);
@@ -363,24 +456,45 @@ pub fn configure_mint(
         AccountMeta::new_readonly(spl_token::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
     ];
-    if let Some(freeze_authority) = freeze_authority {
-        accounts.push(AccountMeta::new(freeze_authority, true))
-    }
 
-    Instruction {
-        program_id: id(),
-        accounts,
-        data: ConfidentialTokenInstruction::ConfigureMint {
-            transfer_auditor_pk,
-        }
-        .pack_into_vec(),
+    if let Some((transfer_auditor_pk, freeze_authority)) = transfer_auditor_pk_and_freeze_authority
+    {
+        accounts.push(AccountMeta::new(freeze_authority, true));
+        encode_instruction(
+            accounts,
+            ConfidentialTokenInstruction::ConfigureMint,
+            &ConfigureMintInstructionData {
+                transfer_auditor_pk,
+            },
+        )
+    } else {
+        encode_instruction(accounts, ConfidentialTokenInstruction::ConfigureMint, &())
     }
+}
+
+/// Create a `ConfidentialTokenInstruction::ConfigureMint` instruction
+pub fn configure_mint(funding_address: Pubkey, token_mint_address: Pubkey) -> Instruction {
+    _configure_mint(funding_address, token_mint_address, None)
+}
+
+/// Create a `ConfidentialTokenInstruction::ConfigureMint` instruction with a transfer auditor
+pub fn configure_mint_with_transfer_auditor(
+    funding_address: Pubkey,
+    token_mint_address: Pubkey,
+    transfer_auditor_pk: ElGamalPK,
+    freeze_authority: Pubkey,
+) -> Instruction {
+    _configure_mint(
+        funding_address,
+        token_mint_address,
+        Some((transfer_auditor_pk, freeze_authority)),
+    )
 }
 
 #[cfg(test)]
 mod tests {
+    /*
     use super::*;
-
     #[test]
     fn test_get_packed_len() {
         assert_eq!(
@@ -422,4 +536,5 @@ mod tests {
             194,
         );
     }
+    */
 }
