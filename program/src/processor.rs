@@ -1,7 +1,7 @@
 //! Program state processor
 
 use {
-    crate::{instruction::*, state::*, *},
+    crate::{instruction::*, pod::*, state::*, *},
     solana_program::{
         account_info::{next_account_info, AccountInfo},
         entrypoint::ProgramResult,
@@ -41,54 +41,74 @@ fn validate_account_owner(account_info: &AccountInfo, owner: &Pubkey) -> Program
     }
 }
 
-fn validate_confidential_account(
-    confidential_account_info: &AccountInfo,
+fn _validate_confidential_account<'a, 'b>(
+    confidential_account_info: &'a AccountInfo<'b>,
     token_account_info: &AccountInfo,
-) -> Result<(ConfidentialAccount, spl_token::state::Account), ProgramError> {
+    is_signer: Option<(
+        /*owner_info:*/ &AccountInfo,
+        /*signers:*/ &[AccountInfo],
+    )>,
+) -> Result<
+    (
+        PodAccountInfoData<'a, 'b, ConfidentialAccount>,
+        spl_token::state::Account,
+    ),
+    ProgramError,
+> {
     validate_account_owner(token_account_info, &spl_token::id())?;
-    validate_account_owner(confidential_account_info, &id())?;
-
     let token_account = spl_token::state::Account::unpack(&token_account_info.data.borrow())?;
-    let confidential_account =
-        ConfidentialAccount::unpack_from_slice(&confidential_account_info.data.borrow())?;
+    if let Some((owner_info, signers)) = is_signer {
+        validate_spl_token_owner(&token_account.owner, owner_info, signers)?;
+    }
 
-    if confidential_account.mint != token_account.mint {
+    let confidential_account =
+        ConfidentialAccount::from_account_info(confidential_account_info, &id())?;
+
+    if !confidential_account.mint.equals(&token_account.mint) {
         msg!("Mint mismatch");
         return Err(ProgramError::InvalidArgument);
     }
 
-    if confidential_account.token_account != *token_account_info.key {
+    if !confidential_account
+        .token_account
+        .equals(token_account_info.key)
+    {
         msg!("Token account mismatch");
         return Err(ProgramError::InvalidArgument);
     }
     Ok((confidential_account, token_account))
 }
 
-fn validate_confidential_account_is_signer(
-    confidential_account_info: &AccountInfo,
+fn validate_confidential_account<'a, 'b>(
+    confidential_account_info: &'a AccountInfo<'b>,
+    token_account_info: &AccountInfo,
+) -> Result<
+    (
+        PodAccountInfoData<'a, 'b, ConfidentialAccount>,
+        spl_token::state::Account,
+    ),
+    ProgramError,
+> {
+    _validate_confidential_account(confidential_account_info, token_account_info, None)
+}
+
+fn validate_confidential_account_is_signer<'a, 'b>(
+    confidential_account_info: &'a AccountInfo<'b>,
     token_account_info: &AccountInfo,
     owner_info: &AccountInfo,
     signers: &[AccountInfo],
-) -> Result<(ConfidentialAccount, spl_token::state::Account), ProgramError> {
-    validate_account_owner(token_account_info, &spl_token::id())?;
-    validate_account_owner(confidential_account_info, &id())?;
-
-    let token_account = spl_token::state::Account::unpack(&token_account_info.data.borrow())?;
-    validate_spl_token_owner(&token_account.owner, owner_info, signers)?;
-
-    let confidential_account =
-        ConfidentialAccount::unpack_from_slice(&confidential_account_info.data.borrow())?;
-
-    if confidential_account.mint != token_account.mint {
-        msg!("Mint mismatch");
-        return Err(ProgramError::InvalidArgument);
-    }
-
-    if confidential_account.token_account != *token_account_info.key {
-        msg!("Token account mismatch");
-        return Err(ProgramError::InvalidArgument);
-    }
-    Ok((confidential_account, token_account))
+) -> Result<
+    (
+        PodAccountInfoData<'a, 'b, ConfidentialAccount>,
+        spl_token::state::Account,
+    ),
+    ProgramError,
+> {
+    _validate_confidential_account(
+        confidential_account_info,
+        token_account_info,
+        Some((owner_info, signers)),
+    )
 }
 
 fn create_pda_account<'a>(
@@ -100,39 +120,57 @@ fn create_pda_account<'a>(
     new_pda_account: &AccountInfo<'a>,
     new_pda_signer_seeds: &[&[u8]],
 ) -> ProgramResult {
-    let required_lamports = rent
-        .minimum_balance(space)
-        .max(1)
-        .saturating_sub(new_pda_account.lamports());
+    if new_pda_account.lamports() > 0 {
+        let required_lamports = rent
+            .minimum_balance(space)
+            .max(1)
+            .saturating_sub(new_pda_account.lamports());
 
-    if required_lamports > 0 {
-        invoke(
-            &system_instruction::transfer(funder.key, new_pda_account.key, required_lamports),
+        if required_lamports > 0 {
+            invoke(
+                &system_instruction::transfer(funder.key, new_pda_account.key, required_lamports),
+                &[
+                    funder.clone(),
+                    new_pda_account.clone(),
+                    system_program.clone(),
+                ],
+            )?;
+        }
+
+        invoke_signed(
+            &system_instruction::allocate(new_pda_account.key, space as u64),
+            &[new_pda_account.clone(), system_program.clone()],
+            &[new_pda_signer_seeds],
+        )?;
+
+        invoke_signed(
+            &system_instruction::assign(new_pda_account.key, owner),
+            &[new_pda_account.clone(), system_program.clone()],
+            &[new_pda_signer_seeds],
+        )
+    } else {
+        invoke_signed(
+            &system_instruction::create_account(
+                funder.key,
+                new_pda_account.key,
+                rent.minimum_balance(space).max(1),
+                space as u64,
+                owner,
+            ),
             &[
                 funder.clone(),
                 new_pda_account.clone(),
                 system_program.clone(),
             ],
-        )?;
+            &[new_pda_signer_seeds],
+        )
     }
-
-    invoke_signed(
-        &system_instruction::allocate(new_pda_account.key, space as u64),
-        &[new_pda_account.clone(), system_program.clone()],
-        &[new_pda_signer_seeds],
-    )?;
-
-    invoke_signed(
-        &system_instruction::assign(new_pda_account.key, owner),
-        &[new_pda_account.clone(), system_program.clone()],
-        &[new_pda_signer_seeds],
-    )
 }
 
 /// Processes an [ConfigureMint] instruction.
 fn process_configure_mint(
     accounts: &[AccountInfo],
-    transfer_auditor_pk: Option<ElGamalPK>,
+    transfer_auditor_pk: Option<&ElGamalPK>,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let funder_info = next_account_info(account_info_iter)?;
@@ -170,7 +208,7 @@ fn process_configure_mint(
 
     // Ensure omnibus token account address derivation is correct
     let (omnibus_token_address, omnibus_token_bump_seed) =
-        get_omnibus_token_address_with_seed(&mint_info.key);
+        get_omnibus_token_address_with_seed(mint_info.key);
 
     if omnibus_token_address != *omnibus_info.key {
         msg!("Error: Omnibus token address does not match seed derivation");
@@ -185,7 +223,7 @@ fn process_configure_mint(
 
     // Ensure transfer auditor account address derivation is correct
     let (transfer_auditor_address, transfer_auditor_bump_seed) =
-        get_transfer_auditor_address_with_seed(&mint_info.key);
+        get_transfer_auditor_address_with_seed(mint_info.key);
     if transfer_auditor_address != *transfer_auditor_info.key {
         msg!("Error: Transfer auditor address does not match seed derivation");
         return Err(ProgramError::InvalidSeeds);
@@ -200,7 +238,7 @@ fn process_configure_mint(
     msg!("Creating omnibus token account: {}", omnibus_info.key);
     create_pda_account(
         funder_info,
-        &rent,
+        rent,
         spl_token::state::Account::get_packed_len(),
         &spl_token::id(),
         system_program_info,
@@ -228,7 +266,7 @@ fn process_configure_mint(
     );
     create_pda_account(
         funder_info,
-        &rent,
+        rent,
         TransferAuditor::get_packed_len(),
         &id(),
         system_program_info,
@@ -236,11 +274,13 @@ fn process_configure_mint(
         transfer_auditor_account_signer_seeds,
     )?;
 
-    TransferAuditor {
-        mint: *mint_info.key,
-        transfer_auditor_pk,
+    let mut transfer_auditor = TransferAuditor::from_account_info(transfer_auditor_info, &id())?;
+
+    transfer_auditor.mint = (*mint_info.key).into();
+    if let Some(transfer_auditor_pk) = transfer_auditor_pk {
+        transfer_auditor.enabled = true.into();
+        transfer_auditor.elgaml_pk = *transfer_auditor_pk;
     }
-    .pack_into_slice(&mut transfer_auditor_info.data.borrow_mut());
 
     Ok(())
 }
@@ -248,7 +288,7 @@ fn process_configure_mint(
 /// Processes an [UpdateTransferAuditor] instruction.
 fn process_update_transfer_auditor(
     accounts: &[AccountInfo],
-    new_transfer_auditor_pk: Option<ElGamalPK>,
+    new_transfer_auditor_pk: Option<&ElGamalPK>,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let transfer_auditor_info = next_account_info(account_info_iter)?;
@@ -271,21 +311,33 @@ fn process_update_transfer_auditor(
         return Err(ProgramError::InvalidArgument);
     }
 
-    let mut transfer_auditor =
-        state::TransferAuditor::unpack_from_slice(&transfer_auditor_info.data.borrow())?;
+    let mut transfer_auditor = TransferAuditor::from_account_info(transfer_auditor_info, &id())?;
 
-    if transfer_auditor.mint != *mint_info.key {
+    if !transfer_auditor.mint.equals(mint_info.key) {
         msg!("Error: Mint mismatch");
         return Err(ProgramError::InvalidArgument);
     }
-    transfer_auditor.transfer_auditor_pk = new_transfer_auditor_pk;
-    transfer_auditor.pack_into_slice(&mut transfer_auditor_info.data.borrow_mut());
+
+    if !bool::from(&transfer_auditor.enabled) {
+        msg!("Error: Transfer auditor is disabled");
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    match new_transfer_auditor_pk {
+        Some(new_transfer_auditor_pk) => transfer_auditor.elgaml_pk = *new_transfer_auditor_pk,
+        None => {
+            transfer_auditor.enabled = false.into();
+        }
+    }
 
     Ok(())
 }
 
 /// Processes an [CreateAccount] instruction.
-fn process_create_account(accounts: &[AccountInfo], elgaml_pk: ElGamalPK) -> ProgramResult {
+fn process_create_account(
+    accounts: &[AccountInfo],
+    data: &CreateAccountInstructionData,
+) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let funder_info = next_account_info(account_info_iter)?;
     let confidential_account_info = next_account_info(account_info_iter)?;
@@ -304,7 +356,7 @@ fn process_create_account(accounts: &[AccountInfo], elgaml_pk: ElGamalPK) -> Pro
 
     // Ensure confidential account address derivation is correct
     let (confidential_address, bump_seed) =
-        get_confidential_address_with_seed(&token_account.mint, &token_account_info.key);
+        get_confidential_address_with_seed(&token_account.mint, token_account_info.key);
     if confidential_address != *confidential_account_info.key {
         msg!("Error: Confidential address does not match seed derivation");
         return Err(ProgramError::InvalidSeeds);
@@ -325,7 +377,7 @@ fn process_create_account(accounts: &[AccountInfo], elgaml_pk: ElGamalPK) -> Pro
     );
     create_pda_account(
         funder_info,
-        &rent,
+        rent,
         ConfidentialAccount::get_packed_len(),
         &id(),
         system_program_info,
@@ -333,33 +385,34 @@ fn process_create_account(accounts: &[AccountInfo], elgaml_pk: ElGamalPK) -> Pro
         confidential_token_account_signer_seeds,
     )?;
 
-    ConfidentialAccount {
-        mint: token_account.mint,
-        token_account: *token_account_info.key,
-        elgaml_pk,
-        accept_incoming_transfers: true,
-        ..ConfidentialAccount::default()
-    }
-    .pack_into_slice(&mut confidential_account_info.data.borrow_mut());
+    let mut confidential_account =
+        ConfidentialAccount::from_account_info(confidential_account_info, &id())?;
+    confidential_account.mint = token_account.mint.into();
+    confidential_account.token_account = (*token_account_info.key).into();
+    confidential_account.elgaml_pk = data.elgaml_pk;
+    confidential_account.accept_incoming_transfers = true.into();
     Ok(())
 }
 
 /// Processes an [CloseAccount] instruction.
-fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
+fn process_close_account(
+    accounts: &[AccountInfo],
+    _data: &CloseAccountInstructionData,
+) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let confidential_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
     let dest_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
-    let (confidential_account, _token_account) = validate_confidential_account_is_signer(
+    let (mut confidential_account, _token_account) = validate_confidential_account_is_signer(
         confidential_account_info,
         token_account_info,
         owner_info,
         account_info_iter.as_slice(),
     )?;
 
-    // TODO: Add real zero balance check
+    // TODO: Add real zero token balance check
     if confidential_account.pending_balance != ElGamalCT::default()
         || confidential_account.available_balance != ElGamalCT::default()
     {
@@ -367,26 +420,28 @@ fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
         return Err(ProgramError::InvalidAccountData);
     }
 
+    // Zero account data
+    *confidential_account = ConfidentialAccount::zeroed();
+
+    // Drain lamports
     let dest_starting_lamports = dest_info.lamports();
     **dest_info.lamports.borrow_mut() = dest_starting_lamports
         .checked_add(confidential_account_info.lamports())
         .ok_or(ProgramError::InvalidAccountData)?;
-
     **confidential_account_info.lamports.borrow_mut() = 0;
-    ConfidentialAccount::default()
-        .pack_into_slice(&mut confidential_account_info.data.borrow_mut());
+
     Ok(())
 }
 
 /// Processes an [UpdateAccountPk] instruction.
 fn process_update_account_pk(
     accounts: &[AccountInfo],
-    elgaml_pk: ElGamalPK,
-    pending_balance: ElGamalCT,
-    available_balance: ElGamalCT,
-    new_elgaml_pk: ElGamalPK,
-    new_pending_balance: ElGamalCT,
-    new_available_balance: ElGamalCT,
+    elgaml_pk: &ElGamalPK,
+    pending_balance: &ElGamalCT,
+    available_balance: &ElGamalCT,
+    new_elgaml_pk: &ElGamalPK,
+    new_pending_balance: &ElGamalCT,
+    new_available_balance: &ElGamalCT,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let confidential_account_info = next_account_info(account_info_iter)?;
@@ -402,20 +457,19 @@ fn process_update_account_pk(
 
     // TODO: Balance equality proof....
 
-    if confidential_account.elgaml_pk != elgaml_pk
-        || confidential_account.pending_balance != pending_balance
-        || confidential_account.available_balance != available_balance
+    if confidential_account.elgaml_pk != *elgaml_pk
+        || confidential_account.pending_balance != *pending_balance
+        || confidential_account.available_balance != *available_balance
     {
         msg!("Pubkey and/or balance mismatch");
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    confidential_account.elgaml_pk = new_elgaml_pk;
-    confidential_account.pending_balance = new_pending_balance;
-    confidential_account.available_balance = new_available_balance;
-    confidential_account.outbound_transfer = OutboundTransfer::default();
+    confidential_account.elgaml_pk = *new_elgaml_pk;
+    confidential_account.pending_balance = *new_pending_balance;
+    confidential_account.available_balance = *new_available_balance;
+    confidential_account.outbound_transfer = OutboundTransfer::zeroed();
 
-    confidential_account.pack_into_slice(&mut confidential_account_info.data.borrow_mut());
     Ok(())
 }
 
@@ -440,13 +494,13 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
         return Err(ProgramError::InvalidAccountData);
     }
 
-    if !confidential_account.accept_incoming_transfers {
+    if !bool::from(&confidential_account.accept_incoming_transfers) {
         msg!("Error: Incoming transfers are disabled");
         return Err(ProgramError::InvalidArgument);
     }
 
     // Ensure omnibus token account address derivation is correct
-    if get_omnibus_token_address(&mint_info.key) != *omnibus_info.key {
+    if get_omnibus_token_address(mint_info.key) != *omnibus_info.key {
         msg!("Error: Omnibus token address does not match seed derivation");
         return Err(ProgramError::InvalidSeeds);
     }
@@ -466,10 +520,10 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
     invoke(
         &spl_token::instruction::transfer_checked(
             &spl_token::id(),
-            &source_token_account_info.key,
-            &mint_info.key,
-            &omnibus_info.key,
-            &owner_info.key,
+            source_token_account_info.key,
+            mint_info.key,
+            omnibus_info.key,
+            owner_info.key,
             signer_pubkeys.as_slice(),
             amount,
             decimals,
@@ -480,7 +534,6 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
     // TODO: implement and uncomment the ElGamalCT addition
     //confidential_account.pending_balance += GroupEncoding::encode(amount)
 
-    confidential_account.pack_into_slice(&mut confidential_account_info.data.borrow_mut());
     Ok(())
 }
 
@@ -496,7 +549,7 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
     let spl_token_program_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
-    let (confidential_account, token_account) = validate_confidential_account_is_signer(
+    let (_confidential_account, token_account) = validate_confidential_account_is_signer(
         confidential_account_info,
         token_account_info,
         owner_info,
@@ -510,7 +563,7 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
 
     // Ensure omnibus token account address derivation is correct
     let (omnibus_token_address, omnibus_token_bump_seed) =
-        get_omnibus_token_address_with_seed(&mint_info.key);
+        get_omnibus_token_address_with_seed(mint_info.key);
     if omnibus_token_address != *omnibus_info.key {
         msg!("Error: Omnibus token address does not match seed derivation");
         return Err(ProgramError::InvalidSeeds);
@@ -526,10 +579,10 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
     invoke_signed(
         &spl_token::instruction::transfer_checked(
             &spl_token::id(),
-            &omnibus_info.key,
-            &mint_info.key,
-            &dest_token_account_info.key,
-            &omnibus_info.key,
+            omnibus_info.key,
+            mint_info.key,
+            dest_token_account_info.key,
+            omnibus_info.key,
             &[],
             amount,
             decimals,
@@ -547,15 +600,21 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
     // TODO: implement and uncomment the ElGamalCT addition
     //confidential_account.available_balance -= GroupEncoding::encode(amount)
 
-    confidential_account.pack_into_slice(&mut confidential_account_info.data.borrow_mut());
     Ok(())
 }
 
-/// Processes a [SubmitTransferProof] instruction.
+// TODO: Rework `TransferProof`
+#[derive(Clone, Debug, PartialEq)]
+enum TransferProof {
+    CiphertextValidity, //(TransDataCTValidity),
+    Range,              //(TransDataRangeProof),
+}
+
+/// Processes a [SubmitCiphertextValidityProof] or [SubmitRangeProof] instruction.
 fn process_submit_transfer_proof(
     accounts: &[AccountInfo],
-    receiver_pk: ElGamalPK,
-    receiver_pending_balance: ElGamalCT,
+    receiver_pk: &ElGamalPK,
+    receiver_pending_balance: &ElGamalCT,
     transfer_proof: TransferProof,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
@@ -572,26 +631,26 @@ fn process_submit_transfer_proof(
     )?;
 
     let mut outbound_transfer = &mut confidential_account.outbound_transfer;
-    if outbound_transfer.receiver_pk != receiver_pk
-        || outbound_transfer.receiver_pending_balance != receiver_pending_balance
+    if outbound_transfer.receiver_pk != *receiver_pk
+        || outbound_transfer.receiver_pending_balance != *receiver_pending_balance
     {
-        *outbound_transfer = OutboundTransfer::default();
+        *outbound_transfer = OutboundTransfer::zeroed();
     }
 
-    let (sender_available_balance, sender_transfer_amount, receiver_transfer_amount) =
+    let (_sender_available_balance, sender_transfer_amount, receiver_transfer_amount) =
         match transfer_proof {
-            TransferProof::CiphertextValidity(_) => {
+            TransferProof::CiphertextValidity => {
                 // TODO: Validate the proof and extract the transfer amounts
-                outbound_transfer.validity_proof = true;
+                outbound_transfer.validity_proof = true.into();
                 (
                     ElGamalCT::default(),
                     ElGamalCT::default(),
                     ElGamalCT::default(),
                 )
             }
-            TransferProof::Range(_) => {
+            TransferProof::Range => {
                 // TODO: Validate the proof and extract the transfer amounts
-                outbound_transfer.range_proof = true;
+                outbound_transfer.range_proof = true.into();
                 (
                     ElGamalCT::default(),
                     ElGamalCT::default(),
@@ -600,24 +659,25 @@ fn process_submit_transfer_proof(
             }
         };
 
+    /* TODO: uncomment/rework
     if sender_available_balance != confidential_account.available_balance {
         msg!("Error: Available balance mismatch");
         return Err(ProgramError::InvalidArgument);
     }
+    */
 
     outbound_transfer.sender_transfer_amount = sender_transfer_amount;
-    outbound_transfer.receiver_pk = receiver_pk;
-    outbound_transfer.receiver_pending_balance = receiver_pending_balance;
+    outbound_transfer.receiver_pk = *receiver_pk;
+    outbound_transfer.receiver_pending_balance = *receiver_pending_balance;
     outbound_transfer.receiver_transfer_amount = receiver_transfer_amount;
 
-    confidential_account.pack_into_slice(&mut confidential_account_info.data.borrow_mut());
     Ok(())
 }
 
 /// Processes a [Transfer] instruction.
 fn process_transfer(
     accounts: &[AccountInfo],
-    receiver_pk: ElGamalPK,
+    receiver_pk: &ElGamalPK,
     receiver_transfer_amount: ElGamalCT,
     transfer_auditor_pk: Option<ElGamalPK>,
 ) -> ProgramResult {
@@ -631,15 +691,22 @@ fn process_transfer(
 
     validate_account_owner(transfer_auditor_info, &id())?;
 
-    //let mint = spl_token::state::Mint::unpack(&mint_info.data.borrow())?;
-    let transfer_auditor =
-        state::TransferAuditor::unpack_from_slice(&transfer_auditor_info.data.borrow())?;
+    let transfer_auditor = TransferAuditor::from_account_info(transfer_auditor_info, &id())?;
 
-    if transfer_auditor.transfer_auditor_pk != transfer_auditor_pk {
-        msg!("Error: Transfer auditor mismatch");
+    if let Some(transfer_auditor_pk) = transfer_auditor_pk {
+        if bool::from(&transfer_auditor.enabled) {
+            if transfer_auditor.elgaml_pk != transfer_auditor_pk {
+                msg!("Error: Invalid transfer auditor pk");
+                return Err(ProgramError::InvalidArgument);
+            }
+        } else {
+            msg!("Error: Transfer auditor pk not required");
+            return Err(ProgramError::InvalidArgument);
+        }
+    } else if bool::from(&transfer_auditor.enabled) {
+        msg!("Error: Transfer auditor pk missing");
         return Err(ProgramError::InvalidArgument);
     }
-
     let (mut confidential_account, token_account) =
         validate_confidential_account(confidential_account_info, token_account_info)?;
 
@@ -649,7 +716,7 @@ fn process_transfer(
     )?;
 
     if token_account.mint != receiver_token_account.mint
-        || token_account.mint != transfer_auditor.mint
+        || !transfer_auditor.mint.equals(&token_account.mint)
     {
         msg!("Error: Mint mismatch");
         return Err(ProgramError::InvalidArgument);
@@ -660,19 +727,20 @@ fn process_transfer(
         return Err(ProgramError::InvalidAccountData);
     }
 
-    if !receiver_confidential_account.accept_incoming_transfers {
+    if !bool::from(&receiver_confidential_account.accept_incoming_transfers) {
         msg!("Error: Incoming transfers are disabled");
         return Err(ProgramError::InvalidArgument);
     }
 
     let outbound_transfer = &confidential_account.outbound_transfer;
-    if !(outbound_transfer.validity_proof && outbound_transfer.range_proof) {
+    if !bool::from(&outbound_transfer.validity_proof) || !bool::from(&outbound_transfer.range_proof)
+    {
         msg!("Error: Transfer proof(s) missing");
         return Err(ProgramError::InvalidAccountData);
     }
 
-    if outbound_transfer.receiver_pk != receiver_pk
-        || receiver_confidential_account.elgaml_pk != receiver_pk
+    if outbound_transfer.receiver_pk != *receiver_pk
+        || receiver_confidential_account.elgaml_pk != *receiver_pk
     {
         msg!("Error: Receiver public key mismatch");
         return Err(ProgramError::InvalidArgument);
@@ -692,11 +760,8 @@ fn process_transfer(
     // confidential_account.available_balance -= outbound_transfer.sender_transfer_amount;
     // receiver_confidential_account.pending_balance += outbound_transfer.receiver_transfer_amount;
 
-    confidential_account.outbound_transfer = OutboundTransfer::default();
+    confidential_account.outbound_transfer = OutboundTransfer::zeroed();
 
-    confidential_account.pack_into_slice(&mut confidential_account_info.data.borrow_mut());
-    receiver_confidential_account
-        .pack_into_slice(&mut receiver_confidential_account_info.data.borrow_mut());
     Ok(())
 }
 
@@ -719,7 +784,6 @@ fn process_apply_pending_balance(accounts: &[AccountInfo]) -> ProgramResult {
     // confidential_account.available_balance += confidential_account.pending_balance;
     confidential_account.pending_balance = ElGamalCT::default();
 
-    confidential_account.pack_into_slice(&mut confidential_account_info.data.borrow_mut());
     Ok(())
 }
 
@@ -741,8 +805,8 @@ fn process_enable_disable_inbound_transfers(
         account_info_iter.as_slice(),
     )?;
 
-    confidential_account.accept_incoming_transfers = accept_incoming_transfers;
-    confidential_account.pack_into_slice(&mut confidential_account_info.data.borrow_mut());
+    confidential_account.accept_incoming_transfers = accept_incoming_transfers.into();
+
     Ok(())
 }
 
@@ -751,80 +815,82 @@ pub fn process_instruction(
     accounts: &[AccountInfo],
     input: &[u8],
 ) -> ProgramResult {
-    match ConfidentialTokenInstruction::unpack_from_slice(input)? {
-        ConfidentialTokenInstruction::ConfigureMint {
-            transfer_auditor_pk,
-        } => {
-            msg!("ConfigureMint");
+    match decode_instruction_type(input)? {
+        ConfidentialTokenInstruction::ConfigureMint => {
+            msg!("ConfigureMint!");
+            let transfer_auditor_pk =
+                decode_optional_instruction_data::<ConfigureMintInstructionData>(input)?
+                    .map(|d| &d.transfer_auditor_pk);
             process_configure_mint(accounts, transfer_auditor_pk)
         }
-        ConfidentialTokenInstruction::UpdateTransferAuditor {
-            new_transfer_auditor_pk,
-        } => {
+        ConfidentialTokenInstruction::UpdateTransferAuditor => {
             msg!("UpdateTransferAuditor");
+            let new_transfer_auditor_pk =
+                decode_optional_instruction_data::<UpdateTransferAuditorInstructionData>(input)?
+                    .map(|d| &d.new_transfer_auditor_pk);
             process_update_transfer_auditor(accounts, new_transfer_auditor_pk)
         }
-        ConfidentialTokenInstruction::CreateAccount { elgaml_pk } => {
+        ConfidentialTokenInstruction::CreateAccount => {
             msg!("CreateAccount");
-            process_create_account(accounts, elgaml_pk)
+            process_create_account(
+                accounts,
+                decode_instruction_data::<CreateAccountInstructionData>(input)?,
+            )
         }
-        ConfidentialTokenInstruction::CloseAccount {
-            crypto_empty_balance_proof: _, /* TODO */
-        } => {
+        ConfidentialTokenInstruction::CloseAccount => {
             msg!("CloseAccount");
-            process_close_account(accounts)
+            process_close_account(
+                accounts,
+                decode_instruction_data::<CloseAccountInstructionData>(input)?,
+            )
         }
-        ConfidentialTokenInstruction::UpdateAccountPk {
-            elgaml_pk,
-            pending_balance,
-            available_balance,
-            new_elgaml_pk,
-            new_pending_balance,
-            new_available_balance,
-            crypto_balance_equality_proof: _, /* TODO */
-        } => {
+        ConfidentialTokenInstruction::UpdateAccountPk => {
             msg!("UpdateAccountPk");
+            let data = decode_instruction_data::<UpdateAccountPkInstructionData>(input)?;
             process_update_account_pk(
                 accounts,
-                elgaml_pk,
-                pending_balance,
-                available_balance,
-                new_elgaml_pk,
-                new_pending_balance,
-                new_available_balance,
+                &data.elgaml_pk,
+                &data.pending_balance,
+                &data.available_balance,
+                &data.new_elgaml_pk,
+                &data.new_pending_balance,
+                &data.new_available_balance,
             )
         }
-        ConfidentialTokenInstruction::Deposit { amount, decimals } => {
+        ConfidentialTokenInstruction::Deposit => {
             msg!("Deposit");
-            process_deposit(accounts, amount, decimals)
+            let data = decode_instruction_data::<DepositInstructionData>(input)?;
+            process_deposit(accounts, data.amount.into(), data.decimals)
         }
-        ConfidentialTokenInstruction::Withdraw {
-            amount,
-            decimals,
-            crypto_sufficient_balance_proof: _, /* TODO */
-        } => {
+        ConfidentialTokenInstruction::Withdraw => {
             msg!("Withdraw");
-            process_withdraw(accounts, amount, decimals)
+            let data = decode_instruction_data::<WithdrawInstructionData>(input)?;
+            process_withdraw(accounts, data.amount.into(), data.decimals)
         }
-        ConfidentialTokenInstruction::SubmitTransferProof {
-            receiver_pk,
-            receiver_pending_balance,
-            transfer_proof,
-        } => {
-            msg!("SubmitTransferProof");
+        ConfidentialTokenInstruction::SubmitCiphertextValidityProof => {
+            msg!("SubmitCiphertextValidityProof");
+            let data =
+                decode_instruction_data::<SubmitCiphertextValidityProofInstructionData>(input)?;
             process_submit_transfer_proof(
                 accounts,
-                receiver_pk,
-                receiver_pending_balance,
-                transfer_proof,
+                &data.receiver_pk,
+                &data.receiver_pending_balance,
+                TransferProof::CiphertextValidity, // TODO
             )
         }
-        ConfidentialTokenInstruction::Transfer {
-            receiver_pk,
-            receiver_transfer_split_amount: _, /* TODO */
-            transfer_audit,
-        } => {
+        ConfidentialTokenInstruction::SubmitRangeProof => {
+            msg!("SubmitRangeProof");
+            let data = decode_instruction_data::<SubmitRangeProofInstructionData>(input)?;
+            process_submit_transfer_proof(
+                accounts,
+                &data.receiver_pk,
+                &data.receiver_pending_balance,
+                TransferProof::Range, // TODO
+            )
+        }
+        ConfidentialTokenInstruction::Transfer => {
             msg!("Transfer");
+            let data = decode_instruction_data::<TransferInstructionData>(input)?;
 
             // TODO: Ensure the proof in `transfer_audit` is valid
 
@@ -839,9 +905,9 @@ pub fn process_instruction(
 
             process_transfer(
                 accounts,
-                receiver_pk,
+                &data.receiver_pk,
                 receiver_transfer_amount,
-                transfer_audit.map(|ta| ta.0),
+                None, // TODO: Support `TransferWithAuditorInstructionData`
             )
         }
         ConfidentialTokenInstruction::ApplyPendingBalance => {

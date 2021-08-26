@@ -7,7 +7,7 @@ use solana_sdk::{
     signature::{Keypair, Signer},
     transaction::Transaction,
 };
-use spl_confidential_token::*;
+use spl_confidential_token::{pod::*, *};
 
 fn program_test() -> ProgramTest {
     let pc = ProgramTest::new(
@@ -41,7 +41,7 @@ async fn test_configure_mint_sanity() {
                 &spl_token::id(),
                 &token_mint_keypair.pubkey(),
                 &token_mint_keypair.pubkey(),
-                None,
+                Some(&token_mint_keypair.pubkey()),
                 9,
             )
             .unwrap(),
@@ -72,15 +72,17 @@ async fn test_configure_mint_sanity() {
     let transfer_auditor_address = get_transfer_auditor_address(&token_mint_keypair.pubkey());
 
     let mut transaction = Transaction::new_with_payer(
-        &[spl_confidential_token::instruction::configure_mint(
-            payer.pubkey(),
-            token_mint_keypair.pubkey(),
-            None,
-            None,
-        )],
+        &[
+            spl_confidential_token::instruction::configure_mint_with_transfer_auditor(
+                payer.pubkey(),
+                token_mint_keypair.pubkey(),
+                ElGamalPK::default(),
+                token_mint_keypair.pubkey(),
+            ),
+        ],
         Some(&payer.pubkey()),
     );
-    transaction.sign(&[&payer], recent_blockhash);
+    transaction.sign(&[&payer, &token_mint_keypair], recent_blockhash);
     banks_client.process_transaction(transaction).await.unwrap();
 
     // Omnibus account now exists
@@ -101,9 +103,10 @@ async fn test_configure_mint_sanity() {
         .await
         .expect("get_account")
         .expect("transfer_auditor_account not found");
-    assert_eq!(
-        transfer_auditor_account.data.len(),
-        spl_confidential_token::state::TransferAuditor::LEN,
-    );
+
     assert_eq!(transfer_auditor_account.owner, spl_confidential_token::id());
+    let transfer_auditor =
+        pod_from_bytes::<state::TransferAuditor>(&transfer_auditor_account.data).unwrap();
+    assert_eq!(transfer_auditor.enabled, true.into());
+    assert_eq!(transfer_auditor.mint, token_mint_keypair.pubkey().into());
 }

@@ -1,55 +1,32 @@
 use {
-    crate::*,
-    borsh::{BorshDeserialize, BorshSchema, BorshSerialize},
-    solana_program::{
-        msg,
-        program_error::ProgramError,
-        program_pack::{Pack, Sealed},
-        pubkey::Pubkey,
-    },
+    crate::{pod::*, *},
+    zeroable::Zeroable,
 };
 
 /// Account used for auditing confidential transfers
-#[derive(Clone, Debug, BorshSerialize, BorshDeserialize, BorshSchema)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct TransferAuditor {
     /// The SPL Token mint associated with this account
-    pub mint: Pubkey,
+    pub mint: PodPubkey,
+
+    /// If true, transfers must include ElGamal cypertext using this public key.
+    /// If false, transfer auditing is disabled
+    pub enabled: PodBool,
 
     /// ElGamal public key for the transfer auditor.
-    ///
-    /// If Some, transfers must include ElGamal cypertext using this public key.
-    /// If None, transfer auditing is disabled
-    pub transfer_auditor_pk: Option<ElGamalPK>,
+    pub elgaml_pk: ElGamalPK,
 }
+impl PodAccountInfo<'_, '_> for TransferAuditor {}
 
-impl Sealed for TransferAuditor {}
-impl Pack for TransferAuditor {
-    const LEN: usize = 65; // see `test_get_packed_len()`
-
-    fn pack_into_slice(&self, dst: &mut [u8]) {
-        let data = self.try_to_vec().unwrap();
-        dst[..data.len()].copy_from_slice(&data);
-    }
-
-    fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
-        let mut mut_src: &[u8] = src;
-        Self::deserialize(&mut mut_src).map_err(|err| {
-            msg!(
-                "Error: failed to deserialize transfer auditor account: {}",
-                err
-            );
-            ProgramError::InvalidAccountData
-        })
-    }
-}
-
-#[derive(Clone, Default, Debug, BorshSerialize, BorshDeserialize, BorshSchema)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct OutboundTransfer {
     /// `true` once a validity proof has been accepted for this transfer
-    pub validity_proof: bool,
+    pub validity_proof: PodBool,
 
     /// `true` once a range proof has been accepted for this transfer
-    pub range_proof: bool,
+    pub range_proof: PodBool,
 
     /// Transfer amount encrypted by the sender's `ConfidentialAccount::elgaml_pk`
     pub sender_transfer_amount: ElGamalCT,
@@ -63,17 +40,19 @@ pub struct OutboundTransfer {
     /// Transfer amount encrypted with `receiver_pk`
     pub receiver_transfer_amount: ElGamalCT,
 }
+impl PodAccountInfo<'_, '_> for OutboundTransfer {}
 
 /// State for a confidential token account
-#[derive(Clone, Default, Debug, BorshSerialize, BorshDeserialize, BorshSchema)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct ConfidentialAccount {
     /// The SPL Token mint associated with this confidential token account
-    pub mint: Pubkey,
+    pub mint: PodPubkey,
 
     /// The SPL Token account that corresponds to this confidential token account.
     /// The owner and close authority of the SPL Token account convey their authority over the
     /// confidential token account
-    pub token_account: Pubkey,
+    pub token_account: PodPubkey,
 
     /// The public key associated with ElGamal encryption
     pub elgaml_pk: ElGamalPK,
@@ -85,33 +64,17 @@ pub struct ConfidentialAccount {
     pub available_balance: ElGamalCT,
 
     /// Prohibit incoming transfers if `false`
-    pub accept_incoming_transfers: bool,
+    pub accept_incoming_transfers: PodBool,
 
     /// Contains the details of an outbound transfer if `Some`.
     /// Resets to `None` upon transfer completion or rejection of the outbound transfer.
     pub outbound_transfer: OutboundTransfer,
 }
-
-impl Sealed for ConfidentialAccount {}
-impl Pack for ConfidentialAccount {
-    const LEN: usize = 451; // see `test_get_packed_len()`
-
-    fn pack_into_slice(&self, dst: &mut [u8]) {
-        let data = self.try_to_vec().unwrap();
-        dst[..data.len()].copy_from_slice(&data);
-    }
-
-    fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
-        let mut mut_src: &[u8] = src;
-        Self::deserialize(&mut mut_src).map_err(|err| {
-            msg!("Error: failed to confidential token account: {}", err);
-            ProgramError::InvalidAccountData
-        })
-    }
-}
+impl PodAccountInfo<'_, '_> for ConfidentialAccount {}
 
 #[cfg(test)]
 mod tests {
+    /*
     use super::*;
 
     #[test]
@@ -127,7 +90,6 @@ mod tests {
         );
     }
 
-    /*
     #[test]
     fn test_serialize_bytes() {
         assert_eq!(FeatureProposal::Expired.try_to_vec().unwrap(), vec![3]);
