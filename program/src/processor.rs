@@ -5,6 +5,7 @@ use {
     solana_program::{
         account_info::{next_account_info, AccountInfo},
         entrypoint::ProgramResult,
+        instruction::Instruction,
         msg,
         program::{invoke, invoke_signed},
         program_error::ProgramError,
@@ -13,10 +14,27 @@ use {
         pubkey::Pubkey,
         rent::Rent,
         system_instruction,
-        sysvar::Sysvar,
+        sysvar::{self, Sysvar},
     },
     std::result::Result,
 };
+
+/// Returns the previous `Instruction` in the currently executing `Transaction`
+fn get_previous_instruction(
+    instruction_sysvar_account_info: &AccountInfo,
+) -> Result<Instruction, ProgramError> {
+    if *instruction_sysvar_account_info.key != sysvar::instructions::id() {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let instruction_sysvar = instruction_sysvar_account_info.data.borrow();
+
+    let current_instruction = sysvar::instructions::load_current_index(&instruction_sysvar);
+    if current_instruction == 0 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    sysvar::instructions::load_instruction_at(current_instruction as usize - 1, &instruction_sysvar)
+        .map_err(|_| ProgramError::InvalidInstructionData)
+}
 
 /// Validates that the provided `owner_account_info` is the expected owner, and is either a single
 /// signer or an SPL Token Multisig account with sufficient signers
@@ -446,6 +464,7 @@ fn process_update_account_pk(
     let account_info_iter = &mut accounts.iter();
     let confidential_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
+    let instructions_sysvar_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
     let (mut confidential_account, _token_account) = validate_confidential_account_is_signer(
@@ -455,7 +474,11 @@ fn process_update_account_pk(
         account_info_iter.as_slice(),
     )?;
 
-    // TODO: Balance equality proof....
+    // TODO: Get balance equality proof from previous instruction....
+    msg!(
+        "TODO: {:?}",
+        get_previous_instruction(instructions_sysvar_info)
+    );
 
     if confidential_account.elgaml_pk != *elgaml_pk
         || confidential_account.pending_balance != *pending_balance

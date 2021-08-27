@@ -231,10 +231,11 @@ pub enum ConfidentialTokenInstruction {
     ///
     ///   0. `[writable]` The confidential token account to update
     ///   1. `[]` Corresponding SPL Token account
-    ///   2. `[signer]` The single account owner
+    ///   2. `[]` Instructions sysvar
+    ///   3. `[signer]` The single account owner
     /// or:
-    ///   2. `[]` The multisig account owner
-    ///   3.. `[signer]` Required M signer accounts for the SPL Token Multisig account
+    ///   3. `[]` The multisig account owner
+    ///   4.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     /// Data expected by this instruction:
     ///   `UpdateAccountPkInstructionData`
