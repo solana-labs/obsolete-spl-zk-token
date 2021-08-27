@@ -1,7 +1,10 @@
 //! Solana program utilities for Plain Old Data types
 use {
     bytemuck::Pod,
-    solana_program::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey},
+    solana_program::{
+        account_info::AccountInfo, instruction::Instruction, program_error::ProgramError,
+        pubkey::Pubkey,
+    },
     std::{
         cell::RefMut,
         marker::PhantomData,
@@ -64,6 +67,18 @@ pub fn pod_get_packed_len<T: Pod>() -> usize {
 /// Convert a slice into a `Pod` (zero copy)
 pub fn pod_from_bytes<T: Pod>(bytes: &[u8]) -> Result<&T, ProgramError> {
     bytemuck::try_from_bytes(bytes).map_err(|_| ProgramError::InvalidArgument)
+}
+
+/// Convert `Instruction` data into a `Pod` (zero copy)
+pub fn pod_from_instruction_data<'a, T: Pod>(
+    instruction: &'a Instruction,
+    program_id: &Pubkey,
+) -> Result<&'a T, ProgramError> {
+    if instruction.program_id != *program_id {
+        Err(ProgramError::InvalidArgument)
+    } else {
+        pod_from_bytes(&instruction.data)
+    }
 }
 
 /// Maybe convert a slice into a `Pod` (zero copy)
