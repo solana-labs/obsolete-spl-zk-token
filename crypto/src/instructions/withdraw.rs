@@ -1,14 +1,8 @@
 use merlin::Transcript;
-use rand_core::OsRng;
-
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::{IsIdentity, MultiscalarMul};
 
 use crate::encryption::elgamal::{ElGamal, ElGamalCT, ElGamalPK, ElGamalSK};
 use crate::encryption::pedersen::PedersenOpen;
 use crate::errors::ProofError;
-use crate::transcript::TranscriptProtocol;
 
 /// Withdraw SPL Tokens from the available balance of a confidential token account.
 ///
@@ -87,7 +81,7 @@ impl WithdrawProofData {
     }
 
     /// Verifies the WithdrawData proof.
-    pub fn verify_proof(amount: u64) -> Result<(), ProofError> {
+    pub fn verify_proof(_amount: u64) -> Result<(), ProofError> {
         // TODO
         Ok(())
     }
@@ -115,7 +109,3 @@ impl WithdrawProof {
         Ok(())
     }
 }
-
-pub struct TransferProof {}
-
-pub struct TransferFinalizeProof {}
