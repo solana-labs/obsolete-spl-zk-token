@@ -346,6 +346,7 @@ impl InnerProductProof {
         buf
     }
 
+    /*
     /// Converts the proof into a byte iterator over serialized view of the proof.
     /// The layout of the inner product proof is:
     /// * \\(n\\) pairs of compressed Ristretto points \\(L_0, R_0 \dots, L_{n-1}, R_{n-1}\\),
@@ -360,6 +361,7 @@ impl InnerProductProof {
             .chain(self.b.as_bytes())
             .copied()
     }
+    */
 
     /// Deserializes the proof from a byte slice.
     /// Returns an error in the following cases:

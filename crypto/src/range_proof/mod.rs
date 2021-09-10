@@ -12,7 +12,6 @@ use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{Identity, IsIdentity, MultiscalarMul, VartimeMultiscalarMul};
 
-use crate::encryption::elgamal::{ElGamalCT, ElGamalSK};
 use crate::encryption::pedersen::{Pedersen, PedersenBase, PedersenComm, PedersenOpen};
 use crate::errors::ProofError;
 use crate::range_proof::generators::BulletproofGens;
@@ -36,13 +35,13 @@ impl RangeProof {
     pub fn create(
         amounts: Vec<u64>,
         bit_lengths: Vec<usize>,
-        comms: Vec<&PedersenComm>,
+        _comms: Vec<&PedersenComm>,
         opens: Vec<&PedersenOpen>,
         t_1_blinding: &PedersenOpen,
         t_2_blinding: &PedersenOpen,
         transcript: &mut Transcript,
     ) -> Self {
-        let n = bit_lengths.len();
+        let _n = bit_lengths.len();
         let nm = bit_lengths.iter().sum();
 
         // Computing the generators online for now. It should ultimately be precomputed.
@@ -189,7 +188,7 @@ impl RangeProof {
         let H = PedersenBase::default().H;
 
         let nm = n * m;
-        let bp_gens = BulletproofGens::new(nm);
+        let _bp_gens = BulletproofGens::new(nm);
 
         if !(n == 8 || n == 16 || n == 32 || n == 64 || n == 128) {
             return Err(ProofError::InvalidBitsize);
@@ -202,7 +201,7 @@ impl RangeProof {
         let z = transcript.challenge_scalar(b"z");
 
         let zz = z * z;
-        let minus_z = -z;
+        let _minus_z = -z;
 
         transcript.validate_and_append_point(b"T_1", &self.T_1)?;
         transcript.validate_and_append_point(b"T_2", &self.T_2)?;
@@ -213,12 +212,12 @@ impl RangeProof {
         transcript.append_scalar(b"t_x_blinding", &self.t_x_blinding);
         transcript.append_scalar(b"e_blinding", &self.e_blinding);
 
-        let w = transcript.challenge_scalar(b"w");
+        let _w = transcript.challenge_scalar(b"w");
 
         // Challenge value for batching statements to be verified
         let c = transcript.challenge_scalar(b"c");
 
-        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(n * m, transcript)?;
+        let (_x_sq, _x_inv_sq, s) = self.ipp_proof.verification_scalars(n * m, transcript)?;
         let s_inv = s.iter().rev();
 
         let a = self.ipp_proof.a;
@@ -232,11 +231,11 @@ impl RangeProof {
             .flat_map(|exp_z| powers_of_2.iter().map(move |exp_2| exp_2 * exp_z))
             .collect();
 
-        let g = s.iter().map(|s_i| -a * s_i);
-        let h = s_inv
+        let _g = s.iter().map(|s_i| -a * s_i);
+        let _h = s_inv
             .zip(util::exp_iter(y.invert()))
             .zip(concat_z_and_2.iter())
-            .map(|((s_i_inv, exp_y_inv), z_and_2)| exp_y_inv * (-b * s_i_inv));
+            .map(|((s_i_inv, exp_y_inv), _z_and_2)| exp_y_inv * (-b * s_i_inv));
 
         let value_commitment_scalars = util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp);
         let basepoint_scalar = c * (delta(n, m, &y, &z) - self.t_x);

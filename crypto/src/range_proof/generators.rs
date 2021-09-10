@@ -1,6 +1,6 @@
 use curve25519_dalek::ristretto::RistrettoPoint;
 use digest::{ExtendableOutput, Input, XofReader};
-use sha3::{Sha3XofReader, Sha3_512, Shake256};
+use sha3::{Sha3XofReader, Shake256};
 
 /// Generators for Pedersen vector commitments.
 ///
@@ -91,7 +91,7 @@ impl BulletproofGens {
             return;
         }
 
-        let mut label = [b'G'];
+        let label = [b'G'];
         self.G_vec.extend(
             &mut GeneratorsChain::new(&[label, [b'G']].concat())
                 .fast_forward(self.gens_capacity)
@@ -107,6 +107,7 @@ impl BulletproofGens {
         self.gens_capacity = new_capacity;
     }
 
+    #[allow(non_snake_case)]
     pub(crate) fn G(&self, n: usize) -> impl Iterator<Item = &RistrettoPoint> {
         GensIter {
             array: &self.G_vec,
@@ -115,6 +116,7 @@ impl BulletproofGens {
         }
     }
 
+    #[allow(non_snake_case)]
     pub(crate) fn H(&self, n: usize) -> impl Iterator<Item = &RistrettoPoint> {
         GensIter {
             array: &self.H_vec,
