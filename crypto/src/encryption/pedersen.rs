@@ -113,6 +113,7 @@ impl PedersenOpen {
         PedersenOpen(Scalar::random(rng))
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_bytes(&self) -> [u8; 32] {
         self.0.to_bytes()
     }
@@ -225,6 +226,7 @@ impl PedersenComm {
         self.0
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_bytes(&self) -> [u8; 32] {
         self.0.compress().to_bytes()
     }

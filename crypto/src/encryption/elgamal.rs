@@ -265,6 +265,7 @@ pub struct ElGamalCT {
     pub decrypt_handle: PedersenDecHandle,
 }
 impl ElGamalCT {
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_bytes(&self) -> [u8; 64] {
         let mut bytes = [0u8; 64];
 
