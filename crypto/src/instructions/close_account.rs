@@ -129,9 +129,7 @@ impl CloseAccountProof {
         let c = transcript.challenge_scalar(b"c");
 
         // decompress R or return verification error
-        let R = R
-            .decompress()
-            .ok_or_else(|| ProofError::VerificationError)?;
+        let R = R.decompress().ok_or(ProofError::VerificationError)?;
 
         // check the required algebraic relation
         let check = RistrettoPoint::multiscalar_mul(vec![z, -c, -Scalar::one()], vec![D, C, R]);

@@ -1,5 +1,7 @@
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::IsIdentity;
+
 use merlin::Transcript;
 
 use crate::errors::ProofError;
@@ -77,12 +79,11 @@ impl TranscriptProtocol for Transcript {
         label: &'static [u8],
         point: &CompressedRistretto,
     ) -> Result<(), ProofError> {
-        use curve25519_dalek::traits::IsIdentity;
-
         if point.is_identity() {
             Err(ProofError::VerificationError)
         } else {
-            Ok(self.append_message(label, point.as_bytes()))
+            self.append_message(label, point.as_bytes());
+            Ok(())
         }
     }
 

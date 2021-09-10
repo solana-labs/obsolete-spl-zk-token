@@ -32,6 +32,7 @@ pub struct RangeProof {
 
 #[allow(non_snake_case)]
 impl RangeProof {
+    #[allow(clippy::many_single_char_names)]
     pub fn create(
         amounts: Vec<u64>,
         bit_lengths: Vec<usize>,
@@ -109,10 +110,10 @@ impl RangeProof {
 
         let t_poly = l_poly.inner_product(&r_poly);
 
-        let T_1 = Pedersen::commit_with(t_poly.1, &t_1_blinding)
+        let T_1 = Pedersen::commit_with(t_poly.1, t_1_blinding)
             .get_point()
             .compress();
-        let T_2 = Pedersen::commit_with(t_poly.2, &t_2_blinding)
+        let T_2 = Pedersen::commit_with(t_poly.2, t_2_blinding)
             .get_point()
             .compress();
 
@@ -175,6 +176,7 @@ impl RangeProof {
         }
     }
 
+    #[allow(clippy::many_single_char_names)]
     pub fn verify(
         &self,
         comms: Vec<&CompressedRistretto>,
@@ -254,7 +256,7 @@ impl RangeProof {
                 .chain(iter::once(Some(G)))
                 .chain(comms.iter().map(|V| V.decompress())),
         )
-        .ok_or_else(|| ProofError::VerificationError)?;
+        .ok_or(ProofError::VerificationError)?;
 
         if mega_check.is_identity() {
             Ok(())

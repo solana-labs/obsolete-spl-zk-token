@@ -30,6 +30,7 @@ impl VecPoly1 {
     pub fn eval(&self, x: Scalar) -> Vec<Scalar> {
         let n = self.0.len();
         let mut out = vec![Scalar::zero(); n];
+        #[allow(clippy::needless_range_loop)]
         for i in 0..n {
             out[i] = self.0[i] + self.1[i] * x;
         }
@@ -126,7 +127,7 @@ pub fn sum_of_powers(x: &Scalar, n: usize) -> Scalar {
     while m > 2 {
         factor = factor * factor;
         result = result + factor * result;
-        m = m / 2;
+        m /= 2;
     }
     result
 }

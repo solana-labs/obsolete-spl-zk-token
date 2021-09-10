@@ -190,12 +190,8 @@ impl UpdateAccountPKProof {
         let w = transcript.challenge_scalar(b"w");
 
         // decompress R_0, R_1 or return verification error
-        let R_0 = R_0
-            .decompress()
-            .ok_or_else(|| ProofError::VerificationError)?;
-        let R_1 = R_1
-            .decompress()
-            .ok_or_else(|| ProofError::VerificationError)?;
+        let R_0 = R_0.decompress().ok_or(ProofError::VerificationError)?;
+        let R_1 = R_1.decompress().ok_or(ProofError::VerificationError)?;
 
         // check the required algebraic relation
         let check = RistrettoPoint::multiscalar_mul(
