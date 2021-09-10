@@ -68,8 +68,8 @@ impl ElGamal {
         amount: T,
         open: &PedersenOpen,
     ) -> ElGamalCT {
-        let message_comm = Pedersen::commit_with(amount, &open);
-        let decrypt_handle = pk.gen_decrypt_handle(&open);
+        let message_comm = Pedersen::commit_with(amount, open);
+        let decrypt_handle = pk.gen_decrypt_handle(open);
 
         ElGamalCT {
             message_comm,
@@ -195,7 +195,7 @@ impl ElGamalSK {
 
     pub fn from_bytes(bytes: &[u8]) -> Option<ElGamalSK> {
         match bytes.try_into() {
-            Ok(bytes) => Scalar::from_canonical_bytes(bytes).map(|scalar| ElGamalSK(scalar)),
+            Ok(bytes) => Scalar::from_canonical_bytes(bytes).map(ElGamalSK),
             _ => None,
         }
     }

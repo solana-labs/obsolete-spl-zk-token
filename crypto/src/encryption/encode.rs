@@ -115,7 +115,7 @@ impl DiscreteLogInstance {
 }
 
 /// Type wrapper for RistrettoPoint that implements the Hash trait
-#[derive(Serialize, Deserialize, Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, Eq)]
 pub struct HashableRistretto(pub RistrettoPoint);
 
 impl HashableRistretto {
@@ -127,6 +127,12 @@ impl HashableRistretto {
 impl Hash for HashableRistretto {
     fn hash<H: Hasher>(&self, state: &mut H) {
         bincode::serialize(self).unwrap().hash(state);
+    }
+}
+
+impl PartialEq for HashableRistretto {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
     }
 }
 

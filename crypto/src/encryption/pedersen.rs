@@ -119,7 +119,7 @@ impl PedersenOpen {
 
     pub fn from_bytes(bytes: &[u8]) -> Option<PedersenOpen> {
         match bytes.try_into() {
-            Ok(bytes) => Scalar::from_canonical_bytes(bytes).map(|scalar| PedersenOpen(scalar)),
+            Ok(bytes) => Scalar::from_canonical_bytes(bytes).map(PedersenOpen),
             _ => None,
         }
     }
@@ -210,6 +210,7 @@ define_mul_variants!(LHS = PedersenOpen, RHS = Scalar, Output = PedersenOpen);
 impl<'a, 'b> Div<&'b Scalar> for &'a PedersenOpen {
     type Output = PedersenOpen;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn div(self, other: &'b Scalar) -> PedersenOpen {
         PedersenOpen(self.get_scalar() * other.invert())
     }
@@ -303,6 +304,7 @@ define_mul_variants!(LHS = PedersenComm, RHS = Scalar, Output = PedersenComm);
 impl<'a, 'b> Div<&'b Scalar> for &'a PedersenComm {
     type Output = PedersenComm;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn div(self, other: &'b Scalar) -> PedersenComm {
         PedersenComm(self.get_point() * other.invert())
     }
@@ -416,6 +418,7 @@ define_mul_variants!(
 impl<'a, 'b> Div<&'b Scalar> for &'a PedersenDecHandle {
     type Output = PedersenDecHandle;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn div(self, other: &'b Scalar) -> PedersenDecHandle {
         PedersenDecHandle(self.get_point() * other.invert())
     }

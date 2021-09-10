@@ -162,16 +162,14 @@ pub struct ValidityProof {
 }
 
 #[allow(non_snake_case)]
+#[allow(clippy::too_many_arguments)]
 fn transfer_proof_create(
     source_sk: &ElGamalSK,
-
     dest_pk: &ElGamalPK,
-
     transfer_amt: (u64, u64),
     transfer_comms: &TransferComms,
     lo_open: &PedersenOpen,
     hi_open: &PedersenOpen,
-
     spendable_balance: u64,
     spendable_ct: &ElGamalCT,
 ) -> (RangeProof, ValidityProof) {
