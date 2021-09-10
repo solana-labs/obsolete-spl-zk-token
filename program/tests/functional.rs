@@ -7,11 +7,11 @@ use solana_sdk::{
     signature::{Keypair, Signer},
     transaction::Transaction,
 };
-use spl_confidential_token::{pod::*, *};
+use spl_zk_token::{pod::*, *};
 
 fn program_test() -> ProgramTest {
     let pc = ProgramTest::new(
-        "spl_confidential_token",
+        "spl_zk_token",
         id(),
         processor!(processor::process_instruction),
     );
@@ -73,7 +73,7 @@ async fn test_configure_mint_sanity() {
 
     let mut transaction = Transaction::new_with_payer(
         &[
-            spl_confidential_token::instruction::configure_mint_with_transfer_auditor(
+            spl_zk_token::instruction::configure_mint_with_transfer_auditor(
                 payer.pubkey(),
                 token_mint_keypair.pubkey(),
                 ElGamalPK::default(),
@@ -104,7 +104,7 @@ async fn test_configure_mint_sanity() {
         .expect("get_account")
         .expect("transfer_auditor_account not found");
 
-    assert_eq!(transfer_auditor_account.owner, spl_confidential_token::id());
+    assert_eq!(transfer_auditor_account.owner, spl_zk_token::id());
     let transfer_auditor =
         pod_from_bytes::<state::TransferAuditor>(&transfer_auditor_account.data).unwrap();
     assert_eq!(transfer_auditor.enabled, true.into());

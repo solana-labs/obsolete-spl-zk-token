@@ -1,5 +1,5 @@
 [package]
-name = "spl-confidential-token"
+name = "spl-zk-token"
 description = "Solana Program Library Confidential Token"
 authors = ["Solana Maintainers <maintainers@solana.foundation>"]
 repository = "https://github.com/solana-labs/solana-program-library"

@@ -4800,23 +4800,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "spl-confidential-token"
-version = "0.1.0"
-dependencies = [
- "assert_matches",
- "bytemuck",
- "bytemuck_derive",
- "num-derive",
- "num-traits",
- "solana-program",
- "solana-program-test",
- "solana-sdk",
- "solana-validator",
- "spl-token",
- "zeroable",
-]
-
-[[package]]
 name = "spl-memo"
 version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4837,6 +4820,23 @@ dependencies = [
  "num_enum",
  "solana-program",
  "thiserror",
+]
+
+[[package]]
+name = "spl-zk-token"
+version = "0.1.0"
+dependencies = [
+ "assert_matches",
+ "bytemuck",
+ "bytemuck_derive",
+ "num-derive",
+ "num-traits",
+ "solana-program",
+ "solana-program-test",
+ "solana-sdk",
+ "solana-validator",
+ "spl-token",
+ "zeroable",
 ]
 
 [[package]]
