@@ -408,12 +408,13 @@ impl InnerProductProof {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::range_proof::generators::BulletproofGens;
-    use rand_core::OsRng;
-    use sha3::Sha3_512;
+    use {
+        super::*, crate::range_proof::generators::BulletproofGens, rand::rngs::OsRng,
+        sha3::Sha3_512,
+    };
 
     #[test]
+    #[allow(non_snake_case)]
     fn test_basic_correctness() {
         let n = 32;
 

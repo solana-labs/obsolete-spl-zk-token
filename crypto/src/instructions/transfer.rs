@@ -1,15 +1,22 @@
-use merlin::Transcript;
-use rand_core::OsRng;
-
-use curve25519_dalek::ristretto::CompressedRistretto;
-use curve25519_dalek::scalar::Scalar;
-
-use crate::encryption::elgamal::{ElGamalCT, ElGamalPK, ElGamalSK};
-use crate::encryption::pedersen::{
-    Pedersen, PedersenBase, PedersenComm, PedersenDecHandle, PedersenOpen,
+use {
+    crate::{
+        encryption::elgamal::{ElGamalCT, ElGamalPK},
+        encryption::pedersen::{PedersenComm, PedersenDecHandle},
+        range_proof::RangeProof,
+    },
+    curve25519_dalek::{ristretto::CompressedRistretto, scalar::Scalar},
 };
-use crate::range_proof::RangeProof;
-use crate::transcript::TranscriptProtocol;
+#[cfg(not(target_arch = "bpf"))]
+use {
+    crate::{
+        encryption::{
+            elgamal::ElGamalSK,
+            pedersen::{Pedersen, PedersenBase, PedersenOpen},
+        },
+        transcript::TranscriptProtocol,
+    },
+    rand::rngs::OsRng,
+};
 
 /// NOTE: I think the logical way to divide up the proof is as before:
 /// 1. rangeproof
@@ -45,6 +52,7 @@ pub struct ValidityProofData {
     pub proof: ValidityProof,
 }
 
+#[cfg(not(target_arch = "bpf"))]
 pub fn create_transfer_instruction(
     transfer_amount: u64,
     spendable_balance: u64,
@@ -163,6 +171,7 @@ pub struct ValidityProof {
 
 #[allow(non_snake_case)]
 #[allow(clippy::too_many_arguments)]
+#[cfg(not(target_arch = "bpf"))]
 fn transfer_proof_create(
     source_sk: &ElGamalSK,
     dest_pk: &ElGamalPK,
@@ -173,7 +182,7 @@ fn transfer_proof_create(
     spendable_balance: u64,
     spendable_ct: &ElGamalCT,
 ) -> (RangeProof, ValidityProof) {
-    let mut transcript = Transcript::new(b"Solana CToken on testnet: Transfer");
+    let mut transcript = merlin::Transcript::new(b"Solana CToken on testnet: Transfer");
 
     let H = PedersenBase::default().H;
 
@@ -246,6 +255,7 @@ pub struct TransferHandles {
     pub auditor: PedersenDecHandle,
 }
 
+#[cfg(not(target_arch = "bpf"))]
 fn split_u64_into_u32(amt: u64) -> (u32, u32) {
     let lo = amt as u32;
     let hi = (amt >> 32) as u32;
