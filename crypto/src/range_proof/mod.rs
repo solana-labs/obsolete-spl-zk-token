@@ -1,22 +1,28 @@
+#[cfg(not(target_arch = "bpf"))]
+use {
+    crate::encryption::pedersen::{Pedersen, PedersenComm, PedersenOpen},
+    curve25519_dalek::traits::MultiscalarMul,
+    rand::rngs::OsRng,
+    subtle::{Choice, ConditionallySelectable},
+};
+use {
+    crate::{
+        encryption::pedersen::PedersenBase, errors::ProofError,
+        range_proof::generators::BulletproofGens, range_proof::inner_product::InnerProductProof,
+        transcript::TranscriptProtocol,
+    },
+    core::iter,
+    curve25519_dalek::{
+        ristretto::{CompressedRistretto, RistrettoPoint},
+        scalar::Scalar,
+        traits::{Identity, IsIdentity, VartimeMultiscalarMul},
+    },
+    merlin::Transcript,
+};
+
 pub mod generators;
 pub mod inner_product;
 pub mod util;
-
-use core::iter;
-use rand_core::OsRng;
-use subtle::{Choice, ConditionallySelectable};
-
-use merlin::Transcript;
-
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::{Identity, IsIdentity, MultiscalarMul, VartimeMultiscalarMul};
-
-use crate::encryption::pedersen::{Pedersen, PedersenBase, PedersenComm, PedersenOpen};
-use crate::errors::ProofError;
-use crate::range_proof::generators::BulletproofGens;
-use crate::range_proof::inner_product::InnerProductProof;
-use crate::transcript::TranscriptProtocol;
 
 #[allow(non_snake_case)]
 pub struct RangeProof {
@@ -33,6 +39,7 @@ pub struct RangeProof {
 #[allow(non_snake_case)]
 impl RangeProof {
     #[allow(clippy::many_single_char_names)]
+    #[cfg(not(target_arch = "bpf"))]
     pub fn create(
         amounts: Vec<u64>,
         bit_lengths: Vec<usize>,
@@ -280,7 +287,7 @@ fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    //use super::*;
 
     // #[test]
     // fn test_pedersen_rangeproof() {

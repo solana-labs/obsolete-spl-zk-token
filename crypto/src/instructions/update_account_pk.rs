@@ -1,14 +1,21 @@
-use merlin::Transcript;
-use rand_core::OsRng;
-
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::{IsIdentity, MultiscalarMul};
-
-use crate::encryption::elgamal::{ElGamalCT, ElGamalPK, ElGamalSK};
-use crate::encryption::pedersen::PedersenBase;
-use crate::errors::ProofError;
-use crate::transcript::TranscriptProtocol;
+#[cfg(not(target_arch = "bpf"))]
+use {crate::encryption::elgamal::ElGamalSK, rand::rngs::OsRng};
+use {
+    crate::{
+        encryption::{
+            elgamal::{ElGamalCT, ElGamalPK},
+            pedersen::PedersenBase,
+        },
+        errors::ProofError,
+        transcript::TranscriptProtocol,
+    },
+    curve25519_dalek::{
+        ristretto::{CompressedRistretto, RistrettoPoint},
+        scalar::Scalar,
+        traits::{IsIdentity, MultiscalarMul},
+    },
+    merlin::Transcript,
+};
 
 /// Update the confidential token account's ElGamal public key.
 ///
@@ -55,6 +62,7 @@ pub struct UpdateAccountPKProofData {
 
 impl UpdateAccountPKProofData {
     /// Create UpdateAccountPublicKeyData including the proof
+    #[cfg(not(target_arch = "bpf"))]
     pub fn create(
         current_balance: u64,
         current_sk: &ElGamalSK,
@@ -108,6 +116,7 @@ pub struct UpdateAccountPKProof {
 
 #[allow(non_snake_case)]
 impl UpdateAccountPKProof {
+    #[cfg(not(target_arch = "bpf"))]
     pub fn create(
         current_balance: u64,
         current_sk: &ElGamalSK,

@@ -1,11 +1,15 @@
 use merlin::Transcript;
-use rand_core::OsRng;
+
+#[cfg(not(target_arch = "bpf"))]
+use rand::rngs::OsRng;
 
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{IsIdentity, MultiscalarMul};
 
-use crate::encryption::elgamal::{ElGamalCT, ElGamalSK};
+use crate::encryption::elgamal::ElGamalCT;
+#[cfg(not(target_arch = "bpf"))]
+use crate::encryption::elgamal::ElGamalSK;
 use crate::errors::ProofError;
 use crate::transcript::TranscriptProtocol;
 
@@ -45,6 +49,7 @@ pub struct CloseAccountProofData {
 
 impl CloseAccountProofData {
     /// Create CloseAccountProofData including the proof
+    #[cfg(not(target_arch = "bpf"))]
     pub fn create(source_sk: &ElGamalSK, source_available_balance: &ElGamalCT) -> Self {
         // generate a new transcript
         //
@@ -83,6 +88,7 @@ pub struct CloseAccountProof {
 
 #[allow(non_snake_case)]
 impl CloseAccountProof {
+    #[cfg(not(target_arch = "bpf"))]
     pub fn create(
         source_sk: &ElGamalSK,
         source_current_balance: &ElGamalCT,

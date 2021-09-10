@@ -4898,7 +4898,6 @@ dependencies = [
  "itertools 0.8.2",
  "merlin",
  "rand 0.7.3",
- "rand_core 0.5.1",
  "serde",
  "sha3 0.8.2",
  "subtle",

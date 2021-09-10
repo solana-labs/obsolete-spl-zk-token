@@ -69,7 +69,10 @@ jobs:
         command: clippy
         args: --workspace --all-targets -- --deny=warnings
 
-    - name: Build and test
+    - name: Build
+      run: ./ci/cargo-build-test.sh
+
+    - name: Build BPF
       run: ./ci/cargo-test-bpf.sh program
 
     - name: Upload programs

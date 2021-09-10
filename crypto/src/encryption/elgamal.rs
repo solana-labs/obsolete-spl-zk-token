@@ -1,7 +1,9 @@
 #![allow(non_snake_case, dead_code)]
 
 use core::ops::{Add, Div, Mul, Sub};
-use rand_core::{CryptoRng, OsRng, RngCore};
+
+#[cfg(not(target_arch = "bpf"))]
+use rand::{rngs::OsRng, CryptoRng, RngCore};
 
 use subtle::{Choice, ConstantTimeEq};
 use zeroize::Zeroize;
@@ -25,12 +27,14 @@ use crate::encryption::pedersen::{
 pub struct ElGamal;
 impl ElGamal {
     /// Generates the public and secret keys for ElGamal encryption.
+    #[cfg(not(target_arch = "bpf"))]
     pub fn keygen() -> (ElGamalPK, ElGamalSK) {
         ElGamal::keygen_with(&mut OsRng) // using OsRng for now
     }
 
     /// On input a randomness generator, the function generates the public and
     /// secret keys for ElGamal encryption.
+    #[cfg(not(target_arch = "bpf"))]
     pub fn keygen_with<T: RngCore + CryptoRng>(rng: &mut T) -> (ElGamalPK, ElGamalSK) {
         // sample a non-zero scalar
         let mut s: Scalar;
@@ -50,6 +54,7 @@ impl ElGamal {
 
     /// On input a public key and a message to be encrypted, the function
     /// returns an ElGamal ciphertext of the message under the public key.
+    #[cfg(not(target_arch = "bpf"))]
     pub fn encrypt<T: Into<Scalar>>(pk: &ElGamalPK, amount: T) -> ElGamalCT {
         let (message_comm, open) = Pedersen::commit(amount);
         let decrypt_handle = pk.gen_decrypt_handle(&open);
@@ -121,6 +126,7 @@ impl ElGamalPK {
     }
 
     /// Utility method for code ergonomics.
+    #[cfg(not(target_arch = "bpf"))]
     pub fn encrypt<T: Into<Scalar>>(&self, msg: T) -> ElGamalCT {
         ElGamal::encrypt(self, msg)
     }

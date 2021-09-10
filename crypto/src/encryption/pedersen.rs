@@ -1,7 +1,9 @@
 #![allow(non_snake_case, dead_code)]
 
 use core::ops::{Add, Div, Mul, Sub};
-use rand_core::{CryptoRng, OsRng, RngCore};
+
+#[cfg(not(target_arch = "bpf"))]
+use rand::{rngs::OsRng, CryptoRng, RngCore};
 
 use sha3::Sha3_512;
 use subtle::{Choice, ConstantTimeEq};
@@ -54,6 +56,7 @@ impl Pedersen {
     /// the number and its corresponding opening.
     ///
     /// TODO: Interface that takes a random generator as input
+    #[cfg(not(target_arch = "bpf"))]
     pub fn commit<T: Into<Scalar>>(amount: T) -> (PedersenComm, PedersenOpen) {
         let open = PedersenOpen(Scalar::random(&mut OsRng));
         let comm = Pedersen::commit_with(amount, &open);
@@ -109,6 +112,7 @@ impl PedersenOpen {
         self.0
     }
 
+    #[cfg(not(target_arch = "bpf"))]
     pub fn random<T: RngCore + CryptoRng>(rng: &mut T) -> Self {
         PedersenOpen(Scalar::random(rng))
     }
