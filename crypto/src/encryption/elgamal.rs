@@ -115,6 +115,7 @@ impl ElGamalPK {
         self.0
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_bytes(&self) -> [u8; 32] {
         self.0.compress().to_bytes()
     }

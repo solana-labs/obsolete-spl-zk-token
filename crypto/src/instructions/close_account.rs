@@ -158,7 +158,7 @@ mod test {
         let (source_pk, source_sk) = ElGamal::keygen();
 
         // If account balance is 0, then the proof should succeed
-        let source_current_balance = source_pk.encrypt(0 as u64);
+        let source_current_balance = source_pk.encrypt(0_u64);
 
         let mut transcript_prove = Transcript::new(b"CloseAccountProof Test");
         let mut transcript_verify = Transcript::new(b"CloseAccountProof Test");
@@ -170,7 +170,7 @@ mod test {
             .is_ok());
 
         // If account balance is not zero, then the proof verification should fail
-        let source_current_balance = source_pk.encrypt(55 as u64);
+        let source_current_balance = source_pk.encrypt(55_u64);
 
         let mut transcript_prove = Transcript::new(b"CloseAccountProof Test");
         let mut transcript_verify = Transcript::new(b"CloseAccountProof Test");

@@ -256,7 +256,7 @@ mod test {
             .is_ok());
 
         // If current_ct and new_ct encrypt different values, then the proof verification should fail
-        let new_ct = new_pk.encrypt(55 as u64);
+        let new_ct = new_pk.encrypt(55_u64);
 
         let mut transcript_prove = Transcript::new(b"UpdateAccountPublicKeyProof Test");
         let mut transcript_verify = Transcript::new(b"UpdateAccountPublicKeyProof Test");
