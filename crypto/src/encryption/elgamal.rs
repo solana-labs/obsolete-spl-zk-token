@@ -12,10 +12,8 @@ use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 
 use arrayref::{array_ref, array_refs};
-use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
-use std::io::{self, Error, ErrorKind, Write};
 
 use crate::encryption::encode::DiscreteLogInstance;
 use crate::encryption::pedersen::{
@@ -150,33 +148,6 @@ impl From<RistrettoPoint> for ElGamalPK {
     }
 }
 
-impl BorshSerialize for ElGamalPK {
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
-        writer.write_all(&self.to_bytes())
-    }
-}
-
-impl BorshDeserialize for ElGamalPK {
-    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        if buf.len() < 32 {
-            return Err(io::Error::new(
-                ErrorKind::InvalidInput,
-                "Unexpected length of input",
-            ));
-        }
-        match Self::from_bytes(&buf[..32]) {
-            Some(result) => {
-                *buf = &buf[32..];
-                Ok(result)
-            }
-            None => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Invalid ElGamalPK representation",
-            )),
-        }
-    }
-}
-
 /// Secret key for the ElGamal encryption scheme.
 #[derive(Serialize, Deserialize, Clone, Debug, Zeroize)]
 #[zeroize(drop)]
@@ -226,33 +197,6 @@ impl ConstantTimeEq for ElGamalSK {
     }
 }
 
-impl BorshSerialize for ElGamalSK {
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
-        writer.write_all(&self.to_bytes())
-    }
-}
-
-impl BorshDeserialize for ElGamalSK {
-    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        if buf.len() < 32 {
-            return Err(io::Error::new(
-                ErrorKind::InvalidInput,
-                "Unexpected length of input",
-            ));
-        }
-        match Self::from_bytes(&buf[..32]) {
-            Some(result) => {
-                *buf = &buf[32..];
-                Ok(result)
-            }
-            None => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Invalid ElGamalSK representation",
-            )),
-        }
-    }
-}
-
 /// Wire version of the `ElGamalCT` type
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
@@ -292,8 +236,6 @@ impl TryFrom<PodElGamalPK> for ElGamalPK {
 /// Ciphertext for the ElGamal encryption scheme.
 #[allow(non_snake_case)]
 #[derive(
-    BorshSerialize,
-    BorshDeserialize,
     Serialize,
     Deserialize,
     Default,
@@ -507,38 +449,6 @@ mod tests {
         let ct_div = ElGamal::encrypt_with(&pk, msg_0 / msg_1, &(open / scalar));
 
         assert_eq!(ct_div, ct / scalar);
-    }
-
-    #[test]
-    fn test_borsh_ciphertext() {
-        let (pk, _) = ElGamal::keygen();
-        let msg: u64 = 77;
-        let ct = pk.encrypt(msg);
-
-        let encoded = ct.try_to_vec().unwrap();
-        let decoded = BorshDeserialize::try_from_slice(&encoded).unwrap();
-
-        assert_eq!(ct, decoded);
-    }
-
-    #[test]
-    fn test_borsh_pubkey() {
-        let (pk, _) = ElGamal::keygen();
-
-        let encoded = pk.try_to_vec().unwrap();
-        let decoded = BorshDeserialize::try_from_slice(&encoded).unwrap();
-
-        assert_eq!(pk, decoded);
-    }
-
-    #[test]
-    fn test_borsh_secretkey() {
-        let (_, sk) = ElGamal::keygen();
-
-        let encoded = sk.try_to_vec().unwrap();
-        let decoded = BorshDeserialize::try_from_slice(&encoded).unwrap();
-
-        assert_eq!(sk, decoded);
     }
 
     #[test]

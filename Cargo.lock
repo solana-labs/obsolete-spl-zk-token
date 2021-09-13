@@ -4754,8 +4754,6 @@ version = "0.1.0"
 dependencies = [
  "arrayref",
  "bincode",
- "borsh",
- "borsh-derive",
  "bytemuck",
  "bytemuck_derive",
  "byteorder",
