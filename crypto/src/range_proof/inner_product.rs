@@ -414,6 +414,7 @@ mod tests {
     };
 
     #[test]
+    #[ignore]
     #[allow(non_snake_case)]
     fn test_basic_correctness() {
         let n = 32;
