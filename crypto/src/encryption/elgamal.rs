@@ -235,16 +235,7 @@ impl TryFrom<PodElGamalPK> for ElGamalPK {
 
 /// Ciphertext for the ElGamal encryption scheme.
 #[allow(non_snake_case)]
-#[derive(
-    Serialize,
-    Deserialize,
-    Default,
-    Clone,
-    Copy,
-    Debug,
-    Eq,
-    PartialEq,
-)]
+#[derive(Serialize, Deserialize, Default, Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ElGamalCT {
     pub message_comm: PedersenComm,
     pub decrypt_handle: PedersenDecHandle,
