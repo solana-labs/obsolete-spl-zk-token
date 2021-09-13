@@ -14,14 +14,14 @@ use curve25519_dalek::scalar::Scalar;
 use arrayref::{array_ref, array_refs};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use std::convert::TryInto;
-use std::io;
-use std::io::{Error, ErrorKind, Write};
+use std::convert::{TryFrom, TryInto};
+use std::io::{self, Error, ErrorKind, Write};
 
 use crate::encryption::encode::DiscreteLogInstance;
 use crate::encryption::pedersen::{
     Pedersen, PedersenBase, PedersenComm, PedersenDecHandle, PedersenOpen,
 };
+use crate::errors::ProofError;
 
 /// Handle for the (twisted) ElGamal encryption scheme
 pub struct ElGamal;
@@ -250,6 +250,42 @@ impl BorshDeserialize for ElGamalSK {
                 "Invalid ElGamalSK representation",
             )),
         }
+    }
+}
+
+/// Wire version of the `ElGamalCT` type
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(transparent)]
+pub struct PodElGamalCT([u8; 64]);
+impl From<ElGamalCT> for PodElGamalCT {
+    fn from(ct: ElGamalCT) -> Self {
+        Self(ct.to_bytes())
+    }
+}
+
+impl TryFrom<PodElGamalCT> for ElGamalCT {
+    type Error = ProofError;
+
+    fn try_from(pod: PodElGamalCT) -> Result<Self, Self::Error> {
+        Self::from_bytes(&pod.0).ok_or(ProofError::InconsistentCTData)
+    }
+}
+
+/// Wire version of the `ElGamalPK` type
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(transparent)]
+pub struct PodElGamalPK([u8; 32]);
+impl From<ElGamalPK> for PodElGamalPK {
+    fn from(pk: ElGamalPK) -> Self {
+        Self(pk.to_bytes())
+    }
+}
+
+impl TryFrom<PodElGamalPK> for ElGamalPK {
+    type Error = ProofError;
+
+    fn try_from(pod: PodElGamalPK) -> Result<Self, Self::Error> {
+        Self::from_bytes(&pod.0).ok_or(ProofError::InconsistentCTData)
     }
 }
 
