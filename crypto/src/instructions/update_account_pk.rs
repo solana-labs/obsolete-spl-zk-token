@@ -3,18 +3,21 @@ use {crate::encryption::elgamal::ElGamalSK, rand::rngs::OsRng};
 use {
     crate::{
         encryption::{
-            elgamal::{ElGamalCT, ElGamalPK},
+            elgamal::{ElGamalCT, ElGamalPK, PodElGamalCT, PodElGamalPK},
             pedersen::PedersenBase,
         },
         errors::ProofError,
+        pod_curve25519_dalek::*,
         transcript::TranscriptProtocol,
     },
     curve25519_dalek::{
-        ristretto::{CompressedRistretto, RistrettoPoint},
+        ristretto::RistrettoPoint,
         scalar::Scalar,
         traits::{IsIdentity, MultiscalarMul},
     },
     merlin::Transcript,
+    std::convert::TryInto,
+    zeroable::Zeroable,
 };
 
 /// Update the confidential token account's ElGamal public key.
@@ -35,12 +38,13 @@ use {
 ///   3.. `[signer]` Required M signer accounts for the SPL Token Multisig account
 ///
 /// Implementing it here as a struct for demonstration
-#[allow(dead_code)]
-struct UpdateAccountPK {
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub struct UpdateAccountPK {
     /// New ElGamal encryption key
-    new_pk: ElGamalPK, // 32 bytes
+    new_pk: PodElGamalPK, // 32 bytes
     /// New encrypted available balance
-    new_ct: ElGamalCT, // 64 bytes
+    new_ct: PodElGamalCT, // 64 bytes
     /// Proof that the encrypted balances are equivalent
     proof_component: UpdateAccountPKProofData, // 224 bytes
 }
@@ -52,9 +56,11 @@ struct UpdateAccountPK {
 /// - The actual program should check that `current_ct` is consistent with what is
 ///   currently stored in the confidential token account
 ///
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct UpdateAccountPKProofData {
     /// Current source available balance encrypted under `current_pk`
-    pub current_ct: ElGamalCT, // 64 bytes
+    pub current_ct: PodElGamalCT, // 64 bytes
 
     /// Proof that the current and new ciphertexts are consistent
     pub proof: UpdateAccountPKProof, // 160 bytes
@@ -88,30 +94,31 @@ impl UpdateAccountPKProofData {
         );
 
         UpdateAccountPKProofData {
-            current_ct: *current_ct,
+            current_ct: (*current_ct).into(),
             proof,
         }
     }
 
     /// Verify UpdateAccountPublicKeyProof
     pub fn verify_proof(&self, new_ct: &ElGamalCT) -> Result<(), ProofError> {
-        let Self { current_ct, proof } = self;
-
+        let current_ct: ElGamalCT = self.current_ct.try_into()?;
         let mut transcript =
             Transcript::new(b"Solana CToken on testnet: UpdateAccountPublicKeyData");
-        proof.verify(current_ct, new_ct, &mut transcript)
+        self.proof.verify(&current_ct, new_ct, &mut transcript)
     }
 }
 
 /// This struct represents the cryptographic proof component that certifies that the current_ct and
 /// new_ct encrypt equal values
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 #[allow(non_snake_case)]
 pub struct UpdateAccountPKProof {
-    pub R_0: CompressedRistretto, // 32 bytes
-    pub R_1: CompressedRistretto, // 32 bytes
-    pub z_sk_0: Scalar,           // 32 bytes
-    pub z_sk_1: Scalar,           // 32 bytes
-    pub z_x: Scalar,              // 32 bytes
+    pub R_0: PodCompressedRistretto, // 32 bytes
+    pub R_1: PodCompressedRistretto, // 32 bytes
+    pub z_sk_0: PodScalar,           // 32 bytes
+    pub z_sk_1: PodScalar,           // 32 bytes
+    pub z_x: PodScalar,              // 32 bytes
 }
 
 #[allow(non_snake_case)]
@@ -158,11 +165,11 @@ impl UpdateAccountPKProof {
         let z_x = c * x + r_x;
 
         UpdateAccountPKProof {
-            R_0,
-            R_1,
-            z_sk_0,
-            z_sk_1,
-            z_x,
+            R_0: R_0.into(),
+            R_1: R_1.into(),
+            z_sk_0: z_sk_0.into(),
+            z_sk_1: z_sk_1.into(),
+            z_x: z_x.into(),
         }
     }
 
@@ -182,13 +189,11 @@ impl UpdateAccountPKProof {
         let C_1 = new_ct.message_comm.get_point();
         let D_1 = new_ct.decrypt_handle.get_point();
 
-        let UpdateAccountPKProof {
-            R_0,
-            R_1,
-            z_sk_0,
-            z_sk_1,
-            z_x,
-        } = *self;
+        let R_0 = self.R_0.into();
+        let R_1 = self.R_1.into();
+        let z_sk_0 = self.z_sk_0.into();
+        let z_sk_1: Scalar = self.z_sk_1.into();
+        let z_x = self.z_x.into();
 
         let G = PedersenBase::default().G;
 
