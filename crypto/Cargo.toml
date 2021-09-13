@@ -9,8 +9,6 @@ arrayref = "0.3.6"
 bincode = "1"
 bytemuck = "1.7.2"
 bytemuck_derive = "1.0.1"
-borsh = "0.9"
-borsh-derive = "0.9.0"
 byteorder = { version = "1", default-features = false }
 clear_on_drop = { version = "0.2", default-features = false }
 curve25519-dalek = { version = "2", default-features = false, features = ["u64_backend", "alloc", "serde"] }
