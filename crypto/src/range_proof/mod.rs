@@ -276,7 +276,7 @@ impl RangeProof {
                 .chain(bp_gens.H(nm).map(|&x| Some(x)))
                 .chain(comms.iter().map(|V| V.decompress())),
         )
-        .ok_or_else(|| ProofError::VerificationError)?;
+        .ok_or(ProofError::VerificationError)?;
 
         if mega_check.is_identity() {
             Ok(())
@@ -290,7 +290,7 @@ impl RangeProof {
 /// \\[
 /// \delta(y,z) = (z - z^{2}) \langle \mathbf{1}, {\mathbf{y}}^{n \cdot m} \rangle - \sum_{j=0}^{m-1} z^{j+3} \cdot \langle \mathbf{1}, {\mathbf{2}}^{n \cdot m} \rangle
 /// \\]
-fn delta(bit_lengths: &Vec<usize>, y: &Scalar, z: &Scalar) -> Scalar {
+fn delta(bit_lengths: &[usize], y: &Scalar, z: &Scalar) -> Scalar {
     let nm: usize = bit_lengths.iter().sum();
     let sum_y = util::sum_of_powers(y, nm);
 
