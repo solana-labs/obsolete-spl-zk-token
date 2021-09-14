@@ -24,6 +24,9 @@ pub trait TranscriptProtocol {
     /// Append a domain separator for update account public key proof.
     fn update_account_public_key_proof_domain_sep(&mut self);
 
+    /// Append a domain separator for withdraw proof.
+    fn withdraw_proof_domain_sep(&mut self);
+
     /// Append a `scalar` with the given `label`.
     fn append_scalar(&mut self, label: &'static [u8], scalar: &Scalar);
 
@@ -64,6 +67,10 @@ impl TranscriptProtocol for Transcript {
 
     fn update_account_public_key_proof_domain_sep(&mut self) {
         self.append_message(b"dom_sep", b"UpdateAccountPublicKeyProof");
+    }
+
+    fn withdraw_proof_domain_sep(&mut self) {
+        self.append_message(b"dom_sep", b"WithdrawProof");
     }
 
     fn append_scalar(&mut self, label: &'static [u8], scalar: &Scalar) {

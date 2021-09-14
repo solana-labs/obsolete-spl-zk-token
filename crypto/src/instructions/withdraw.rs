@@ -1,8 +1,21 @@
-use merlin::Transcript;
-
-use crate::encryption::elgamal::{ElGamal, ElGamalCT, ElGamalPK, ElGamalSK};
-use crate::encryption::pedersen::PedersenOpen;
-use crate::errors::ProofError;
+#[cfg(not(target_arch = "bpf"))]
+use {
+    crate::encryption::elgamal::{ElGamalPK, ElGamalSK},
+    rand::rngs::OsRng,
+};
+use {
+    crate::{
+        encryption::{elgamal::ElGamalCT, pedersen::{PedersenOpen, PedersenBase}},
+        errors::ProofError,
+        pod::*,
+        range_proof::RangeProof,
+        transcript::TranscriptProtocol,
+    },
+    curve25519_dalek::{
+        scalar::Scalar,
+    },
+    merlin::Transcript,
+};
 
 /// Withdraw SPL Tokens from the available balance of a confidential token account.
 ///
@@ -41,41 +54,36 @@ struct Withdraw {
 ///
 pub struct WithdrawProofData {
     /// The source account ElGamal public key
-    pub source_pk: ElGamalPK,
+    pub source_pk: PodElGamalPK, // 32 bytes
     /// The source account available balance *after* the withdraw (encrypted by
     /// `source_pk`)
-    pub source_final_balance: ElGamalCT,
+    pub final_balance_ct: PodElGamalCT, // 64 bytes
     /// Proof that the account is solvent
     pub proof: WithdrawProof,
 }
 
 impl WithdrawProofData {
-    pub fn create(
+    #[cfg(not(target_arch = "bpf"))]
+    pub fn new(
         amount: u64,
-        source_pk: &ElGamalPK,
+        source_pk: ElGamalPK,
         source_sk: &ElGamalSK,
-        source_current_balance: &ElGamalCT,
+        current_balance: u64,
+        current_balance_ct: ElGamalCT,
     ) -> Self {
-        // generate a new transcript
-        let mut transcript = Transcript::new(b"Solana CToken on testnet: WithdrawData");
+        // subtract withdraw amount from current balance
+        let final_balance = current_balance - amount;
 
         // encode withdraw amount as an ElGamal ciphertext and subtract it from
         // current source balance
-        let amount_encoded = ElGamal::encrypt_with(source_pk, amount, &PedersenOpen::default());
-        let source_final_balance = source_current_balance - amount_encoded;
+        let amount_encoded = source_pk.encrypt_with(amount, &PedersenOpen::default());
+        let final_balance_ct = current_balance_ct - amount_encoded;
 
-        // create proof of solvency
-        let proof = WithdrawProof::create(
-            amount,
-            source_pk,
-            source_sk,
-            &source_final_balance,
-            &mut transcript,
-        );
+        let proof = WithdrawProof::new(source_sk, final_balance, &final_balance_ct);
 
-        WithdrawProofData {
-            source_pk: *source_pk,
-            source_final_balance,
+        Self {
+            source_pk: source_pk.into(),
+            final_balance_ct: final_balance_ct.into(),
             proof,
         }
     }
@@ -90,22 +98,70 @@ impl WithdrawProofData {
 /// This struct represents the cryptographic proof component that certifies the account's solvency
 /// for withdrawal
 #[allow(non_snake_case)]
-pub struct WithdrawProof {}
+pub struct WithdrawProof {
+    /// Wrapper for range proof: R component
+    pub R: PodCompressedRistretto,
+    /// Wrapper for range proof: z component
+    pub z: PodScalar,
+    /// Associated range proof
+    pub range_proof: RangeProof,
+}
 
 #[allow(non_snake_case)]
 impl WithdrawProof {
-    pub fn create(
-        _amount: u64,
-        _source_pk: &ElGamalPK,
-        _source_sk: &ElGamalSK,
-        _source_final_balance: &ElGamalCT,
-        _transcript: &mut Transcript,
+    fn transcript_new() -> Transcript {
+        Transcript::new(b"WithdrawProof")
+    }
+
+    pub fn new(
+        source_sk: &ElGamalSK,
+        final_balance: u64,
+        final_balance_ct: &ElGamalCT,
     ) -> Self {
-        // TODO
-        WithdrawProof {}
+        let mut transcript = Self::transcript_new();
+
+        // Add a domain separator to record the start of the protocol
+        transcript.withdraw_proof_domain_sep();
+
+        // Extract the relevant scalar and Ristretto points from the input
+        let H = PedersenBase::default().H;
+        let D = final_balance_ct.decrypt_handle.get_point();
+        let s = source_sk.get_scalar();
+
+        // Generate wrapper components for range proof
+        let r_new = Scalar::random(&mut OsRng);
+        let y = Scalar::random(&mut OsRng);
+        let R = (y * D + r_new * H).compress();
+
+        transcript.append_point(b"R", &R);
+        let c = transcript.challenge_scalar(b"c");
+
+        let z = c * s + y;
+        let new_open = PedersenOpen(c * r_new);
+
+        // Generate the range proof component
+        let t_1_blinding = PedersenOpen::random(&mut OsRng);
+        let t_2_blinding = PedersenOpen::random(&mut OsRng);
+
+        let range_proof = RangeProof::create(
+            vec![final_balance],
+            vec![64],
+            vec![],
+            vec![&new_open],
+            &t_1_blinding,
+            &t_2_blinding,
+            &mut transcript,
+        );
+
+        WithdrawProof {
+            R: R.into(),
+            z: z.into(),
+            range_proof,
+        }
     }
 
     pub fn verify(&self) -> Result<(), ProofError> {
         Ok(())
     }
 }
+
