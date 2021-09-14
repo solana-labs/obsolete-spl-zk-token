@@ -299,7 +299,7 @@ fn process_configure_mint(
     transfer_auditor.mint = (*mint_info.key).into();
     if let Some(transfer_auditor_pk) = transfer_auditor_pk {
         transfer_auditor.enabled = true.into();
-        transfer_auditor.elgaml_pk = *transfer_auditor_pk;
+        transfer_auditor.elgamal_pk = *transfer_auditor_pk;
     }
 
     Ok(())
@@ -344,7 +344,7 @@ fn process_update_transfer_auditor(
     }
 
     match new_transfer_auditor_pk {
-        Some(new_transfer_auditor_pk) => transfer_auditor.elgaml_pk = *new_transfer_auditor_pk,
+        Some(new_transfer_auditor_pk) => transfer_auditor.elgamal_pk = *new_transfer_auditor_pk,
         None => {
             transfer_auditor.enabled = false.into();
         }
@@ -409,7 +409,7 @@ fn process_create_account(
         ConfidentialAccount::from_account_info(confidential_account_info, &id())?;
     confidential_account.mint = token_account.mint.into();
     confidential_account.token_account = (*token_account_info.key).into();
-    confidential_account.elgaml_pk = data.elgaml_pk;
+    confidential_account.elgamal_pk = data.elgamal_pk;
     confidential_account.accept_incoming_transfers = true.into();
     Ok(())
 }
@@ -474,7 +474,7 @@ fn process_update_account_pk(input: &[u8], accounts: &[AccountInfo]) -> ProgramR
     }
 
     let available_balance = data.current_ct;
-    let new_elgaml_pk = data.new_pk;
+    let new_elgamal_pk = data.new_pk;
     let new_available_balance = data.new_ct;
 
     let (mut confidential_account, _token_account) = validate_confidential_account_is_signer(
@@ -494,7 +494,7 @@ fn process_update_account_pk(input: &[u8], accounts: &[AccountInfo]) -> ProgramR
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    confidential_account.elgaml_pk = new_elgaml_pk;
+    confidential_account.elgamal_pk = new_elgamal_pk;
     confidential_account.available_balance = new_available_balance;
     confidential_account.outbound_transfer = OutboundTransfer::zeroed();
 
@@ -723,7 +723,7 @@ fn process_transfer(
 
     if let Some(transfer_auditor_pk) = transfer_auditor_pk {
         if bool::from(&transfer_auditor.enabled) {
-            if transfer_auditor.elgaml_pk != transfer_auditor_pk {
+            if transfer_auditor.elgamal_pk != transfer_auditor_pk {
                 msg!("Error: Invalid transfer auditor pk");
                 return Err(ProgramError::InvalidArgument);
             }
@@ -768,7 +768,7 @@ fn process_transfer(
     }
 
     if outbound_transfer.receiver_pk != *receiver_pk
-        || receiver_confidential_account.elgaml_pk != *receiver_pk
+        || receiver_confidential_account.elgamal_pk != *receiver_pk
     {
         msg!("Error: Receiver public key mismatch");
         return Err(ProgramError::InvalidArgument);

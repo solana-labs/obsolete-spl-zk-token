@@ -34,7 +34,7 @@ pub struct UpdateTransferAuditorInstructionData {
 #[repr(transparent)]
 pub struct CreateAccountInstructionData {
     /// The public key associated with the account
-    pub elgaml_pk: PodElGamalPK,
+    pub elgamal_pk: PodElGamalPK,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]

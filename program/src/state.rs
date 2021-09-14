@@ -12,7 +12,7 @@ pub struct TransferAuditor {
     pub enabled: PodBool,
 
     /// ElGamal public key for the transfer auditor.
-    pub elgaml_pk: PodElGamalPK,
+    pub elgamal_pk: PodElGamalPK,
 }
 impl PodAccountInfo<'_, '_> for TransferAuditor {}
 
@@ -25,7 +25,7 @@ pub struct OutboundTransfer {
     /// `true` once a range proof has been accepted for this transfer
     pub range_proof: PodBool,
 
-    /// Transfer amount encrypted by the sender's `ConfidentialAccount::elgaml_pk`
+    /// Transfer amount encrypted by the sender's `ConfidentialAccount::elgamal_pk`
     pub sender_transfer_amount: PodElGamalCT,
 
     /// The receiver's ElGamal public key
@@ -52,12 +52,12 @@ pub struct ConfidentialAccount {
     pub token_account: PodPubkey,
 
     /// The public key associated with ElGamal encryption
-    pub elgaml_pk: PodElGamalPK,
+    pub elgamal_pk: PodElGamalPK,
 
-    /// The pending balance (encrypted by `elgaml_pk`)
+    /// The pending balance (encrypted by `elgamal_pk`)
     pub pending_balance: PodElGamalCT,
 
-    /// The available balance (encrypted by `elgaml_pk`)
+    /// The available balance (encrypted by `elgamal_pk`)
     pub available_balance: PodElGamalCT,
 
     /// Prohibit incoming transfers if `false`
