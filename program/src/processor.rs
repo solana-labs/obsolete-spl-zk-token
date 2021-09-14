@@ -16,6 +16,8 @@ use {
         system_instruction,
         sysvar::{self, Sysvar},
     },
+    spl_zk_token_crypto::instructions::update_account_pk::UpdateAccountPkData,
+    spl_zk_token_crypto::pod::*,
     std::result::Result,
 };
 
@@ -188,7 +190,7 @@ fn create_pda_account<'a>(
 /// Processes an [ConfigureMint] instruction.
 fn process_configure_mint(
     accounts: &[AccountInfo],
-    transfer_auditor_pk: Option<&ElGamalPK>,
+    transfer_auditor_pk: Option<&PodElGamalPK>,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let funder_info = next_account_info(account_info_iter)?;
@@ -306,7 +308,7 @@ fn process_configure_mint(
 /// Processes an [UpdateTransferAuditor] instruction.
 fn process_update_transfer_auditor(
     accounts: &[AccountInfo],
-    new_transfer_auditor_pk: Option<&ElGamalPK>,
+    new_transfer_auditor_pk: Option<&PodElGamalPK>,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let transfer_auditor_info = next_account_info(account_info_iter)?;
@@ -431,8 +433,8 @@ fn process_close_account(
     )?;
 
     // TODO: Add real zero token balance check
-    if confidential_account.pending_balance != ElGamalCT::default()
-        || confidential_account.available_balance != ElGamalCT::default()
+    if confidential_account.pending_balance != PodElGamalCT::zeroed()
+        || confidential_account.available_balance != PodElGamalCT::zeroed()
     {
         msg!("Confidential account balance is not zero");
         return Err(ProgramError::InvalidAccountData);
@@ -452,20 +454,28 @@ fn process_close_account(
 }
 
 /// Processes an [UpdateAccountPk] instruction.
-fn process_update_account_pk(
-    accounts: &[AccountInfo],
-    elgaml_pk: &ElGamalPK,
-    pending_balance: &ElGamalCT,
-    available_balance: &ElGamalCT,
-    new_elgaml_pk: &ElGamalPK,
-    new_pending_balance: &ElGamalCT,
-    new_available_balance: &ElGamalCT,
-) -> ProgramResult {
+fn process_update_account_pk(input: &[u8], accounts: &[AccountInfo]) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let confidential_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
     let instructions_sysvar_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
+
+    // TODO: Read `data` and confirm proof from reading the data of the previous instruction
+    // instead of using `decode_instruction_data()` on this instruction input....
+    msg!(
+        "TODO: {:?}",
+        get_previous_instruction(instructions_sysvar_info)
+    );
+    let data = decode_instruction_data::<UpdateAccountPkData>(input)?;
+    if let Err(err) = data.verify() {
+        msg!("proof verification failed: {:?}", err);
+        return Err(ProgramError::InvalidInstructionData);
+    }
+
+    let available_balance = data.current_ct;
+    let new_elgaml_pk = data.new_pk;
+    let new_available_balance = data.new_ct;
 
     let (mut confidential_account, _token_account) = validate_confidential_account_is_signer(
         confidential_account_info,
@@ -474,23 +484,18 @@ fn process_update_account_pk(
         account_info_iter.as_slice(),
     )?;
 
-    // TODO: Get balance equality proof from previous instruction....
-    msg!(
-        "TODO: {:?}",
-        get_previous_instruction(instructions_sysvar_info)
-    );
+    if confidential_account.pending_balance != PodElGamalCT::zeroed() {
+        msg!("Pending balance is not zero");
+        return Err(ProgramError::InvalidAccountData);
+    }
 
-    if confidential_account.elgaml_pk != *elgaml_pk
-        || confidential_account.pending_balance != *pending_balance
-        || confidential_account.available_balance != *available_balance
-    {
-        msg!("Pubkey and/or balance mismatch");
+    if confidential_account.available_balance != available_balance {
+        msg!("Available balance mismatch");
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    confidential_account.elgaml_pk = *new_elgaml_pk;
-    confidential_account.pending_balance = *new_pending_balance;
-    confidential_account.available_balance = *new_available_balance;
+    confidential_account.elgaml_pk = new_elgaml_pk;
+    confidential_account.available_balance = new_available_balance;
     confidential_account.outbound_transfer = OutboundTransfer::zeroed();
 
     Ok(())
@@ -554,7 +559,7 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
         &accounts,
     )?;
 
-    // TODO: implement and uncomment the ElGamalCT addition
+    // TODO: implement and uncomment the PodElGamalCT addition
     //confidential_account.pending_balance += GroupEncoding::encode(amount)
 
     Ok(())
@@ -620,7 +625,7 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
         &[omnibus_token_account_signer_seeds],
     )?;
 
-    // TODO: implement and uncomment the ElGamalCT addition
+    // TODO: implement and uncomment the PodElGamalCT addition
     //confidential_account.available_balance -= GroupEncoding::encode(amount)
 
     Ok(())
@@ -636,8 +641,8 @@ enum TransferProof {
 /// Processes a [SubmitCiphertextValidityProof] or [SubmitRangeProof] instruction.
 fn process_submit_transfer_proof(
     accounts: &[AccountInfo],
-    receiver_pk: &ElGamalPK,
-    receiver_pending_balance: &ElGamalCT,
+    receiver_pk: &PodElGamalPK,
+    receiver_pending_balance: &PodElGamalCT,
     transfer_proof: TransferProof,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
@@ -666,18 +671,18 @@ fn process_submit_transfer_proof(
                 // TODO: Validate the proof and extract the transfer amounts
                 outbound_transfer.validity_proof = true.into();
                 (
-                    ElGamalCT::default(),
-                    ElGamalCT::default(),
-                    ElGamalCT::default(),
+                    PodElGamalCT::zeroed(),
+                    PodElGamalCT::zeroed(),
+                    PodElGamalCT::zeroed(),
                 )
             }
             TransferProof::Range => {
                 // TODO: Validate the proof and extract the transfer amounts
                 outbound_transfer.range_proof = true.into();
                 (
-                    ElGamalCT::default(),
-                    ElGamalCT::default(),
-                    ElGamalCT::default(),
+                    PodElGamalCT::zeroed(),
+                    PodElGamalCT::zeroed(),
+                    PodElGamalCT::zeroed(),
                 )
             }
         };
@@ -700,9 +705,9 @@ fn process_submit_transfer_proof(
 /// Processes a [Transfer] instruction.
 fn process_transfer(
     accounts: &[AccountInfo],
-    receiver_pk: &ElGamalPK,
-    receiver_transfer_amount: ElGamalCT,
-    transfer_auditor_pk: Option<ElGamalPK>,
+    receiver_pk: &PodElGamalPK,
+    receiver_transfer_amount: PodElGamalCT,
+    transfer_auditor_pk: Option<PodElGamalPK>,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
@@ -779,7 +784,7 @@ fn process_transfer(
         return Err(ProgramError::InvalidArgument);
     }
 
-    // TODO: implement and uncomment the ElGamalCT addition
+    // TODO: implement and uncomment the PodElGamalCT addition
     // confidential_account.available_balance -= outbound_transfer.sender_transfer_amount;
     // receiver_confidential_account.pending_balance += outbound_transfer.receiver_transfer_amount;
 
@@ -803,9 +808,9 @@ fn process_apply_pending_balance(accounts: &[AccountInfo]) -> ProgramResult {
         account_info_iter.as_slice(),
     )?;
 
-    // TODO: implement and uncomment the ElGamalCT addition
+    // TODO: implement and uncomment the PodElGamalCT addition
     // confidential_account.available_balance += confidential_account.pending_balance;
-    confidential_account.pending_balance = ElGamalCT::default();
+    confidential_account.pending_balance = PodElGamalCT::zeroed();
 
     Ok(())
 }
@@ -869,16 +874,7 @@ pub fn process_instruction(
         }
         ConfidentialTokenInstruction::UpdateAccountPk => {
             msg!("UpdateAccountPk");
-            let data = decode_instruction_data::<UpdateAccountPkInstructionData>(input)?;
-            process_update_account_pk(
-                accounts,
-                &data.elgaml_pk,
-                &data.pending_balance,
-                &data.available_balance,
-                &data.new_elgaml_pk,
-                &data.new_pending_balance,
-                &data.new_available_balance,
-            )
+            process_update_account_pk(input, accounts)
         }
         ConfidentialTokenInstruction::Deposit => {
             msg!("Deposit");
@@ -924,7 +920,7 @@ pub fn process_instruction(
                 receiver_transfer_split_amount.1,
             );
             */
-            let receiver_transfer_amount = ElGamalCT::default();
+            let receiver_transfer_amount = PodElGamalCT::zeroed();
 
             process_transfer(
                 accounts,
