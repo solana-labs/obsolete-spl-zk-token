@@ -1,7 +1,4 @@
-use {
-    crate::{pod::*, *},
-    zeroable::Zeroable,
-};
+use {crate::pod::*, spl_zk_token_crypto::pod::*, zeroable::Zeroable};
 
 /// Account used for auditing confidential transfers
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -15,7 +12,7 @@ pub struct TransferAuditor {
     pub enabled: PodBool,
 
     /// ElGamal public key for the transfer auditor.
-    pub elgaml_pk: ElGamalPK,
+    pub elgamal_pk: PodElGamalPK,
 }
 impl PodAccountInfo<'_, '_> for TransferAuditor {}
 
@@ -28,17 +25,17 @@ pub struct OutboundTransfer {
     /// `true` once a range proof has been accepted for this transfer
     pub range_proof: PodBool,
 
-    /// Transfer amount encrypted by the sender's `ConfidentialAccount::elgaml_pk`
-    pub sender_transfer_amount: ElGamalCT,
+    /// Transfer amount encrypted by the sender's `ConfidentialAccount::elgamal_pk`
+    pub sender_transfer_amount: PodElGamalCT,
 
     /// The receiver's ElGamal public key
-    pub receiver_pk: ElGamalPK,
+    pub receiver_pk: PodElGamalPK,
 
     /// The receiver's pending balance encrypted with `receiver_pk`
-    pub receiver_pending_balance: ElGamalCT,
+    pub receiver_pending_balance: PodElGamalCT,
 
     /// Transfer amount encrypted with `receiver_pk`
-    pub receiver_transfer_amount: ElGamalCT,
+    pub receiver_transfer_amount: PodElGamalCT,
 }
 impl PodAccountInfo<'_, '_> for OutboundTransfer {}
 
@@ -55,13 +52,13 @@ pub struct ConfidentialAccount {
     pub token_account: PodPubkey,
 
     /// The public key associated with ElGamal encryption
-    pub elgaml_pk: ElGamalPK,
+    pub elgamal_pk: PodElGamalPK,
 
-    /// The pending balance (encrypted by `elgaml_pk`)
-    pub pending_balance: ElGamalCT,
+    /// The pending balance (encrypted by `elgamal_pk`)
+    pub pending_balance: PodElGamalCT,
 
-    /// The available balance (encrypted by `elgaml_pk`)
-    pub available_balance: ElGamalCT,
+    /// The available balance (encrypted by `elgamal_pk`)
+    pub available_balance: PodElGamalCT,
 
     /// Prohibit incoming transfers if `false`
     pub accept_incoming_transfers: PodBool,

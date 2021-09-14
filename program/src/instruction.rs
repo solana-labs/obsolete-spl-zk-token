@@ -11,6 +11,8 @@ use {
         pubkey::Pubkey,
         sysvar,
     },
+    spl_zk_token_crypto::pod::*,
+    //spl_zk_token_crypto::instructions::update_account_pk::UpdateAccountPkData,
     zeroable::Zeroable,
 };
 
@@ -18,21 +20,21 @@ use {
 #[repr(transparent)]
 pub struct ConfigureMintInstructionData {
     /// The `transfer_auditor` public key.
-    pub transfer_auditor_pk: ElGamalPK,
+    pub transfer_auditor_pk: PodElGamalPK,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct UpdateTransferAuditorInstructionData {
     /// The new `transfer_auditor` public key.
-    pub new_transfer_auditor_pk: ElGamalPK,
+    pub new_transfer_auditor_pk: PodElGamalPK,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct CreateAccountInstructionData {
     /// The public key associated with the account
-    pub elgaml_pk: ElGamalPK,
+    pub elgamal_pk: PodElGamalPK,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -40,21 +42,6 @@ pub struct CreateAccountInstructionData {
 pub struct CloseAccountInstructionData {
     // TODO: Proof that the encrypted balance is 0
     pub crypto_zero_balance_proof: [u8; 256],
-}
-
-#[derive(Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct UpdateAccountPkInstructionData {
-    pub elgaml_pk: ElGamalPK,
-    pub pending_balance: ElGamalCT,
-    pub available_balance: ElGamalCT,
-
-    pub new_elgaml_pk: ElGamalPK,
-    pub new_pending_balance: ElGamalCT,
-    pub new_available_balance: ElGamalCT,
-
-    /// TODO: Proof that the encrypted balances are equivalent
-    pub crypto_balance_equality_proof: [u8; 256],
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -81,10 +68,10 @@ pub struct WithdrawInstructionData {
 #[repr(C)]
 pub struct SubmitCiphertextValidityProofInstructionData {
     /// The receiver's ElGamal public key
-    pub receiver_pk: ElGamalPK,
+    pub receiver_pk: PodElGamalPK,
 
     /// The receiver's pending balance, encrypted with `receiver_pk`
-    pub receiver_pending_balance: ElGamalCT,
+    pub receiver_pending_balance: PodElGamalCT,
 
     pub proof: TransDataCTValidity,
 }
@@ -93,10 +80,10 @@ pub struct SubmitCiphertextValidityProofInstructionData {
 #[repr(C)]
 pub struct SubmitRangeProofInstructionData {
     /// The receiver's ElGamal public key
-    pub receiver_pk: ElGamalPK,
+    pub receiver_pk: PodElGamalPK,
 
     /// The receiver's pending balance, encrypted with `receiver_pk`
-    pub receiver_pending_balance: ElGamalCT,
+    pub receiver_pending_balance: PodElGamalCT,
 
     pub proof: TransDataRangeProof,
 }
@@ -105,7 +92,7 @@ pub struct SubmitRangeProofInstructionData {
 #[repr(C)]
 pub struct TransferInstructionData {
     /// Receiver's encryption key
-    pub receiver_pk: ElGamalPK,
+    pub receiver_pk: PodElGamalPK,
 
     /// Transfer amount split into two 32 values and encrypted so only the receiver can view it
     pub receiver_transfer_split_amount: ElGamalSplitCT,
@@ -117,7 +104,7 @@ pub struct TransferWithAuditorInstructionData {
     pub transfer_data: TransferInstructionData,
 
     /// Transfer Auditor's encryption key
-    pub transfer_auditor_pk: ElGamalPK,
+    pub transfer_auditor_pk: PodElGamalPK,
 
     /// Transfer amount split into two 32 values and encrypted so only the transfer auditor can view it
     pub transfer_auditor_split_amount: ElGamalSplitCT,
@@ -238,7 +225,7 @@ pub enum ConfidentialTokenInstruction {
     ///   4.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     /// Data expected by this instruction:
-    ///   `UpdateAccountPkInstructionData`
+    ///   `UpdateAccountPkData`
     ///
     UpdateAccountPk,
 
@@ -443,7 +430,7 @@ pub(crate) fn encode_instruction<T: Pod>(
 fn _configure_mint(
     funding_address: Pubkey,
     token_mint_address: Pubkey,
-    transfer_auditor_pk_and_freeze_authority: Option<(ElGamalPK, Pubkey)>,
+    transfer_auditor_pk_and_freeze_authority: Option<(PodElGamalPK, Pubkey)>,
 ) -> Instruction {
     let omnibus_token_address = get_omnibus_token_address(&token_mint_address);
     let transfer_auditor_address = get_transfer_auditor_address(&token_mint_address);
@@ -482,7 +469,7 @@ pub fn configure_mint(funding_address: Pubkey, token_mint_address: Pubkey) -> In
 pub fn configure_mint_with_transfer_auditor(
     funding_address: Pubkey,
     token_mint_address: Pubkey,
-    transfer_auditor_pk: ElGamalPK,
+    transfer_auditor_pk: PodElGamalPK,
     freeze_authority: Pubkey,
 ) -> Instruction {
     _configure_mint(
@@ -508,8 +495,8 @@ mod tests {
     fn test_instruction_size() {
         assert_eq!(
             ConfidentialTokenInstruction::SubmitTransferProof {
-                receiver_pk: ElGamalPK::default(),
-                receiver_pending_balance: ElGamalCT::default(),
+                receiver_pk: PodElGamalPK::default(),
+                receiver_pending_balance: PodElGamalCT::default(),
                 transfer_proof: TransferProof::CiphertextValidity(TransDataCTValidity::default()),
             }
             .pack_into_vec()
@@ -518,8 +505,8 @@ mod tests {
         );
         assert_eq!(
             ConfidentialTokenInstruction::SubmitTransferProof {
-                receiver_pk: ElGamalPK::default(),
-                receiver_pending_balance: ElGamalCT::default(),
+                receiver_pk: PodElGamalPK::default(),
+                receiver_pending_balance: PodElGamalCT::default(),
                 transfer_proof: TransferProof::Range(TransDataRangeProof::default()),
             }
             .pack_into_vec()
@@ -528,9 +515,9 @@ mod tests {
         );
         assert_eq!(
             ConfidentialTokenInstruction::Transfer {
-                receiver_pk: ElGamalPK::default(),
+                receiver_pk: PodElGamalPK::default(),
                 receiver_transfer_split_amount: ElGamalSplitCT::default(),
-                transfer_audit: Some((ElGamalPK::default(), ElGamalSplitCT::default(), ())),
+                transfer_audit: Some((PodElGamalPK::default(), ElGamalSplitCT::default(), ())),
             }
             .pack_into_vec()
             .len(),

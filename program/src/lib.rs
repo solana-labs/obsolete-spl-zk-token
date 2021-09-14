@@ -14,26 +14,6 @@ pub mod state;
 // ==== crypto placeholders ====
 #[derive(Clone, Copy, Debug, Pod, Zeroable, PartialEq)]
 #[repr(C)]
-pub struct ElGamalPK {
-    data: [u8; 32],
-}
-impl Default for ElGamalPK {
-    fn default() -> Self {
-        Self { data: [0; 32] }
-    }
-}
-#[derive(Clone, Copy, Debug, Pod, Zeroable, PartialEq)]
-#[repr(C)]
-pub struct ElGamalCT {
-    data: [u8; 64],
-}
-impl Default for ElGamalCT {
-    fn default() -> Self {
-        Self { data: [0; 64] }
-    }
-}
-#[derive(Clone, Copy, Debug, Pod, Zeroable, PartialEq)]
-#[repr(C)]
 pub struct ElGamalSplitCT {
     data_high: [u8; 32],
     data_low: [u8; 32],
@@ -56,10 +36,6 @@ pub struct TransDataCTValidity {
 #[repr(C)]
 pub struct TransDataRangeProof {
     crypto_stuff: [u8; 512], // TODO
-}
-#[derive(Clone, Debug, PartialEq)]
-pub struct UpdateEncKeyData {
-    crypto_stuff: bool,
 }
 // ==== fin crypto placeholders ====
 

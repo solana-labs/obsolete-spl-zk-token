@@ -1,28 +1,23 @@
-#![allow(non_snake_case, dead_code)]
-
-use core::ops::{Add, Div, Mul, Sub};
-
 #[cfg(not(target_arch = "bpf"))]
 use rand::{rngs::OsRng, CryptoRng, RngCore};
-
-use sha3::Sha3_512;
-use subtle::{Choice, ConstantTimeEq};
-use zeroize::Zeroize;
-
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_COMPRESSED;
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::MultiscalarMul;
-
-use borsh::{BorshDeserialize, BorshSerialize};
-use serde::{Deserialize, Serialize};
-use std::convert::TryInto;
-use std::io;
-use std::io::{Error, ErrorKind, Write};
-
-use crate::encryption::elgamal::{ElGamalCT, ElGamalPK};
-use crate::errors::ProofError;
+use {
+    crate::{
+        encryption::elgamal::{ElGamalCT, ElGamalPK},
+        errors::ProofError,
+    },
+    core::ops::{Add, Div, Mul, Sub},
+    curve25519_dalek::{
+        constants::{RISTRETTO_BASEPOINT_COMPRESSED, RISTRETTO_BASEPOINT_POINT},
+        ristretto::{CompressedRistretto, RistrettoPoint},
+        scalar::Scalar,
+        traits::MultiscalarMul,
+    },
+    serde::{Deserialize, Serialize},
+    sha3::Sha3_512,
+    std::convert::TryInto,
+    subtle::{Choice, ConstantTimeEq},
+    zeroize::Zeroize,
+};
 
 /// Curve basepoints for which Pedersen commitment is defined over.
 ///
@@ -40,6 +35,7 @@ pub struct PedersenBase {
 /// `G` is a constant point in the curve25519_dalek library
 /// `H` is the Sha3 hash of `G` interpretted as a RistrettoPoint
 impl Default for PedersenBase {
+    #[allow(non_snake_case)]
     fn default() -> PedersenBase {
         let G = RISTRETTO_BASEPOINT_POINT;
         let H =
@@ -147,33 +143,6 @@ impl Default for PedersenOpen {
     }
 }
 
-impl BorshSerialize for PedersenOpen {
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
-        writer.write_all(&self.to_bytes())
-    }
-}
-
-impl BorshDeserialize for PedersenOpen {
-    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        if buf.len() < 32 {
-            return Err(io::Error::new(
-                ErrorKind::InvalidInput,
-                "Unexpected length of input",
-            ));
-        }
-        match Self::from_bytes(&buf[..32]) {
-            Some(result) => {
-                *buf = &buf[32..];
-                Ok(result)
-            }
-            None => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Invalid PedersenOpen representation",
-            )),
-        }
-    }
-}
-
 impl<'a, 'b> Add<&'b PedersenOpen> for &'a PedersenOpen {
     type Output = PedersenOpen;
 
@@ -239,33 +208,6 @@ impl PedersenComm {
         Some(PedersenComm(
             CompressedRistretto::from_slice(bytes).decompress()?,
         ))
-    }
-}
-
-impl BorshSerialize for PedersenComm {
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
-        writer.write_all(&self.to_bytes())
-    }
-}
-
-impl BorshDeserialize for PedersenComm {
-    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        if buf.len() < 32 {
-            return Err(io::Error::new(
-                ErrorKind::InvalidInput,
-                "Unexpected length of input",
-            ));
-        }
-        match Self::from_bytes(&buf[..32]) {
-            Some(result) => {
-                *buf = &buf[32..];
-                Ok(result)
-            }
-            None => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Invalid PedersenComm representation",
-            )),
-        }
     }
 }
 
@@ -350,33 +292,6 @@ impl PedersenDecHandle {
         Some(PedersenDecHandle(
             CompressedRistretto::from_slice(bytes).decompress()?,
         ))
-    }
-}
-
-impl BorshSerialize for PedersenDecHandle {
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
-        writer.write_all(&self.to_bytes())
-    }
-}
-
-impl BorshDeserialize for PedersenDecHandle {
-    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        if buf.len() < 32 {
-            return Err(io::Error::new(
-                ErrorKind::InvalidInput,
-                "Unexpected length of input",
-            ));
-        }
-        match Self::from_bytes(&buf[..32]) {
-            Some(result) => {
-                *buf = &buf[32..];
-                Ok(result)
-            }
-            None => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Invalid PedersenDecHandle representation",
-            )),
-        }
     }
 }
 
@@ -533,37 +448,6 @@ mod tests {
 
         let encoded = handle.to_bytes();
         let decoded = PedersenDecHandle::from_bytes(&encoded).unwrap();
-
-        assert_eq!(handle, decoded);
-    }
-
-    #[test]
-    fn test_borsh_commitment() {
-        let amt: u64 = 55;
-        let (comm, _) = Pedersen::commit(amt);
-
-        let encoded = comm.try_to_vec().unwrap();
-        let decoded = BorshDeserialize::try_from_slice(&encoded).unwrap();
-
-        assert_eq!(comm, decoded);
-    }
-
-    #[test]
-    fn test_borsh_opening() {
-        let open = PedersenOpen(Scalar::random(&mut OsRng));
-
-        let encoded = open.try_to_vec().unwrap();
-        let decoded = BorshDeserialize::try_from_slice(&encoded).unwrap();
-
-        assert_eq!(open, decoded);
-    }
-
-    #[test]
-    fn test_borsh_decrypt_handle() {
-        let handle = PedersenDecHandle(RistrettoPoint::default());
-
-        let encoded = handle.try_to_vec().unwrap();
-        let decoded = PedersenDecHandle::try_from_slice(&encoded).unwrap();
 
         assert_eq!(handle, decoded);
     }
