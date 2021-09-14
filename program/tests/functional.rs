@@ -1,13 +1,17 @@
 // Mark this test as BPF-only due to current `ProgramTest` limitations when CPIing into the system program
 #![cfg(feature = "test-bpf")]
 
-use solana_program::{program_pack::Pack, pubkey::Pubkey, system_instruction};
-use solana_program_test::*;
-use solana_sdk::{
-    signature::{Keypair, Signer},
-    transaction::Transaction,
+use {
+    bytemuck::Zeroable,
+    solana_program::{program_pack::Pack, pubkey::Pubkey, system_instruction},
+    solana_program_test::*,
+    solana_sdk::{
+        signature::{Keypair, Signer},
+        transaction::Transaction,
+    },
+    spl_zk_token::{pod::*, *},
+    spl_zk_token_crypto::pod::*,
 };
-use spl_zk_token::{pod::*, *};
 
 fn program_test() -> ProgramTest {
     let pc = ProgramTest::new(
@@ -76,7 +80,7 @@ async fn test_configure_mint_sanity() {
             spl_zk_token::instruction::configure_mint_with_transfer_auditor(
                 payer.pubkey(),
                 token_mint_keypair.pubkey(),
-                ElGamalPK::default(),
+                PodElGamalPK::zeroed(),
                 token_mint_keypair.pubkey(),
             ),
         ],

@@ -1,25 +1,23 @@
-#![allow(non_snake_case, dead_code)]
-
-use core::ops::{Add, Div, Mul, Sub};
-
 #[cfg(not(target_arch = "bpf"))]
 use rand::{rngs::OsRng, CryptoRng, RngCore};
-
-use sha3::Sha3_512;
-use subtle::{Choice, ConstantTimeEq};
-use zeroize::Zeroize;
-
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_COMPRESSED;
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::MultiscalarMul;
-
-use serde::{Deserialize, Serialize};
-use std::convert::TryInto;
-
-use crate::encryption::elgamal::{ElGamalCT, ElGamalPK};
-use crate::errors::ProofError;
+use {
+    crate::{
+        encryption::elgamal::{ElGamalCT, ElGamalPK},
+        errors::ProofError,
+    },
+    core::ops::{Add, Div, Mul, Sub},
+    curve25519_dalek::{
+        constants::{RISTRETTO_BASEPOINT_COMPRESSED, RISTRETTO_BASEPOINT_POINT},
+        ristretto::{CompressedRistretto, RistrettoPoint},
+        scalar::Scalar,
+        traits::MultiscalarMul,
+    },
+    serde::{Deserialize, Serialize},
+    sha3::Sha3_512,
+    std::convert::TryInto,
+    subtle::{Choice, ConstantTimeEq},
+    zeroize::Zeroize,
+};
 
 /// Curve basepoints for which Pedersen commitment is defined over.
 ///
@@ -37,6 +35,7 @@ pub struct PedersenBase {
 /// `G` is a constant point in the curve25519_dalek library
 /// `H` is the Sha3 hash of `G` interpretted as a RistrettoPoint
 impl Default for PedersenBase {
+    #[allow(non_snake_case)]
     fn default() -> PedersenBase {
         let G = RISTRETTO_BASEPOINT_POINT;
         let H =

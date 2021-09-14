@@ -4745,6 +4745,7 @@ dependencies = [
  "solana-sdk",
  "solana-validator",
  "spl-token",
+ "spl-zk-token-crypto",
  "zeroable",
 ]
 
