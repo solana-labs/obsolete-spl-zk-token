@@ -15,7 +15,7 @@ use {
     curve25519_dalek::{
         ristretto::{CompressedRistretto, RistrettoPoint},
         scalar::Scalar,
-        traits::{Identity, IsIdentity, VartimeMultiscalarMul},
+        traits::{IsIdentity, VartimeMultiscalarMul},
     },
     merlin::Transcript,
 };
@@ -43,13 +43,12 @@ impl RangeProof {
     pub fn create(
         amounts: Vec<u64>,
         bit_lengths: Vec<usize>,
-        _comms: Vec<&PedersenComm>,
+        _comms: Vec<&PedersenComm>, // to be removed after instruction update
         opens: Vec<&PedersenOpen>,
         t_1_blinding: &PedersenOpen,
         t_2_blinding: &PedersenOpen,
         transcript: &mut Transcript,
     ) -> Self {
-        let _n = bit_lengths.len();
         let nm = bit_lengths.iter().sum();
 
         // Computing the generators online for now. It should ultimately be precomputed.
@@ -62,8 +61,8 @@ impl RangeProof {
         let mut A = a_blinding * H;
 
         let mut gens_iter = bp_gens.G(nm).zip(bp_gens.H(nm));
-        for (amount_i, m_i) in amounts.iter().zip(bit_lengths.iter()) {
-            for j in 0..(*m_i) {
+        for (amount_i, n_i) in amounts.iter().zip(bit_lengths.iter()) {
+            for j in 0..(*n_i) {
                 let (G_ij, H_ij) = gens_iter.next().unwrap();
                 let v_ij = Choice::from(((amount_i >> j) & 1) as u8);
                 let mut point = -H_ij;
@@ -95,11 +94,11 @@ impl RangeProof {
 
         let mut i = 0;
         let mut exp_z = z * z;
-        for (amount_i, m_i) in amounts.iter().zip(bit_lengths.iter()) {
+        for (amount_i, n_i) in amounts.iter().zip(bit_lengths.iter()) {
             let mut exp_y = Scalar::one();
             let mut exp_2 = Scalar::one();
 
-            for j in 0..(*m_i) {
+            for j in 0..(*n_i) {
                 let a_L_j = Scalar::from((amount_i >> j) & 1);
                 let a_R_j = a_L_j - Scalar::one();
 
@@ -157,15 +156,17 @@ impl RangeProof {
         let w = transcript.challenge_scalar(b"w");
         let Q = w * G;
 
+        transcript.challenge_scalar(b"c");
+
         let G_factors: Vec<Scalar> = iter::repeat(Scalar::one()).take(nm).collect();
-        let H_factors: Vec<Scalar> = util::exp_iter(y).take(nm).collect();
+        let H_factors: Vec<Scalar> = util::exp_iter(y.invert()).take(nm).collect();
 
         let ipp_proof = InnerProductProof::create(
             &Q,
             &G_factors,
             &H_factors,
             bp_gens.G(nm).cloned().collect(),
-            bp_gens.G(nm).cloned().collect(),
+            bp_gens.H(nm).cloned().collect(),
             l_vec,
             r_vec,
             transcript,
@@ -187,30 +188,27 @@ impl RangeProof {
     pub fn verify(
         &self,
         comms: Vec<&CompressedRistretto>,
-        n: usize,
-        m: usize,
+        bit_lengths: Vec<usize>,
         transcript: &mut Transcript,
     ) -> Result<(), ProofError> {
-        // TODO: clean-up variables
-
         let G = PedersenBase::default().G;
         let H = PedersenBase::default().H;
 
-        let nm = n * m;
-        let _bp_gens = BulletproofGens::new(nm);
+        let m = bit_lengths.len();
+        let nm: usize = bit_lengths.iter().sum();
+        let bp_gens = BulletproofGens::new(nm);
 
-        if !(n == 8 || n == 16 || n == 32 || n == 64 || n == 128) {
-            return Err(ProofError::InvalidBitsize);
-        }
+        // if !(nm == 8 || nm == 16 || nm == 32 || nm == 64 || nm == 128) {
+        //     return Err(ProofError::InvalidBitsize);
+        // }
 
         transcript.validate_and_append_point(b"A", &self.A)?;
         transcript.validate_and_append_point(b"S", &self.S)?;
 
         let y = transcript.challenge_scalar(b"y");
         let z = transcript.challenge_scalar(b"z");
-
         let zz = z * z;
-        let _minus_z = -z;
+        let minus_z = -z;
 
         transcript.validate_and_append_point(b"T_1", &self.T_1)?;
         transcript.validate_and_append_point(b"T_2", &self.T_2)?;
@@ -221,12 +219,12 @@ impl RangeProof {
         transcript.append_scalar(b"t_x_blinding", &self.t_x_blinding);
         transcript.append_scalar(b"e_blinding", &self.e_blinding);
 
-        let _w = transcript.challenge_scalar(b"w");
+        let w = transcript.challenge_scalar(b"w");
 
         // Challenge value for batching statements to be verified
         let c = transcript.challenge_scalar(b"c");
 
-        let (_x_sq, _x_inv_sq, s) = self.ipp_proof.verification_scalars(n * m, transcript)?;
+        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(nm, transcript)?;
         let s_inv = s.iter().rev();
 
         let a = self.ipp_proof.a;
@@ -234,36 +232,47 @@ impl RangeProof {
 
         // Construct concat_z_and_2, an iterator of the values of
         // z^0 * \vec(2)^n || z^1 * \vec(2)^n || ... || z^(m-1) * \vec(2)^n
-        let powers_of_2: Vec<Scalar> = util::exp_iter(Scalar::from(2u64)).take(n).collect();
         let concat_z_and_2: Vec<Scalar> = util::exp_iter(z)
-            .take(m)
-            .flat_map(|exp_z| powers_of_2.iter().map(move |exp_2| exp_2 * exp_z))
+            .zip(bit_lengths.iter())
+            .flat_map(|(exp_z, n_i)| util::exp_iter(Scalar::from(2u64)).take(*n_i).map(move |exp_2| exp_2 * exp_z))
             .collect();
 
-        let _g = s.iter().map(|s_i| -a * s_i);
-        let _h = s_inv
+        let g_alt = s.iter().map(|s_i| minus_z - a * s_i);
+        let h_alt = s_inv.clone()
             .zip(util::exp_iter(y.invert()))
             .zip(concat_z_and_2.iter())
-            .map(|((s_i_inv, exp_y_inv), _z_and_2)| exp_y_inv * (-b * s_i_inv));
+            .map(|((s_i_inv, exp_y_inv), z_and_2)| z + exp_y_inv * (zz * z_and_2 - b * s_i_inv));
 
+        let basepoint_scalar = w * (self.t_x - a * b) + c * (delta(&bit_lengths, &y, &z) - self.t_x);
         let value_commitment_scalars = util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp);
-        let basepoint_scalar = c * (delta(n, m, &y, &z) - self.t_x);
 
         let mega_check = RistrettoPoint::optional_multiscalar_mul(
             iter::once(Scalar::one())
+                .chain(iter::once(x))
                 .chain(iter::once(c * x))
                 .chain(iter::once(c * x * x))
-                .chain(iter::once(-c * self.t_x_blinding))
+                .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
                 .chain(iter::once(basepoint_scalar))
-                .chain(value_commitment_scalars),
-            iter::once(Some(RistrettoPoint::identity()))
+                .chain(x_sq.iter().cloned())
+                .chain(x_inv_sq.iter().cloned())
+                .chain(g_alt)
+                .chain(h_alt)
+                .chain(value_commitment_scalars)
+            ,
+            iter::once(self.A.decompress())
+                .chain(iter::once(self.S.decompress()))
                 .chain(iter::once(self.T_1.decompress()))
                 .chain(iter::once(self.T_2.decompress()))
                 .chain(iter::once(Some(H)))
                 .chain(iter::once(Some(G)))
-                .chain(comms.iter().map(|V| V.decompress())),
+                .chain(self.ipp_proof.L_vec.iter().map(|L| L.decompress()))
+                .chain(self.ipp_proof.R_vec.iter().map(|R| R.decompress()))
+                .chain(bp_gens.G(nm).map(|&x| Some(x)))
+                .chain(bp_gens.H(nm).map(|&x| Some(x)))
+                .chain(comms.iter().map(|V| V.decompress()))
+            ,
         )
-        .ok_or(ProofError::VerificationError)?;
+        .ok_or_else(|| ProofError::VerificationError)?;
 
         if mega_check.is_identity() {
             Ok(())
@@ -277,43 +286,44 @@ impl RangeProof {
 /// \\[
 /// \delta(y,z) = (z - z^{2}) \langle \mathbf{1}, {\mathbf{y}}^{n \cdot m} \rangle - \sum_{j=0}^{m-1} z^{j+3} \cdot \langle \mathbf{1}, {\mathbf{2}}^{n \cdot m} \rangle
 /// \\]
-fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
-    let sum_y = util::sum_of_powers(y, n * m);
-    let sum_2 = util::sum_of_powers(&Scalar::from(2u64), n);
-    let sum_z = util::sum_of_powers(z, m);
+fn delta(bit_lengths: &Vec<usize>, y: &Scalar, z: &Scalar) -> Scalar {
+    let nm: usize = bit_lengths.iter().sum();
+    let sum_y = util::sum_of_powers(y, nm);
 
-    (z - z * z) * sum_y - z * z * z * sum_2 * sum_z
+    let mut agg_delta = (z - z * z) * sum_y;
+    let mut exp_z = z * z * z;
+    for n_i in bit_lengths.iter() {
+        let sum_2 = util::sum_of_powers(&Scalar::from(2u64), *n_i);
+        agg_delta -= exp_z * sum_2;
+        exp_z *= z;
+    }
+    agg_delta
 }
 
 #[cfg(test)]
 mod tests {
-    //use super::*;
+    use super::*;
 
-    // #[test]
-    // fn test_pedersen_rangeproof() {
-    //     let (comm, open) = Pedersen::commit(55 as u64);
+    #[test]
+    fn test_pedersen_rangeproof() {
+        let (comm, open) = Pedersen::commit(55 as u64);
 
-    //     let pedersen_instance = RangeInstance {
-    //         amount: 55,
-    //         bit_length: 64,
-    //         comm,
-    //         open,
-    //     };
+        let t_1_blinding = PedersenOpen::random(&mut OsRng);
+        let t_2_blinding = PedersenOpen::random(&mut OsRng);
 
-    //     let pedersen_instances = vec![pedersen_instance];
-    //     let t_1_blinding = PedersenOpen::random(&mut OsRng);
-    //     let t_2_blinding = PedersenOpen::random(&mut OsRng);
+        let mut transcript_create = Transcript::new(b"Test");
+        let mut transcript_verify = Transcript::new(b"Test");
 
-    //     let mut transcript_create = Transcript::new(b"Test");
-    //     let mut transcript_verify = Transcript::new(b"Test");
+        let proof = RangeProof::create(
+            vec![55],
+            vec![32 as usize],
+            vec![&comm],
+            vec![&open],
+            &t_1_blinding,
+            &t_2_blinding,
+            &mut transcript_create,
+        );
 
-    //     let proof = RangeProof::create(
-    //         pedersen_instances,
-    //         t_1_blinding,
-    //         t_2_blinding,
-    //         &mut transcript_create,
-    //     );
-
-    //     assert!(proof.verify(vec![&comm.get_point().compress()], 64, 1, &mut transcript_verify).is_ok());
-    // }
+        assert!(proof.verify(vec![&comm.get_point().compress()], vec![32 as usize], &mut transcript_verify).is_ok());
+    }
 }
