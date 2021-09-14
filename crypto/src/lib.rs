@@ -10,5 +10,3 @@ pub mod instructions;
 pub mod pod;
 pub mod range_proof;
 pub mod transcript;
-// pub mod transfer_data;
-// pub mod validity_proof;
