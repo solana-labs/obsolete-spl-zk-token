@@ -461,6 +461,18 @@ fn process_update_account_pk(input: &[u8], accounts: &[AccountInfo]) -> ProgramR
     let instructions_sysvar_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
+    let (mut confidential_account, _token_account) = validate_confidential_account_is_signer(
+        confidential_account_info,
+        token_account_info,
+        owner_info,
+        account_info_iter.as_slice(),
+    )?;
+
+    if confidential_account.pending_balance != PodElGamalCT::zeroed() {
+        msg!("Pending balance is not zero");
+        return Err(ProgramError::InvalidAccountData);
+    }
+
     // TODO: Read `data` and confirm proof from reading the data of the previous instruction
     // instead of using `decode_instruction_data()` on this instruction input....
     msg!(
@@ -473,20 +485,14 @@ fn process_update_account_pk(input: &[u8], accounts: &[AccountInfo]) -> ProgramR
         return Err(ProgramError::InvalidInstructionData);
     }
 
+    let elgamal_pk = data.current_pk;
     let available_balance = data.current_ct;
     let new_elgamal_pk = data.new_pk;
     let new_available_balance = data.new_ct;
 
-    let (mut confidential_account, _token_account) = validate_confidential_account_is_signer(
-        confidential_account_info,
-        token_account_info,
-        owner_info,
-        account_info_iter.as_slice(),
-    )?;
-
-    if confidential_account.pending_balance != PodElGamalCT::zeroed() {
-        msg!("Pending balance is not zero");
-        return Err(ProgramError::InvalidAccountData);
+    if confidential_account.elgamal_pk != elgamal_pk {
+        msg!("ElGamal PK mismatch");
+        return Err(ProgramError::InvalidInstructionData);
     }
 
     if confidential_account.available_balance != available_balance {

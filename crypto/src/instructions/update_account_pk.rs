@@ -30,6 +30,9 @@ use {
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct UpdateAccountPkData {
+    /// Current ElGamal encryption key
+    pub current_pk: PodElGamalPK, // 32 bytes
+
     /// Current encrypted available balance
     pub current_ct: PodElGamalCT, // 64 bytes
 
@@ -47,17 +50,19 @@ impl UpdateAccountPkData {
     #[cfg(not(target_arch = "bpf"))]
     pub fn new(
         current_balance: u64,
+        current_pk: ElGamalPK,
         current_sk: &ElGamalSK,
-        current_ct: ElGamalCT,
         new_pk: ElGamalPK,
         new_sk: &ElGamalSK,
     ) -> Self {
+        let current_ct = current_pk.encrypt(current_balance);
         let new_ct = new_pk.encrypt(current_balance);
 
         let proof =
             UpdateAccountPkProof::new(current_balance, current_sk, new_sk, &current_ct, &new_ct);
 
         Self {
+            current_pk: current_pk.into(),
             current_ct: current_ct.into(),
             new_ct: new_ct.into(),
             new_pk: new_pk.into(),
