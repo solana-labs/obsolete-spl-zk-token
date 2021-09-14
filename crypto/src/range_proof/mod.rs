@@ -234,16 +234,22 @@ impl RangeProof {
         // z^0 * \vec(2)^n || z^1 * \vec(2)^n || ... || z^(m-1) * \vec(2)^n
         let concat_z_and_2: Vec<Scalar> = util::exp_iter(z)
             .zip(bit_lengths.iter())
-            .flat_map(|(exp_z, n_i)| util::exp_iter(Scalar::from(2u64)).take(*n_i).map(move |exp_2| exp_2 * exp_z))
+            .flat_map(|(exp_z, n_i)| {
+                util::exp_iter(Scalar::from(2u64))
+                    .take(*n_i)
+                    .map(move |exp_2| exp_2 * exp_z)
+            })
             .collect();
 
         let g_alt = s.iter().map(|s_i| minus_z - a * s_i);
-        let h_alt = s_inv.clone()
+        let h_alt = s_inv
+            .clone()
             .zip(util::exp_iter(y.invert()))
             .zip(concat_z_and_2.iter())
             .map(|((s_i_inv, exp_y_inv), z_and_2)| z + exp_y_inv * (zz * z_and_2 - b * s_i_inv));
 
-        let basepoint_scalar = w * (self.t_x - a * b) + c * (delta(&bit_lengths, &y, &z) - self.t_x);
+        let basepoint_scalar =
+            w * (self.t_x - a * b) + c * (delta(&bit_lengths, &y, &z) - self.t_x);
         let value_commitment_scalars = util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp);
 
         let mega_check = RistrettoPoint::optional_multiscalar_mul(
@@ -257,8 +263,7 @@ impl RangeProof {
                 .chain(x_inv_sq.iter().cloned())
                 .chain(g_alt)
                 .chain(h_alt)
-                .chain(value_commitment_scalars)
-            ,
+                .chain(value_commitment_scalars),
             iter::once(self.A.decompress())
                 .chain(iter::once(self.S.decompress()))
                 .chain(iter::once(self.T_1.decompress()))
@@ -269,8 +274,7 @@ impl RangeProof {
                 .chain(self.ipp_proof.R_vec.iter().map(|R| R.decompress()))
                 .chain(bp_gens.G(nm).map(|&x| Some(x)))
                 .chain(bp_gens.H(nm).map(|&x| Some(x)))
-                .chain(comms.iter().map(|V| V.decompress()))
-            ,
+                .chain(comms.iter().map(|V| V.decompress())),
         )
         .ok_or_else(|| ProofError::VerificationError)?;
 
@@ -324,6 +328,12 @@ mod tests {
             &mut transcript_create,
         );
 
-        assert!(proof.verify(vec![&comm.get_point().compress()], vec![32 as usize], &mut transcript_verify).is_ok());
+        assert!(proof
+            .verify(
+                vec![&comm.get_point().compress()],
+                vec![32 as usize],
+                &mut transcript_verify
+            )
+            .is_ok());
     }
 }
