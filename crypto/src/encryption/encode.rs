@@ -8,7 +8,6 @@ use curve25519_dalek::traits::Identity;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
-use bincode;
 use serde::{Deserialize, Serialize};
 
 const TWO14: u32 = 16384; // 2^14
@@ -200,7 +199,6 @@ impl Neg for HashableRistretto {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use time;
 
     /// Discrete log test for 16/16 split
     ///

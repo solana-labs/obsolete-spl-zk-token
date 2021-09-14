@@ -355,7 +355,6 @@ define_div_variants!(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bincode;
 
     #[test]
     fn test_commit_verification_correctness() {

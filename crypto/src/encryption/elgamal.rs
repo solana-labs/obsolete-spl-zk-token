@@ -291,7 +291,6 @@ define_div_variants!(LHS = ElGamalCT, RHS = Scalar, Output = ElGamalCT);
 mod tests {
     use super::*;
     use crate::encryption::pedersen::Pedersen;
-    use bincode;
 
     #[test]
     fn test_encrypt_decrypt_correctness() {

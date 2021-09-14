@@ -310,7 +310,7 @@ mod tests {
 
     #[test]
     fn test_pedersen_rangeproof() {
-        let (comm, open) = Pedersen::commit(55 as u64);
+        let (comm, open) = Pedersen::commit(55_u64);
 
         let t_1_blinding = PedersenOpen::random(&mut OsRng);
         let t_2_blinding = PedersenOpen::random(&mut OsRng);
@@ -320,7 +320,7 @@ mod tests {
 
         let proof = RangeProof::create(
             vec![55],
-            vec![32 as usize],
+            vec![32],
             vec![&comm],
             vec![&open],
             &t_1_blinding,
@@ -331,7 +331,7 @@ mod tests {
         assert!(proof
             .verify(
                 vec![&comm.get_point().compress()],
-                vec![32 as usize],
+                vec![32_usize],
                 &mut transcript_verify
             )
             .is_ok());

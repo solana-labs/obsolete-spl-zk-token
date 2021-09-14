@@ -5,15 +5,16 @@ use {
 };
 use {
     crate::{
-        encryption::{elgamal::ElGamalCT, pedersen::{PedersenOpen, PedersenBase}},
+        encryption::{
+            elgamal::ElGamalCT,
+            pedersen::{PedersenBase, PedersenOpen},
+        },
         errors::ProofError,
         pod::*,
         range_proof::RangeProof,
         transcript::TranscriptProtocol,
     },
-    curve25519_dalek::{
-        scalar::Scalar,
-    },
+    curve25519_dalek::scalar::Scalar,
     merlin::Transcript,
 };
 
@@ -113,11 +114,7 @@ impl WithdrawProof {
         Transcript::new(b"WithdrawProof")
     }
 
-    pub fn new(
-        source_sk: &ElGamalSK,
-        final_balance: u64,
-        final_balance_ct: &ElGamalCT,
-    ) -> Self {
+    pub fn new(source_sk: &ElGamalSK, final_balance: u64, final_balance_ct: &ElGamalCT) -> Self {
         let mut transcript = Self::transcript_new();
 
         // Add a domain separator to record the start of the protocol
@@ -164,4 +161,3 @@ impl WithdrawProof {
         Ok(())
     }
 }
-
