@@ -241,8 +241,8 @@ impl RangeProof {
             })
             .collect();
 
-        let g_alt = s.iter().map(|s_i| minus_z - a * s_i);
-        let h_alt = s_inv
+        let gs = s.iter().map(|s_i| minus_z - a * s_i);
+        let hs = s_inv
             .clone()
             .zip(util::exp_iter(y.invert()))
             .zip(concat_z_and_2.iter())
@@ -261,8 +261,8 @@ impl RangeProof {
                 .chain(iter::once(basepoint_scalar))
                 .chain(x_sq.iter().cloned())
                 .chain(x_inv_sq.iter().cloned())
-                .chain(g_alt)
-                .chain(h_alt)
+                .chain(gs)
+                .chain(hs)
                 .chain(value_commitment_scalars),
             iter::once(self.A.decompress())
                 .chain(iter::once(self.S.decompress()))
@@ -309,7 +309,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_pedersen_rangeproof() {
+    fn test_single_rangeproof() {
         let (comm, open) = Pedersen::commit(55_u64);
 
         let t_1_blinding = PedersenOpen::random(&mut OsRng);
@@ -331,8 +331,43 @@ mod tests {
         assert!(proof
             .verify(
                 vec![&comm.get_point().compress()],
-                vec![32_usize],
+                vec![32],
                 &mut transcript_verify
+            )
+            .is_ok());
+    }
+
+    #[test]
+    fn test_aggregated_rangeproof() {
+        let (comm_1, open_1) = Pedersen::commit(55_u64);
+        let (comm_2, open_2) = Pedersen::commit(77_u64);
+        //let (comm_3, open_3) = Pedersen::commit(99_u64);
+
+        let t_1_blinding = PedersenOpen::random(&mut OsRng);
+        let t_2_blinding = PedersenOpen::random(&mut OsRng);
+
+        let mut transcript_create = Transcript::new(b"Test");
+        let mut transcript_verify = Transcript::new(b"Test");
+
+        let proof = RangeProof::create(
+            vec![55, 77],
+            vec![32, 32],
+            vec![&comm_1, &comm_2],
+            vec![&open_1, &open_2],
+            &t_1_blinding,
+            &t_2_blinding,
+            &mut transcript_create,
+        );
+
+        let comm_1_point = comm_1.get_point().compress();
+        let comm_2_point = comm_2.get_point().compress();
+        // let comm_3_point = comm_3.get_point().compress();
+
+        assert!(proof
+            .verify(
+                vec![&comm_1_point, &comm_2_point],
+                vec![32, 32],
+                &mut transcript_verify,
             )
             .is_ok());
     }

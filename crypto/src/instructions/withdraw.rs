@@ -130,13 +130,11 @@ impl WithdrawProof {
 
         // generate a random masking factor that also serves as a nonce
         let y = Scalar::random(&mut OsRng);
-        let R = (y * D + r_new * H).compress();
+        let R = (y * D + r_new * H).compress(); // TODO: use multiscalar_mul
 
         // record R on transcript and receive a challenge scalar
         transcript.append_point(b"R", &R);
         let c = transcript.challenge_scalar(b"c");
-
-        println!("prove c: {:?}", c);
 
         // compute the masked secret key
         let z = s + c * y;

@@ -205,14 +205,13 @@ fn transfer_proof_create(
     // Generate proof for the new spenable ciphertext
     let r_new = Scalar::random(&mut OsRng);
     let y = Scalar::random(&mut OsRng);
-    let R = (y * D + r_new * H).compress();
+    let R = (y * D + r_new * H).compress(); // TODO: use multiscalar_mul
 
     transcript.append_point(b"R", &R);
     let c = transcript.challenge_scalar(b"c");
 
-    let z = c * s + y;
+    let z = s + c * y;
     let spendable_open = PedersenOpen(c * r_new);
-    //let spendable_comm = Pedersen::commit_with(spendable_balance, &spendable_open);
 
     // Generate proof for the transfer amounts
     let t_1_blinding = PedersenOpen::random(&mut OsRng);
@@ -233,11 +232,8 @@ fn transfer_proof_create(
     );
 
     // Generate aggregated range proof
-    let T_1 = t_1_blinding.get_scalar() * dest_pk.get_point();
-    let T_2 = t_2_blinding.get_scalar() * dest_pk.get_point();
-
-    let T_1 = T_1.compress();
-    let T_2 = T_2.compress();
+    let T_1 = (t_1_blinding.get_scalar() * dest_pk.get_point()).compress();
+    let T_2 = (t_2_blinding.get_scalar() * dest_pk.get_point()).compress();
 
     transcript.append_point(b"T_1", &T_1);
     transcript.append_point(b"T_2", &T_2);
