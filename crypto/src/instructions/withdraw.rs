@@ -14,8 +14,12 @@ use {
         range_proof::RangeProof,
         transcript::TranscriptProtocol,
     },
-    curve25519_dalek::scalar::Scalar,
+    curve25519_dalek::{
+        ristretto::RistrettoPoint,
+        scalar::Scalar,
+    },
     merlin::Transcript,
+    std::convert::TryInto,
 };
 
 /// Withdraw SPL Tokens from the available balance of a confidential token account.
@@ -43,7 +47,7 @@ struct Withdraw {
     /// Expected number of base 10 digits to the right of the decimal place.
     decimals: u8,
     /// TODO: Proof that the encrypted balance is >= `amount`
-    proof_component: WithdrawProofData,
+    proof_component: WithdrawData,
 }
 
 /// This struct includes the cryptographic proof *and* the account data information needed to verify
@@ -53,9 +57,7 @@ struct Withdraw {
 /// - The actual program should check that `current_ct` is consistent with what is
 ///   currently stored in the confidential token account TODO: update
 ///
-pub struct WithdrawProofData {
-    /// The source account ElGamal public key
-    pub source_pk: PodElGamalPK, // 32 bytes
+pub struct WithdrawData {
     /// The source account available balance *after* the withdraw (encrypted by
     /// `source_pk`)
     pub final_balance_ct: PodElGamalCT, // 64 bytes
@@ -63,7 +65,7 @@ pub struct WithdrawProofData {
     pub proof: WithdrawProof,
 }
 
-impl WithdrawProofData {
+impl WithdrawData {
     #[cfg(not(target_arch = "bpf"))]
     pub fn new(
         amount: u64,
@@ -73,6 +75,8 @@ impl WithdrawProofData {
         current_balance_ct: ElGamalCT,
     ) -> Self {
         // subtract withdraw amount from current balance
+        //
+        // panics if current_balance < amount
         let final_balance = current_balance - amount;
 
         // encode withdraw amount as an ElGamal ciphertext and subtract it from
@@ -83,16 +87,14 @@ impl WithdrawProofData {
         let proof = WithdrawProof::new(source_sk, final_balance, &final_balance_ct);
 
         Self {
-            source_pk: source_pk.into(),
             final_balance_ct: final_balance_ct.into(),
             proof,
         }
     }
 
-    /// Verifies the WithdrawData proof.
-    pub fn verify_proof(_amount: u64) -> Result<(), ProofError> {
-        // TODO
-        Ok(())
+    pub fn verify(&self) -> Result<(), ProofError> {
+        let final_balance_ct = self.final_balance_ct.try_into()?;
+        self.proof.verify(&final_balance_ct)
     }
 }
 
@@ -117,23 +119,31 @@ impl WithdrawProof {
     pub fn new(source_sk: &ElGamalSK, final_balance: u64, final_balance_ct: &ElGamalCT) -> Self {
         let mut transcript = Self::transcript_new();
 
-        // Add a domain separator to record the start of the protocol
+        // add a domain separator to record the start of the protocol
         transcript.withdraw_proof_domain_sep();
 
-        // Extract the relevant scalar and Ristretto points from the input
+        // extract the relevant scalar and Ristretto points from the input
         let H = PedersenBase::default().H;
         let D = final_balance_ct.decrypt_handle.get_point();
         let s = source_sk.get_scalar();
 
-        // Generate wrapper components for range proof
+        // new pedersen opening
         let r_new = Scalar::random(&mut OsRng);
+
+        // generate a random masking factor that also serves as a nonce
         let y = Scalar::random(&mut OsRng);
         let R = (y * D + r_new * H).compress();
 
+        // record R on transcript and receive a challenge scalar
         transcript.append_point(b"R", &R);
         let c = transcript.challenge_scalar(b"c");
 
-        let z = c * s + y;
+        println!("prove c: {:?}", c);
+
+        // compute the masked secret key
+        let z = s + c * y;
+
+        // compute the new Pedersen commitment and opening
         let new_open = PedersenOpen(c * r_new);
 
         // Generate the range proof component
@@ -157,7 +167,68 @@ impl WithdrawProof {
         }
     }
 
-    pub fn verify(&self) -> Result<(), ProofError> {
-        Ok(())
+    pub fn verify(&self, final_balance_ct: &ElGamalCT) -> Result<(), ProofError> {
+        let mut transcript = Self::transcript_new();
+
+        // Add a domain separator to record the start of the protocol
+        transcript.withdraw_proof_domain_sep();
+
+        // Extract the relevant scalar and Ristretto points from the input
+        let C = final_balance_ct.message_comm.get_point();
+        let D = final_balance_ct.decrypt_handle.get_point();
+
+        let R = self.R.into();
+        let z: Scalar = self.z.into();
+
+        // generate a challenge scalar
+        transcript.validate_and_append_point(b"R", &R)?;
+        let c = transcript.challenge_scalar(b"c");
+
+        // decompress R or return verification error
+        let R = R.decompress().ok_or(ProofError::VerificationError)?;
+
+        // compute new Pedersen commitment to verify range proof with
+        let new_comm: RistrettoPoint = C - z * D + c * R;
+
+        self.range_proof.verify(vec![&new_comm.compress()], vec![64_usize], &mut transcript)
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::encryption::elgamal::ElGamal;
+
+    #[test]
+    fn test_withdraw_correctness() {
+        // generate and verify proof properly
+        let (source_pk, source_sk) = ElGamal::keygen();
+
+        let current_balance: u64 = 77;
+        let current_balance_ct = source_pk.encrypt(current_balance);
+
+        let withdraw_amount: u64 = 55;
+
+        let data = WithdrawData::new(
+            withdraw_amount,
+            source_pk,
+            &source_sk,
+            current_balance,
+            current_balance_ct
+        );
+        assert!(data.verify().is_ok());
+
+        // generate and verify proof with wrong balance
+        let wrong_balance: u64 = 99;
+        let data = WithdrawData::new(
+            withdraw_amount,
+            source_pk,
+            &source_sk,
+            wrong_balance,
+            current_balance_ct,
+        );
+        assert!(data.verify().is_err());
+
     }
 }
