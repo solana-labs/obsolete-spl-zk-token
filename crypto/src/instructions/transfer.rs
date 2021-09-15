@@ -29,26 +29,38 @@ use {
 ///
 
 pub struct TransferWithRangeProof {
-    pub amount_comms: TransferComms,
-    pub proof_component: RangeProofData,
+    pub proof_component: TransferWithRangeProofData,
 }
 
 pub struct TransferWithValidityProof {
-    pub decryption_handles_lo: TransferHandles,
-    pub decryption_handles_hi: TransferHandles,
-    pub proof_component: ValidityProofData,
-    pub memo_component: OtherComponents,
+    pub proof_component: TransferWithValidityProofData,
+    pub other_component: OtherComponents,
 }
 
-pub struct RangeProofData {
+pub struct TransferWithRangeProofData {
+    /// The transfer amount encoded as Pedersen commitments
+    pub amount_comms: TransferComms,
+
+    /// The Pedersen commitment component of the source account spendable balance
     pub spendable_comm: PedersenComm,
 
+    /// Proof that certifies:
+    ///   1. the source account has enough funds for the transfer
+    ///   2. the transfer amount is a 64-bit positive number
     pub proof: RangeProof,
 }
 
-pub struct ValidityProofData {
+pub struct TransferWithValidityProofData {
+    /// The decryption handles that allow decryption of the lo-bits
+    pub decryption_handles_lo: TransferHandles,
+
+    /// The decryption handles that allow decryption of the hi-bits
+    pub decryption_handles_hi: TransferHandles,
+
+    /// The public encryption keys associated with the transfer: source, dest, and auditor
     pub transfer_public_keys: TransferPubKeys,
 
+    /// Proof that certifies that the decryption handles are generated correctly
     pub proof: ValidityProof,
 }
 
@@ -67,39 +79,38 @@ pub fn create_transfer_instruction(
         dest_pk,
         auditor_pk,
     };
-
     // split and encrypt transfer amount
     let (amount_lo, amount_hi) = split_u64_into_u32(transfer_amount);
 
     let (comm_lo, open_lo) = Pedersen::commit(amount_lo);
     let (comm_hi, open_hi) = Pedersen::commit(amount_hi);
 
-    let handle_source_lo = PedersenDecHandle::generate_handle(&open_lo, &source_pk);
-    let handle_dest_lo = PedersenDecHandle::generate_handle(&open_lo, &dest_pk);
-    let handle_auditor_lo = PedersenDecHandle::generate_handle(&open_lo, &auditor_pk);
+    let handle_source_lo = source_pk.gen_decrypt_handle(&open_lo);
+    let handle_dest_lo = dest_pk.gen_decrypt_handle(&open_lo);
+    let handle_auditor_lo = auditor_pk.gen_decrypt_handle(&open_lo);
 
-    let handle_source_hi = PedersenDecHandle::generate_handle(&open_hi, &source_pk);
-    let handle_dest_hi = PedersenDecHandle::generate_handle(&open_hi, &dest_pk);
-    let handle_auditor_hi = PedersenDecHandle::generate_handle(&open_hi, &auditor_pk);
+    let handle_source_hi = source_pk.gen_decrypt_handle(&open_hi);
+    let handle_dest_hi = dest_pk.gen_decrypt_handle(&open_hi);
+    let handle_auditor_hi = auditor_pk.gen_decrypt_handle(&open_hi);
 
-    let transfer_comms = TransferComms {
+    let amount_comms = TransferComms {
         lo: comm_lo,
         hi: comm_hi,
     };
 
-    let lo_transfer_handles = TransferHandles {
+    let decryption_handles_lo = TransferHandles {
         source: handle_source_lo,
         dest: handle_dest_lo,
         auditor: handle_auditor_lo,
     };
 
-    let hi_transfer_handles = TransferHandles {
+    let decryption_handles_hi = TransferHandles {
         source: handle_source_hi,
         dest: handle_dest_hi,
         auditor: handle_auditor_hi,
     };
 
-    // subtract to spendable comm
+    // subtract transfer amount from the spendable ciphertext
     let spendable_comm = spendable_ct.message_comm;
     let spendable_handle = spendable_ct.decrypt_handle;
 
@@ -114,11 +125,13 @@ pub fn create_transfer_instruction(
     };
 
     // generate proofs
+    //
+    // range_proof and validity_proof should be generated together
     let (range_proof, validity_proof) = transfer_proof_create(
         &source_sk,
         &dest_pk,
         (amount_lo as u64, amount_hi as u64),
-        &transfer_comms,
+        &amount_comms,
         &open_lo,
         &open_hi,
         new_spendable_balance,
@@ -126,27 +139,27 @@ pub fn create_transfer_instruction(
     );
 
     // generate data components
-    let range_proof_data = RangeProofData {
+    let range_proof_data = TransferWithRangeProofData {
+        amount_comms,
         spendable_comm: new_spendable_comm,
         proof: range_proof,
     };
 
-    let validity_proof_data = ValidityProofData {
+    let validity_proof_data = TransferWithValidityProofData {
+        decryption_handles_lo,
+        decryption_handles_hi,
         transfer_public_keys,
         proof: validity_proof,
     };
 
     // generate instruction
     let transfer_range_proof = TransferWithRangeProof {
-        amount_comms: transfer_comms,
         proof_component: range_proof_data,
     };
 
     let transfer_proof_create = TransferWithValidityProof {
-        decryption_handles_lo: lo_transfer_handles,
-        decryption_handles_hi: hi_transfer_handles,
         proof_component: validity_proof_data,
-        memo_component: OtherComponents,
+        other_component: OtherComponents,
     };
 
     (transfer_range_proof, transfer_proof_create)
@@ -160,12 +173,13 @@ pub struct OtherComponents;
 /// These two components should be output by a RangeProof creation function.
 #[allow(non_snake_case)]
 pub struct ValidityProof {
-    // Proof components for the spendable ciphertext components
+    // Proof component for the spendable ciphertext components: R
     pub R: CompressedRistretto,
+    // Proof component for the spendable ciphertext components: z
     pub z: Scalar,
-
-    // Proof for the transaction amount components
+    // Proof component for the transaction amount components: T_1
     pub T_1: CompressedRistretto,
+    // Proof component for the transaction amount components: T_2
     pub T_2: CompressedRistretto,
 }
 
@@ -185,9 +199,7 @@ fn transfer_proof_create(
     let mut transcript = merlin::Transcript::new(b"Solana CToken on testnet: Transfer");
 
     let H = PedersenBase::default().H;
-
     let D = spendable_ct.decrypt_handle.get_point();
-
     let s = source_sk.get_scalar();
 
     // Generate proof for the new spenable ciphertext

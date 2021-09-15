@@ -13,10 +13,10 @@ use merlin::Transcript;
 
 #[allow(non_snake_case)]
 pub struct InnerProductProof {
-    pub L_vec: Vec<CompressedRistretto>,
-    pub R_vec: Vec<CompressedRistretto>,
-    pub a: Scalar,
-    pub b: Scalar,
+    pub L_vec: Vec<CompressedRistretto>, // 32 * log(bit_length)
+    pub R_vec: Vec<CompressedRistretto>, // 32 * log(bit_length)
+    pub a: Scalar, // 32 bytes
+    pub b: Scalar, // 32 bytes
 }
 
 #[allow(non_snake_case)]
