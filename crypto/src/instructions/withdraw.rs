@@ -14,10 +14,7 @@ use {
         range_proof::RangeProof,
         transcript::TranscriptProtocol,
     },
-    curve25519_dalek::{
-        ristretto::RistrettoPoint,
-        scalar::Scalar,
-    },
+    curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar},
     merlin::Transcript,
     std::convert::TryInto,
 };
@@ -116,6 +113,7 @@ impl WithdrawProof {
         Transcript::new(b"WithdrawProof")
     }
 
+    #[cfg(not(target_arch = "bpf"))]
     pub fn new(source_sk: &ElGamalSK, final_balance: u64, final_balance_ct: &ElGamalCT) -> Self {
         let mut transcript = Self::transcript_new();
 
@@ -190,10 +188,10 @@ impl WithdrawProof {
         // compute new Pedersen commitment to verify range proof with
         let new_comm: RistrettoPoint = C - z * D + c * R;
 
-        self.range_proof.verify(vec![&new_comm.compress()], vec![64_usize], &mut transcript)
+        self.range_proof
+            .verify(vec![&new_comm.compress()], vec![64_usize], &mut transcript)
     }
 }
-
 
 #[cfg(test)]
 mod test {
@@ -215,7 +213,7 @@ mod test {
             source_pk,
             &source_sk,
             current_balance,
-            current_balance_ct
+            current_balance_ct,
         );
         assert!(data.verify().is_ok());
 
@@ -229,6 +227,5 @@ mod test {
             current_balance_ct,
         );
         assert!(data.verify().is_err());
-
     }
 }
