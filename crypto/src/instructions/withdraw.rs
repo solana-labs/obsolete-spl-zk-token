@@ -14,7 +14,7 @@ use {
         range_proof::RangeProof,
         transcript::TranscriptProtocol,
     },
-    curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar},
+    curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar, traits::MultiscalarMul},
     merlin::Transcript,
     std::convert::TryInto,
 };
@@ -43,8 +43,8 @@ struct Withdraw {
     amount: u64,
     /// Expected number of base 10 digits to the right of the decimal place.
     decimals: u8,
-    /// TODO: Proof that the encrypted balance is >= `amount`
-    proof_component: WithdrawData,
+    /// Proof that the encrypted balance is >= `amount`
+    proof_component: WithdrawData, // 800 bytes
 }
 
 /// This struct includes the cryptographic proof *and* the account data information needed to verify
@@ -56,10 +56,10 @@ struct Withdraw {
 ///
 pub struct WithdrawData {
     /// The source account available balance *after* the withdraw (encrypted by
-    /// `source_pk`)
+    /// `source_pk`
     pub final_balance_ct: PodElGamalCT, // 64 bytes
     /// Proof that the account is solvent
-    pub proof: WithdrawProof,
+    pub proof: WithdrawProof, // 736 bytes
 }
 
 impl WithdrawData {
@@ -100,11 +100,11 @@ impl WithdrawData {
 #[allow(non_snake_case)]
 pub struct WithdrawProof {
     /// Wrapper for range proof: R component
-    pub R: PodCompressedRistretto,
+    pub R: PodCompressedRistretto, // 32 bytes
     /// Wrapper for range proof: z component
-    pub z: PodScalar,
+    pub z: PodScalar, // 32 bytes
     /// Associated range proof
-    pub range_proof: RangeProof,
+    pub range_proof: RangeProof, // 672 bytes TODO: Create PodRangeProof
 }
 
 #[allow(non_snake_case)]
@@ -186,7 +186,7 @@ impl WithdrawProof {
         let R = R.decompress().ok_or(ProofError::VerificationError)?;
 
         // compute new Pedersen commitment to verify range proof with
-        let new_comm: RistrettoPoint = C - z * D + c * R;
+        let new_comm = RistrettoPoint::multiscalar_mul(vec![Scalar::one(), -z, c], vec![C, D, R]);
 
         self.range_proof
             .verify(vec![&new_comm.compress()], vec![64_usize], &mut transcript)
@@ -200,7 +200,7 @@ mod test {
 
     #[test]
     fn test_withdraw_correctness() {
-        // generate and verify proof properly
+        // generate and verify proof for the proper setting
         let (source_pk, source_sk) = ElGamal::keygen();
 
         let current_balance: u64 = 77;
@@ -227,5 +227,7 @@ mod test {
             current_balance_ct,
         );
         assert!(data.verify().is_err());
+
+        // TODO: test for ciphertexts that encrypt numbers outside the 0, 2^64 range
     }
 }
