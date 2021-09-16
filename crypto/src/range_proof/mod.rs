@@ -94,8 +94,8 @@ impl RangeProof {
 
         let mut i = 0;
         let mut exp_z = z * z;
+        let mut exp_y = Scalar::one();
         for (amount_i, n_i) in amounts.iter().zip(bit_lengths.iter()) {
-            let mut exp_y = Scalar::one();
             let mut exp_2 = Scalar::one();
 
             for j in 0..(*n_i) {
@@ -198,15 +198,16 @@ impl RangeProof {
         let nm: usize = bit_lengths.iter().sum();
         let bp_gens = BulletproofGens::new(nm);
 
-        // if !(nm == 8 || nm == 16 || nm == 32 || nm == 64 || nm == 128) {
-        //     return Err(ProofError::InvalidBitsize);
-        // }
+        if !(nm == 8 || nm == 16 || nm == 32 || nm == 64 || nm == 128) {
+            return Err(ProofError::InvalidBitsize);
+        }
 
         transcript.validate_and_append_point(b"A", &self.A)?;
         transcript.validate_and_append_point(b"S", &self.S)?;
 
         let y = transcript.challenge_scalar(b"y");
         let z = transcript.challenge_scalar(b"z");
+
         let zz = z * z;
         let minus_z = -z;
 
@@ -341,7 +342,7 @@ mod tests {
     fn test_aggregated_rangeproof() {
         let (comm_1, open_1) = Pedersen::commit(55_u64);
         let (comm_2, open_2) = Pedersen::commit(77_u64);
-        //let (comm_3, open_3) = Pedersen::commit(99_u64);
+        let (comm_3, open_3) = Pedersen::commit(99_u64);
 
         let t_1_blinding = PedersenOpen::random(&mut OsRng);
         let t_2_blinding = PedersenOpen::random(&mut OsRng);
@@ -350,10 +351,10 @@ mod tests {
         let mut transcript_verify = Transcript::new(b"Test");
 
         let proof = RangeProof::create(
-            vec![55, 77],
-            vec![32, 32],
-            vec![&comm_1, &comm_2],
-            vec![&open_1, &open_2],
+            vec![55, 77, 99],
+            vec![64, 32, 32],
+            vec![&comm_1, &comm_2, &comm_3],
+            vec![&open_1, &open_2, &open_3],
             &t_1_blinding,
             &t_2_blinding,
             &mut transcript_create,
@@ -361,12 +362,12 @@ mod tests {
 
         let comm_1_point = comm_1.get_point().compress();
         let comm_2_point = comm_2.get_point().compress();
-        // let comm_3_point = comm_3.get_point().compress();
+        let comm_3_point = comm_3.get_point().compress();
 
         assert!(proof
             .verify(
-                vec![&comm_1_point, &comm_2_point],
-                vec![32, 32],
+                vec![&comm_1_point, &comm_2_point, &comm_3_point],
+                vec![64, 32, 32],
                 &mut transcript_verify,
             )
             .is_ok());
