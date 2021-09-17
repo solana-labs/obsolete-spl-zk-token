@@ -4,7 +4,11 @@ use {
         encryption::pedersen::{PedersenComm, PedersenDecHandle},
         range_proof::RangeProof,
     },
-    curve25519_dalek::{ristretto::CompressedRistretto, scalar::Scalar},
+    curve25519_dalek::{
+        ristretto::{CompressedRistretto, RistrettoPoint},
+        scalar::Scalar,
+        traits::MultiscalarMul,
+    },
 };
 #[cfg(not(target_arch = "bpf"))]
 use {
@@ -129,7 +133,7 @@ pub fn create_transfer_instruction(
     // range_proof and validity_proof should be generated together
     let (range_proof, validity_proof) = transfer_proof_create(
         &source_sk,
-        &dest_pk,
+        &transfer_public_keys,
         (amount_lo as u64, amount_hi as u64),
         &amount_comms,
         &open_lo,
@@ -177,6 +181,8 @@ pub struct ValidityProof {
     pub R: CompressedRistretto,
     // Proof component for the spendable ciphertext components: z
     pub z: Scalar,
+    // Proof component for the transaction amount components: P_src
+    pub T_src: CompressedRistretto,
     // Proof component for the transaction amount components: T_1
     pub T_1: CompressedRistretto,
     // Proof component for the transaction amount components: T_2
@@ -188,18 +194,18 @@ pub struct ValidityProof {
 #[cfg(not(target_arch = "bpf"))]
 fn transfer_proof_create(
     source_sk: &ElGamalSK,
-    dest_pk: &ElGamalPK,
+    public_keys: &TransferPubKeys,
     transfer_amt: (u64, u64),
     transfer_comms: &TransferComms,
     lo_open: &PedersenOpen,
     hi_open: &PedersenOpen,
-    spendable_balance: u64,
-    spendable_ct: &ElGamalCT,
+    new_spendable_balance: u64,
+    new_spendable_ct: &ElGamalCT,
 ) -> (RangeProof, ValidityProof) {
-    let mut transcript = merlin::Transcript::new(b"Solana CToken on testnet: Transfer");
+    let mut transcript = merlin::Transcript::new(b"TransferProof");
 
     let H = PedersenBase::default().H;
-    let D = spendable_ct.decrypt_handle.get_point();
+    let D = new_spendable_ct.decrypt_handle.get_point();
     let s = source_sk.get_scalar();
 
     // Generate proof for the new spenable ciphertext
@@ -212,16 +218,37 @@ fn transfer_proof_create(
 
     let z = s + c * y;
     let spendable_open = PedersenOpen(c * r_new);
+    let T_src = public_keys.source_pk
+        .gen_decrypt_handle(&spendable_open)
+        .get_point()
+        .compress();
 
     // Generate proof for the transfer amounts
     let t_1_blinding = PedersenOpen::random(&mut OsRng);
     let t_2_blinding = PedersenOpen::random(&mut OsRng);
 
+    let u = transcript.challenge_scalar(b"u");
+    let P_joint = RistrettoPoint::multiscalar_mul(
+        vec![Scalar::one(), u, u*u],
+        vec![
+            public_keys.source_pk.get_point(),
+            public_keys.dest_pk.get_point(),
+            public_keys.auditor_pk.get_point()
+        ],
+    );
+
+    let T_1 = (t_1_blinding.get_scalar() * P_joint).compress();
+    let T_2 = (t_2_blinding.get_scalar() * P_joint).compress();
+
+    transcript.append_point(b"T_1", &T_1);
+    transcript.append_point(b"T_2", &T_2);
+
+    // Generate aggregated range proof
     let range_proof = RangeProof::create(
-        vec![spendable_balance, transfer_amt.0, transfer_amt.1],
+        vec![new_spendable_balance, transfer_amt.0, transfer_amt.1],
         vec![64, 32, 32],
         vec![
-            &spendable_ct.message_comm,
+            &new_spendable_ct.message_comm,
             &transfer_comms.lo,
             &transfer_comms.hi,
         ],
@@ -231,14 +258,7 @@ fn transfer_proof_create(
         &mut transcript,
     );
 
-    // Generate aggregated range proof
-    let T_1 = (t_1_blinding.get_scalar() * dest_pk.get_point()).compress();
-    let T_2 = (t_2_blinding.get_scalar() * dest_pk.get_point()).compress();
-
-    transcript.append_point(b"T_1", &T_1);
-    transcript.append_point(b"T_2", &T_2);
-
-    let validity_proof = ValidityProof { R, z, T_1, T_2 };
+    let validity_proof = ValidityProof { R, z, T_src, T_1, T_2 };
 
     (range_proof, validity_proof)
 }
