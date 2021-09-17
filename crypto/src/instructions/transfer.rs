@@ -1,25 +1,23 @@
+#[cfg(not(target_arch = "bpf"))]
+use {
+    crate::encryption::{
+        elgamal::ElGamalSK,
+        pedersen::{Pedersen, PedersenBase, PedersenOpen},
+    },
+    rand::rngs::OsRng,
+};
 use {
     crate::{
         encryption::elgamal::{ElGamalCT, ElGamalPK},
         encryption::pedersen::{PedersenComm, PedersenDecHandle},
         range_proof::RangeProof,
+        transcript::TranscriptProtocol,
     },
     curve25519_dalek::{
         ristretto::{CompressedRistretto, RistrettoPoint},
         scalar::Scalar,
         traits::MultiscalarMul,
     },
-};
-#[cfg(not(target_arch = "bpf"))]
-use {
-    crate::{
-        encryption::{
-            elgamal::ElGamalSK,
-            pedersen::{Pedersen, PedersenBase, PedersenOpen},
-        },
-        transcript::TranscriptProtocol,
-    },
-    rand::rngs::OsRng,
 };
 
 /// NOTE: I think the logical way to divide up the proof is as before:
@@ -157,16 +155,16 @@ pub fn create_transfer_instruction(
     };
 
     // generate instruction
-    let transfer_range_proof = TransferWithRangeProof {
+    let transfer_with_range_proof = TransferWithRangeProof {
         proof_component: range_proof_data,
     };
 
-    let transfer_proof_create = TransferWithValidityProof {
+    let transfer_with_validity_proof = TransferWithValidityProof {
         proof_component: validity_proof_data,
         other_component: OtherComponents,
     };
 
-    (transfer_range_proof, transfer_proof_create)
+    (transfer_with_range_proof, transfer_with_validity_proof)
 }
 
 /// Other components needed for transfer excluding the crypto components
@@ -211,14 +209,15 @@ fn transfer_proof_create(
     // Generate proof for the new spenable ciphertext
     let r_new = Scalar::random(&mut OsRng);
     let y = Scalar::random(&mut OsRng);
-    let R = (y * D + r_new * H).compress(); // TODO: use multiscalar_mul
+    let R = RistrettoPoint::multiscalar_mul(vec![y, r_new], vec![D, H]).compress();
 
     transcript.append_point(b"R", &R);
     let c = transcript.challenge_scalar(b"c");
 
     let z = s + c * y;
     let spendable_open = PedersenOpen(c * r_new);
-    let T_src = public_keys.source_pk
+    let T_src = public_keys
+        .source_pk
         .gen_decrypt_handle(&spendable_open)
         .get_point()
         .compress();
@@ -229,11 +228,11 @@ fn transfer_proof_create(
 
     let u = transcript.challenge_scalar(b"u");
     let P_joint = RistrettoPoint::multiscalar_mul(
-        vec![Scalar::one(), u, u*u],
+        vec![Scalar::one(), u, u * u],
         vec![
             public_keys.source_pk.get_point(),
             public_keys.dest_pk.get_point(),
-            public_keys.auditor_pk.get_point()
+            public_keys.auditor_pk.get_point(),
         ],
     );
 
@@ -258,7 +257,13 @@ fn transfer_proof_create(
         &mut transcript,
     );
 
-    let validity_proof = ValidityProof { R, z, T_src, T_1, T_2 };
+    let validity_proof = ValidityProof {
+        R,
+        z,
+        T_src,
+        T_1,
+        T_2,
+    };
 
     (range_proof, validity_proof)
 }
