@@ -27,6 +27,12 @@ pub trait TranscriptProtocol {
     /// Append a domain separator for withdraw proof.
     fn withdraw_proof_domain_sep(&mut self);
 
+    /// Append a domain separator for transfer with range proof.
+    fn transfer_range_proof_sep(&mut self);
+
+    /// Append a domain separator for transfer with validity proof.
+    fn transfer_validity_proof_sep(&mut self);
+
     /// Append a `scalar` with the given `label`.
     fn append_scalar(&mut self, label: &'static [u8], scalar: &Scalar);
 
@@ -71,6 +77,14 @@ impl TranscriptProtocol for Transcript {
 
     fn withdraw_proof_domain_sep(&mut self) {
         self.append_message(b"dom_sep", b"WithdrawProof");
+    }
+
+    fn transfer_range_proof_sep(&mut self) {
+        self.append_message(b"dom_sep", b"TransferWithRangeProof");
+    }
+
+    fn transfer_validity_proof_sep(&mut self) {
+        self.append_message(b"dom_sep", b"TransferWithValidityProof");
     }
 
     fn append_scalar(&mut self, label: &'static [u8], scalar: &Scalar) {

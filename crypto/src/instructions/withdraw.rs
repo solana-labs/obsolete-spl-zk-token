@@ -149,7 +149,6 @@ impl WithdrawProof {
         let range_proof = RangeProof::create(
             vec![final_balance],
             vec![64],
-            vec![],
             vec![&new_open],
             &t_1_blinding,
             &t_2_blinding,

@@ -43,7 +43,6 @@ impl RangeProof {
     pub fn create(
         amounts: Vec<u64>,
         bit_lengths: Vec<usize>,
-        _comms: Vec<&PedersenComm>, // to be removed after instruction update
         opens: Vec<&PedersenOpen>,
         t_1_blinding: &PedersenOpen,
         t_2_blinding: &PedersenOpen,
