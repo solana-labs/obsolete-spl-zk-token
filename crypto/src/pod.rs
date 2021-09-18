@@ -87,12 +87,20 @@ impl fmt::Debug for PodElGamalPK {
     }
 }
 
+
 #[derive(Clone, Copy, Pod, Zeroable, PartialEq)]
 #[repr(transparent)]
 pub struct PodPedersenComm([u8; 32]);
 impl From<PedersenComm> for PodPedersenComm {
     fn from(comm: PedersenComm) -> Self {
         Self(comm.to_bytes())
+    }
+}
+
+// For proof verification, interpret PodPedersenComm as CompressedRistretto
+impl From<PodPedersenComm> for CompressedRistretto {
+    fn from(pod: PodPedersenComm) -> Self {
+        Self(pod.0)
     }
 }
 
@@ -116,6 +124,13 @@ pub struct PodPedersenDecHandle([u8; 32]);
 impl From<PedersenDecHandle> for PodPedersenDecHandle {
     fn from(handle: PedersenDecHandle) -> Self {
         Self(handle.to_bytes())
+    }
+}
+
+// For proof verification, interpret PodPedersenDecHandle as CompressedRistretto
+impl From<PodPedersenDecHandle> for CompressedRistretto {
+    fn from(pod: PodPedersenDecHandle) -> Self {
+        Self(pod.0)
     }
 }
 
