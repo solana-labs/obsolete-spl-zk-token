@@ -189,6 +189,7 @@ pub struct ValidityProof {
 
 #[allow(non_snake_case)]
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::many_single_char_names)]
 #[cfg(not(target_arch = "bpf"))]
 fn transfer_proof_create(
     source_sk: &ElGamalSK,
