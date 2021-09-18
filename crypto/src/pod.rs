@@ -5,7 +5,7 @@ use {
         errors::ProofError,
     },
     curve25519_dalek::{ristretto::CompressedRistretto, scalar::Scalar},
-    std::convert::TryFrom,
+    std::{convert::TryFrom, fmt},
 };
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -57,6 +57,12 @@ impl TryFrom<PodElGamalCT> for ElGamalCT {
     }
 }
 
+impl fmt::Debug for PodElGamalCT {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
 #[derive(Clone, Copy, Pod, Zeroable, PartialEq)]
 #[repr(transparent)]
 pub struct PodElGamalPK([u8; 32]);
@@ -71,5 +77,11 @@ impl TryFrom<PodElGamalPK> for ElGamalPK {
 
     fn try_from(pod: PodElGamalPK) -> Result<Self, Self::Error> {
         Self::from_bytes(&pod.0).ok_or(ProofError::InconsistentCTData)
+    }
+}
+
+impl fmt::Debug for PodElGamalPK {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.0)
     }
 }
