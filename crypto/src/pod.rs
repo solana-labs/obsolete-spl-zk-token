@@ -87,7 +87,6 @@ impl fmt::Debug for PodElGamalPK {
     }
 }
 
-
 #[derive(Clone, Copy, Pod, Zeroable, PartialEq)]
 #[repr(transparent)]
 pub struct PodPedersenComm([u8; 32]);

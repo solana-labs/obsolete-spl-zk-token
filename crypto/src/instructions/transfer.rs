@@ -15,13 +15,8 @@ use {
         range_proof::RangeProof,
         transcript::TranscriptProtocol,
     },
-    curve25519_dalek::{
-        ristretto::{CompressedRistretto, RistrettoPoint},
-        scalar::Scalar,
-        traits::MultiscalarMul,
-    },
+    curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar, traits::MultiscalarMul},
     merlin::Transcript,
-    std::convert::TryInto,
 };
 
 /// NOTE: I think the logical way to divide up the proof is as before:
@@ -59,12 +54,6 @@ impl TransferData {
         dest_pk: ElGamalPK,
         auditor_pk: ElGamalPK,
     ) -> Self {
-        let transfer_public_keys = TransferPubKeys {
-            source_pk,
-            dest_pk,
-            auditor_pk,
-        };
-
         // split and encrypt transfer amount
         let (amount_lo, amount_hi) = split_u64_into_u32(transfer_amount);
 
@@ -80,20 +69,26 @@ impl TransferData {
         let handle_auditor_hi = auditor_pk.gen_decrypt_handle(&open_hi);
 
         let amount_comms = TransferComms {
-            lo: comm_lo,
-            hi: comm_hi,
+            lo: comm_lo.into(),
+            hi: comm_hi.into(),
         };
 
         let decryption_handles_lo = TransferHandles {
-            source: handle_source_lo,
-            dest: handle_dest_lo,
-            auditor: handle_auditor_lo,
+            source: handle_source_lo.into(),
+            dest: handle_dest_lo.into(),
+            auditor: handle_auditor_lo.into(),
         };
 
         let decryption_handles_hi = TransferHandles {
-            source: handle_source_hi,
-            dest: handle_dest_hi,
-            auditor: handle_auditor_hi,
+            source: handle_source_hi.into(),
+            dest: handle_dest_hi.into(),
+            auditor: handle_auditor_hi.into(),
+        };
+
+        let transfer_public_keys = TransferPubKeys {
+            source_pk: source_pk.into(),
+            dest_pk: dest_pk.into(),
+            auditor_pk: auditor_pk.into(),
         };
 
         // subtract transfer amount from the spendable ciphertext
@@ -111,9 +106,11 @@ impl TransferData {
         };
 
         // range_proof and validity_proof should be generated together
-        let transfer_proofs = TransferProofs::new(
+        let (transfer_proofs, spendable_comm_for_verification) = TransferProofs::new(
             &source_sk,
-            &transfer_public_keys,
+            &source_pk,
+            &dest_pk,
+            &auditor_pk,
             (amount_lo as u64, amount_hi as u64),
             &open_lo,
             &open_hi,
@@ -124,7 +121,7 @@ impl TransferData {
         // generate data components
         let range_proof_data = TransferWithRangeProofData {
             amount_comms,
-            spendable_comm: new_spendable_comm,
+            spendable_comm: spendable_comm_for_verification.into(),
             proof: transfer_proofs.range_proof,
         };
 
@@ -147,7 +144,7 @@ pub struct TransferWithRangeProofData {
     pub amount_comms: TransferComms,
 
     /// The Pedersen commitment component of the source account spendable balance
-    pub spendable_comm: PedersenComm,
+    pub spendable_comm: PodPedersenComm,
 
     /// Proof that certifies:
     ///   1. the source account has enough funds for the transfer
@@ -157,8 +154,17 @@ pub struct TransferWithRangeProofData {
 
 impl TransferWithRangeProofData {
     pub fn verify(&self) -> Result<(), ProofError> {
-        // TODO
-        Ok(())
+        let mut transcript = Transcript::new(b"TransferWithRangeProof");
+
+        self.proof.verify(
+            vec![
+                &self.spendable_comm.into(),
+                &self.amount_comms.lo.into(),
+                &self.amount_comms.hi.into(),
+            ],
+            vec![64_usize, 32_usize, 32_usize],
+            &mut transcript,
+        )
     }
 }
 
@@ -198,13 +204,15 @@ impl TransferProofs {
     #[cfg(not(target_arch = "bpf"))]
     pub fn new(
         source_sk: &ElGamalSK,
-        public_keys: &TransferPubKeys,
+        source_pk: &ElGamalPK,
+        dest_pk: &ElGamalPK,
+        auditor_pk: &ElGamalPK,
         transfer_amt: (u64, u64),
         lo_open: &PedersenOpen,
         hi_open: &PedersenOpen,
         new_spendable_balance: u64,
         new_spendable_ct: &ElGamalCT,
-    ) -> Self {
+    ) -> (Self, PedersenComm) {
         // TODO: commit to pubkeys and commitments
         let mut transcript_validity_proof = merlin::Transcript::new(b"TransferWithValidityProof");
 
@@ -212,7 +220,7 @@ impl TransferProofs {
         let D = new_spendable_ct.decrypt_handle.get_point();
         let s = source_sk.get_scalar();
 
-        // Generate proof for the new spenable ciphertext
+        // Generate proof for the new spendable ciphertext
         let r_new = Scalar::random(&mut OsRng);
         let y = Scalar::random(&mut OsRng);
         let R = RistrettoPoint::multiscalar_mul(vec![y, r_new], vec![D, H]).compress();
@@ -221,12 +229,14 @@ impl TransferProofs {
         let c = transcript_validity_proof.challenge_scalar(b"c");
 
         let z = s + c * y;
-        let spendable_open = PedersenOpen(c * r_new);
-        let T_src = public_keys
-            .source_pk
-            .gen_decrypt_handle(&spendable_open)
+        let new_spendable_open = PedersenOpen(c * r_new);
+        let T_src = source_pk
+            .gen_decrypt_handle(&new_spendable_open)
             .get_point()
             .compress();
+
+        let spendable_comm_for_verification =
+            Pedersen::commit_with(new_spendable_balance, &new_spendable_open);
 
         // Generate proof for the transfer amounts
         let t_1_blinding = PedersenOpen::random(&mut OsRng);
@@ -236,9 +246,9 @@ impl TransferProofs {
         let P_joint = RistrettoPoint::multiscalar_mul(
             vec![Scalar::one(), u, u * u],
             vec![
-                public_keys.source_pk.get_point(),
-                public_keys.dest_pk.get_point(),
-                public_keys.auditor_pk.get_point(),
+                source_pk.get_point(),
+                dest_pk.get_point(),
+                auditor_pk.get_point(),
             ],
         );
 
@@ -249,28 +259,31 @@ impl TransferProofs {
         transcript_validity_proof.append_point(b"T_2", &T_2);
 
         let validity_proof = ValidityProof {
-            R,
-            z,
-            T_src,
-            T_1,
-            T_2,
+            R: R.into(),
+            z: z.into(),
+            T_src: T_src.into(),
+            T_1: T_1.into(),
+            T_2: T_2.into(),
         };
 
         // Generate aggregated range proof
-        let mut transcript_range_proof = merlin::Transcript::new(b"TransferWithRangeProof");
+        let mut transcript_range_proof = Transcript::new(b"TransferWithRangeProof");
         let range_proof = RangeProof::create(
             vec![new_spendable_balance, transfer_amt.0, transfer_amt.1],
             vec![64, 32, 32],
-            vec![&spendable_open, lo_open, hi_open],
+            vec![&new_spendable_open, lo_open, hi_open],
             &t_1_blinding,
             &t_2_blinding,
             &mut transcript_range_proof,
         );
 
-        Self {
-            range_proof,
-            validity_proof,
-        }
+        (
+            Self {
+                range_proof,
+                validity_proof,
+            },
+            spendable_comm_for_verification,
+        )
     }
 }
 
@@ -280,35 +293,35 @@ impl TransferProofs {
 #[allow(non_snake_case)]
 pub struct ValidityProof {
     // Proof component for the spendable ciphertext components: R
-    pub R: CompressedRistretto,
+    pub R: PodCompressedRistretto,
     // Proof component for the spendable ciphertext components: z
-    pub z: Scalar,
+    pub z: PodScalar,
     // Proof component for the transaction amount components: P_src
-    pub T_src: CompressedRistretto,
+    pub T_src: PodCompressedRistretto,
     // Proof component for the transaction amount components: T_1
-    pub T_1: CompressedRistretto,
+    pub T_1: PodCompressedRistretto,
     // Proof component for the transaction amount components: T_2
-    pub T_2: CompressedRistretto,
+    pub T_2: PodCompressedRistretto,
 }
 
 /// The ElGamal public keys needed for a transfer
 pub struct TransferPubKeys {
-    pub source_pk: ElGamalPK,
-    pub dest_pk: ElGamalPK,
-    pub auditor_pk: ElGamalPK,
+    pub source_pk: PodElGamalPK,
+    pub dest_pk: PodElGamalPK,
+    pub auditor_pk: PodElGamalPK,
 }
 
 /// The transfer amount commitments needed for a transfer
 pub struct TransferComms {
-    pub lo: PedersenComm,
-    pub hi: PedersenComm,
+    pub lo: PodPedersenComm,
+    pub hi: PodPedersenComm,
 }
 
 /// The decryption handles needed for a transfer
 pub struct TransferHandles {
-    pub source: PedersenDecHandle,
-    pub dest: PedersenDecHandle,
-    pub auditor: PedersenDecHandle,
+    pub source: PodPedersenDecHandle,
+    pub dest: PodPedersenDecHandle,
+    pub auditor: PodPedersenDecHandle,
 }
 
 #[cfg(not(target_arch = "bpf"))]
@@ -334,4 +347,42 @@ pub fn combine_u32_handles(
 
 pub fn combine_u32_ciphertexts(ct_lo: ElGamalCT, ct_hi: ElGamalCT) -> ElGamalCT {
     ct_lo + ct_hi * Scalar::from(TWO_32)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::encryption::elgamal::ElGamal;
+
+    #[test]
+    fn test_transfer_correctness() {
+        // ElGamal keys for source, destination, and auditor accounts
+        let (source_pk, source_sk) = ElGamal::keygen();
+        let (dest_pk, _) = ElGamal::keygen();
+        let (auditor_pk, _) = ElGamal::keygen();
+
+        // create source account spendable ciphertext
+        let spendable_balance: u64 = 77;
+        let spendable_ct = source_pk.encrypt(spendable_balance);
+
+        // transfer amount
+        let transfer_amount: u64 = 55;
+
+        // create transfer data
+        let transfer_data = TransferData::new(
+            transfer_amount,
+            spendable_balance,
+            spendable_ct,
+            source_sk,
+            source_pk,
+            dest_pk,
+            auditor_pk,
+        );
+
+        // verify range proof
+        assert!(transfer_data.range_proof_data.verify().is_ok());
+
+        // verify ciphertext validity proof
+        assert!(transfer_data.validity_proof_data.verify().is_ok());
+    }
 }

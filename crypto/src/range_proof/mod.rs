@@ -1,6 +1,6 @@
 #[cfg(not(target_arch = "bpf"))]
 use {
-    crate::encryption::pedersen::{Pedersen, PedersenComm, PedersenOpen},
+    crate::encryption::pedersen::{Pedersen, PedersenOpen},
     curve25519_dalek::traits::MultiscalarMul,
     rand::rngs::OsRng,
     subtle::{Choice, ConditionallySelectable},
@@ -321,7 +321,6 @@ mod tests {
         let proof = RangeProof::create(
             vec![55],
             vec![32],
-            vec![&comm],
             vec![&open],
             &t_1_blinding,
             &t_2_blinding,
@@ -352,7 +351,6 @@ mod tests {
         let proof = RangeProof::create(
             vec![55, 77, 99],
             vec![64, 32, 32],
-            vec![&comm_1, &comm_2, &comm_3],
             vec![&open_1, &open_2, &open_3],
             &t_1_blinding,
             &t_2_blinding,
