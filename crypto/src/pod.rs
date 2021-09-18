@@ -2,6 +2,7 @@
 use {
     crate::{
         encryption::elgamal::{ElGamalCT, ElGamalPK},
+        encryption::pedersen::{PedersenComm, PedersenDecHandle},
         errors::ProofError,
     },
     curve25519_dalek::{ristretto::CompressedRistretto, scalar::Scalar},
@@ -81,6 +82,52 @@ impl TryFrom<PodElGamalPK> for ElGamalPK {
 }
 
 impl fmt::Debug for PodElGamalPK {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+#[derive(Clone, Copy, Pod, Zeroable, PartialEq)]
+#[repr(transparent)]
+pub struct PodPedersenComm([u8; 32]);
+impl From<PedersenComm> for PodPedersenComm {
+    fn from(comm: PedersenComm) -> Self {
+        Self(comm.to_bytes())
+    }
+}
+
+impl TryFrom<PodPedersenComm> for PedersenComm {
+    type Error = ProofError;
+
+    fn try_from(pod: PodPedersenComm) -> Result<Self, Self::Error> {
+        Self::from_bytes(&pod.0).ok_or(ProofError::InconsistentCTData)
+    }
+}
+
+impl fmt::Debug for PodPedersenComm {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+#[derive(Clone, Copy, Pod, Zeroable, PartialEq)]
+#[repr(transparent)]
+pub struct PodPedersenDecHandle([u8; 32]);
+impl From<PedersenDecHandle> for PodPedersenDecHandle {
+    fn from(handle: PedersenDecHandle) -> Self {
+        Self(handle.to_bytes())
+    }
+}
+
+impl TryFrom<PodPedersenDecHandle> for PedersenDecHandle {
+    type Error = ProofError;
+
+    fn try_from(pod: PodPedersenDecHandle) -> Result<Self, Self::Error> {
+        Self::from_bytes(&pod.0).ok_or(ProofError::InconsistentCTData)
+    }
+}
+
+impl fmt::Debug for PodPedersenDecHandle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.0)
     }
