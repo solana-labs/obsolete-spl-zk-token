@@ -479,10 +479,16 @@ fn process_update_account_pk(input: &[u8], accounts: &[AccountInfo]) -> ProgramR
         "TODO: {:?}",
         get_previous_instruction(instructions_sysvar_info)
     );
+
     let data = decode_instruction_data::<UpdateAccountPkData>(input)?;
-    if let Err(err) = data.verify() {
-        msg!("proof verification failed: {:?}", err);
-        return Err(ProgramError::InvalidInstructionData);
+
+    // Proof verification causes a BPF stack overflow
+    #[cfg(not(target_arch = "bpf"))]
+    {
+        if let Err(err) = data.verify() {
+            msg!("proof verification failed: {:?}", err);
+            return Err(ProgramError::InvalidInstructionData);
+        }
     }
 
     let elgamal_pk = data.current_pk;
