@@ -43,7 +43,6 @@ pub struct TransferWithValidityProof {
     pub other_component: OtherComponents,
 }
 
-
 pub struct TransferData {
     pub range_proof_data: TransferWithRangeProofData,
     pub validity_proof_data: TransferWithValidityProofData,
@@ -187,7 +186,6 @@ impl TransferWithValidityProofData {
 /// Other components needed for transfer excluding the crypto components
 pub struct OtherComponents;
 
-
 pub struct TransferProofs {
     pub range_proof: RangeProof,
     pub validity_proof: ValidityProof,
@@ -196,6 +194,7 @@ pub struct TransferProofs {
 #[allow(non_snake_case)]
 impl TransferProofs {
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::many_single_char_names)]
     #[cfg(not(target_arch = "bpf"))]
     pub fn new(
         source_sk: &ElGamalSK,
@@ -268,10 +267,12 @@ impl TransferProofs {
             &mut transcript_range_proof,
         );
 
-        Self { range_proof, validity_proof }
+        Self {
+            range_proof,
+            validity_proof,
+        }
     }
 }
-
 
 /// Proof components for transfer instructions.
 ///
