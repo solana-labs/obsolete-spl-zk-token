@@ -50,12 +50,12 @@ impl UpdateAccountPkData {
     #[cfg(not(target_arch = "bpf"))]
     pub fn new(
         current_balance: u64,
+        current_ct: ElGamalCT,
         current_pk: ElGamalPK,
         current_sk: &ElGamalSK,
         new_pk: ElGamalPK,
         new_sk: &ElGamalSK,
     ) -> Self {
-        let current_ct = current_pk.encrypt(current_balance);
         let new_ct = new_pk.encrypt(current_balance);
 
         let proof =

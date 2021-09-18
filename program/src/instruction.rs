@@ -1,5 +1,6 @@
 //! Program instructions
 
+pub use spl_zk_token_crypto::instructions::update_account_pk::UpdateAccountPkData;
 use {
     crate::{pod::*, *},
     bytemuck::Pod,
@@ -12,7 +13,6 @@ use {
         sysvar,
     },
     spl_zk_token_crypto::pod::*,
-    //spl_zk_token_crypto::instructions::update_account_pk::UpdateAccountPkData,
     zeroable::Zeroable,
 };
 
@@ -31,10 +31,16 @@ pub struct UpdateTransferAuditorInstructionData {
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
-#[repr(transparent)]
+#[repr(C)]
 pub struct CreateAccountInstructionData {
     /// The public key associated with the account
     pub elgamal_pk: PodElGamalPK,
+
+    /// 0, encrypted with `elgamal_pk`
+    pub zero_balance: PodElGamalCT,
+
+    // TODO: Proof that `zero_balance` equals 0
+    pub crypto_zero_balance_proof: [u8; 256],
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -476,6 +482,31 @@ pub fn configure_mint_with_transfer_auditor(
         funding_address,
         token_mint_address,
         Some((transfer_auditor_pk, freeze_authority)),
+    )
+}
+
+/// Create a `ConfidentialTokenInstruction::UpdateAccountPk` instruction
+pub fn update_account_pk(
+    zk_token_account: Pubkey,
+    token_account: Pubkey,
+    owner: Pubkey,
+    multisig_signers: &[&Pubkey],
+    data: UpdateAccountPkData,
+) -> Instruction {
+    let mut accounts = vec![
+        AccountMeta::new(zk_token_account, false),
+        AccountMeta::new_readonly(token_account, false),
+        AccountMeta::new_readonly(sysvar::instructions::id(), false),
+        AccountMeta::new_readonly(owner, multisig_signers.is_empty()),
+    ];
+
+    for multisig_signer in multisig_signers.iter() {
+        accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
+    }
+    encode_instruction(
+        accounts,
+        ConfidentialTokenInstruction::UpdateAccountPk,
+        &data,
     )
 }
 
