@@ -52,7 +52,7 @@ struct Withdraw {
 ///
 /// - The pre-instruction should call WithdrawData::verify_proof(&self)
 /// - The actual program should check that `current_ct` is consistent with what is
-///   currently stored in the confidential token account TODO: update
+///   currently stored in the confidential token account TODO: update this statement
 ///
 pub struct WithdrawData {
     /// The source account available balance *after* the withdraw (encrypted by
@@ -130,7 +130,11 @@ impl WithdrawProof {
 
         // generate a random masking factor that also serves as a nonce
         let y = Scalar::random(&mut OsRng);
-        let R = (y * D + r_new * H).compress(); // TODO: use multiscalar_mul
+
+        let R = RistrettoPoint::multiscalar_mul(
+            vec![y, r_new],
+            vec![D, H],
+        ).compress();
 
         // record R on transcript and receive a challenge scalar
         transcript.append_point(b"R", &R);
@@ -142,16 +146,10 @@ impl WithdrawProof {
         // compute the new Pedersen commitment and opening
         let new_open = PedersenOpen(c * r_new);
 
-        // Generate the range proof component
-        let t_1_blinding = PedersenOpen::random(&mut OsRng);
-        let t_2_blinding = PedersenOpen::random(&mut OsRng);
-
         let range_proof = RangeProof::create(
             vec![final_balance],
             vec![64],
             vec![&new_open],
-            &t_1_blinding,
-            &t_2_blinding,
             &mut transcript,
         );
 

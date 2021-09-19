@@ -44,10 +44,33 @@ impl RangeProof {
         amounts: Vec<u64>,
         bit_lengths: Vec<usize>,
         opens: Vec<&PedersenOpen>,
+        transcript: &mut Transcript,
+    ) -> Self {
+        let t_1_blinding = PedersenOpen::random(&mut OsRng);
+        let t_2_blinding = PedersenOpen::random(&mut OsRng);
+
+        let (range_proof, _, _) = Self::create_with(
+            amounts,
+            bit_lengths,
+            opens,
+            &t_1_blinding,
+            &t_2_blinding,
+            transcript,
+        );
+
+        range_proof
+    }
+
+    #[allow(clippy::many_single_char_names)]
+    #[cfg(not(target_arch = "bpf"))]
+    pub fn create_with(
+        amounts: Vec<u64>,
+        bit_lengths: Vec<usize>,
+        opens: Vec<&PedersenOpen>,
         t_1_blinding: &PedersenOpen,
         t_2_blinding: &PedersenOpen,
         transcript: &mut Transcript,
-    ) -> Self {
+    ) -> (Self, Scalar, Scalar) {
         let nm = bit_lengths.iter().sum();
 
         // Computing the generators online for now. It should ultimately be precomputed.
@@ -171,7 +194,7 @@ impl RangeProof {
             transcript,
         );
 
-        RangeProof {
+        let range_proof = RangeProof {
             A: A.compress(),
             S: S.compress(),
             T_1,
@@ -180,7 +203,9 @@ impl RangeProof {
             t_x_blinding,
             e_blinding,
             ipp_proof,
-        }
+        };
+
+        (range_proof, x, z)
     }
 
     #[allow(clippy::many_single_char_names)]
@@ -312,9 +337,6 @@ mod tests {
     fn test_single_rangeproof() {
         let (comm, open) = Pedersen::commit(55_u64);
 
-        let t_1_blinding = PedersenOpen::random(&mut OsRng);
-        let t_2_blinding = PedersenOpen::random(&mut OsRng);
-
         let mut transcript_create = Transcript::new(b"Test");
         let mut transcript_verify = Transcript::new(b"Test");
 
@@ -322,8 +344,6 @@ mod tests {
             vec![55],
             vec![32],
             vec![&open],
-            &t_1_blinding,
-            &t_2_blinding,
             &mut transcript_create,
         );
 
@@ -342,9 +362,6 @@ mod tests {
         let (comm_2, open_2) = Pedersen::commit(77_u64);
         let (comm_3, open_3) = Pedersen::commit(99_u64);
 
-        let t_1_blinding = PedersenOpen::random(&mut OsRng);
-        let t_2_blinding = PedersenOpen::random(&mut OsRng);
-
         let mut transcript_create = Transcript::new(b"Test");
         let mut transcript_verify = Transcript::new(b"Test");
 
@@ -352,8 +369,6 @@ mod tests {
             vec![55, 77, 99],
             vec![64, 32, 32],
             vec![&open_1, &open_2, &open_3],
-            &t_1_blinding,
-            &t_2_blinding,
             &mut transcript_create,
         );
 

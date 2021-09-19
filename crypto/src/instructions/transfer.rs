@@ -106,7 +106,7 @@ impl TransferData {
         };
 
         // range_proof and validity_proof should be generated together
-        let (transfer_proofs, spendable_comm_for_verification) = TransferProofs::new(
+        let (transfer_proofs, ephemeral_state) = TransferProofs::new(
             &source_sk,
             &source_pk,
             &dest_pk,
@@ -121,8 +121,8 @@ impl TransferData {
         // generate data components
         let range_proof_data = TransferWithRangeProofData {
             amount_comms,
-            spendable_comm: spendable_comm_for_verification.into(),
             proof: transfer_proofs.range_proof,
+            ephemeral_state,
         };
 
         let validity_proof_data = TransferWithValidityProofData {
@@ -130,6 +130,7 @@ impl TransferData {
             decryption_handles_hi,
             transfer_public_keys,
             proof: transfer_proofs.validity_proof,
+            ephemeral_state,
         };
 
         TransferData {
@@ -143,13 +144,13 @@ pub struct TransferWithRangeProofData {
     /// The transfer amount encoded as Pedersen commitments
     pub amount_comms: TransferComms,
 
-    /// The Pedersen commitment component of the source account spendable balance
-    pub spendable_comm: PodPedersenComm,
-
     /// Proof that certifies:
     ///   1. the source account has enough funds for the transfer
     ///   2. the transfer amount is a 64-bit positive number
     pub proof: RangeProof,
+
+    /// Ephemeral state between the two transfer instruction data
+    pub ephemeral_state: TransferEphemeralState,
 }
 
 impl TransferWithRangeProofData {
@@ -158,7 +159,7 @@ impl TransferWithRangeProofData {
 
         self.proof.verify(
             vec![
-                &self.spendable_comm.into(),
+                &self.ephemeral_state.spendable_comm_verification.into(),
                 &self.amount_comms.lo.into(),
                 &self.amount_comms.hi.into(),
             ],
@@ -180,6 +181,16 @@ pub struct TransferWithValidityProofData {
 
     /// Proof that certifies that the decryption handles are generated correctly
     pub proof: ValidityProof,
+
+    /// Ephemeral state between the two transfer instruction data
+    pub ephemeral_state: TransferEphemeralState,
+}
+
+#[derive(Clone, Copy)]
+pub struct TransferEphemeralState {
+    pub spendable_comm_verification: PodPedersenComm,
+    pub x: PodScalar,
+    pub z: PodScalar,
 }
 
 impl TransferWithValidityProofData {
@@ -212,7 +223,7 @@ impl TransferProofs {
         hi_open: &PedersenOpen,
         new_spendable_balance: u64,
         new_spendable_ct: &ElGamalCT,
-    ) -> (Self, PedersenComm) {
+    ) -> (Self, TransferEphemeralState) {
         // TODO: commit to pubkeys and commitments
         let mut transcript_validity_proof = merlin::Transcript::new(b"TransferWithValidityProof");
 
@@ -235,7 +246,7 @@ impl TransferProofs {
             .get_point()
             .compress();
 
-        let spendable_comm_for_verification =
+        let spendable_comm_verification =
             Pedersen::commit_with(new_spendable_balance, &new_spendable_open);
 
         // Generate proof for the transfer amounts
@@ -268,7 +279,7 @@ impl TransferProofs {
 
         // Generate aggregated range proof
         let mut transcript_range_proof = Transcript::new(b"TransferWithRangeProof");
-        let range_proof = RangeProof::create(
+        let (range_proof, x, z) = RangeProof::create_with(
             vec![new_spendable_balance, transfer_amt.0, transfer_amt.1],
             vec![64, 32, 32],
             vec![&new_spendable_open, lo_open, hi_open],
@@ -277,12 +288,18 @@ impl TransferProofs {
             &mut transcript_range_proof,
         );
 
+        let ephemeral_state = TransferEphemeralState {
+            spendable_comm_verification: spendable_comm_verification.into(),
+            x: x.into(),
+            z: z.into(),
+        };
+
         (
             Self {
                 range_proof,
                 validity_proof,
             },
-            spendable_comm_for_verification,
+            ephemeral_state,
         )
     }
 }
