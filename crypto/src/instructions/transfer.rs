@@ -157,13 +157,15 @@ impl TransferWithRangeProofData {
     pub fn verify(&self) -> Result<(), ProofError> {
         let mut transcript = Transcript::new(b"TransferWithRangeProof");
 
-        self.proof.verify(
+        self.proof.verify_with(
             vec![
                 &self.ephemeral_state.spendable_comm_verification.into(),
                 &self.amount_comms.lo.into(),
                 &self.amount_comms.hi.into(),
             ],
             vec![64_usize, 32_usize, 32_usize],
+            Some(self.ephemeral_state.x.into()),
+            Some(self.ephemeral_state.z.into()),
             &mut transcript,
         )
     }

@@ -215,6 +215,24 @@ impl RangeProof {
         bit_lengths: Vec<usize>,
         transcript: &mut Transcript,
     ) -> Result<(), ProofError> {
+        self.verify_with(
+            comms,
+            bit_lengths,
+            None,
+            None,
+            transcript,
+        )
+    }
+
+    #[allow(clippy::many_single_char_names)]
+    pub fn verify_with(
+        &self,
+        comms: Vec<&CompressedRistretto>,
+        bit_lengths: Vec<usize>,
+        x_ver: Option<Scalar>,
+        z_ver: Option<Scalar>,
+        transcript: &mut Transcript,
+    ) -> Result<(), ProofError> {
         let G = PedersenBase::default().G;
         let H = PedersenBase::default().H;
 
@@ -232,6 +250,10 @@ impl RangeProof {
         let y = transcript.challenge_scalar(b"y");
         let z = transcript.challenge_scalar(b"z");
 
+        if z_ver.is_some() && z_ver.unwrap() != z {
+            return Err(ProofError::VerificationError);
+        }
+
         let zz = z * z;
         let minus_z = -z;
 
@@ -239,6 +261,10 @@ impl RangeProof {
         transcript.validate_and_append_point(b"T_2", &self.T_2)?;
 
         let x = transcript.challenge_scalar(b"x");
+
+        if x_ver.is_some() && x_ver.unwrap() != x {
+            return Err(ProofError::VerificationError);
+        }
 
         transcript.append_scalar(b"t_x", &self.t_x);
         transcript.append_scalar(b"t_x_blinding", &self.t_x_blinding);
