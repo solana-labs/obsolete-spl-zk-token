@@ -215,13 +215,7 @@ impl RangeProof {
         bit_lengths: Vec<usize>,
         transcript: &mut Transcript,
     ) -> Result<(), ProofError> {
-        self.verify_with(
-            comms,
-            bit_lengths,
-            None,
-            None,
-            transcript,
-        )
+        self.verify_with(comms, bit_lengths, None, None, transcript)
     }
 
     #[allow(clippy::many_single_char_names)]
@@ -335,6 +329,57 @@ impl RangeProof {
             Err(ProofError::VerificationError)
         }
     }
+
+    // Following the dalek rangeproof library signature for now. The exact method signature can be
+    // changed.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(7 * 32 + self.ipp_proof.serialized_size());
+        buf.extend_from_slice(self.A.as_bytes());
+        buf.extend_from_slice(self.S.as_bytes());
+        buf.extend_from_slice(self.T_1.as_bytes());
+        buf.extend_from_slice(self.T_2.as_bytes());
+        buf.extend_from_slice(self.t_x.as_bytes());
+        buf.extend_from_slice(self.t_x_blinding.as_bytes());
+        buf.extend_from_slice(self.e_blinding.as_bytes());
+        buf.extend_from_slice(&self.ipp_proof.to_bytes());
+        buf
+    }
+
+    // Following the dalek rangeproof library signature for now. The exact method signature can be
+    // changed.
+    pub fn from_bytes(slice: &[u8]) -> Result<RangeProof, ProofError> {
+        if slice.len() % 32 != 0 {
+            return Err(ProofError::FormatError);
+        }
+        if slice.len() < 7 * 32 {
+            return Err(ProofError::FormatError);
+        }
+
+        let A = CompressedRistretto(util::read32(&slice[0 * 32..]));
+        let S = CompressedRistretto(util::read32(&slice[1 * 32..]));
+        let T_1 = CompressedRistretto(util::read32(&slice[2 * 32..]));
+        let T_2 = CompressedRistretto(util::read32(&slice[3 * 32..]));
+
+        let t_x = Scalar::from_canonical_bytes(util::read32(&slice[4 * 32..]))
+            .ok_or(ProofError::FormatError)?;
+        let t_x_blinding = Scalar::from_canonical_bytes(util::read32(&slice[5 * 32..]))
+            .ok_or(ProofError::FormatError)?;
+        let e_blinding = Scalar::from_canonical_bytes(util::read32(&slice[6 * 32..]))
+            .ok_or(ProofError::FormatError)?;
+
+        let ipp_proof = InnerProductProof::from_bytes(&slice[7 * 32..])?;
+
+        Ok(RangeProof {
+            A,
+            S,
+            T_1,
+            T_2,
+            t_x,
+            t_x_blinding,
+            e_blinding,
+            ipp_proof,
+        })
+    }
 }
 
 /// Compute
@@ -366,12 +411,7 @@ mod tests {
         let mut transcript_create = Transcript::new(b"Test");
         let mut transcript_verify = Transcript::new(b"Test");
 
-        let proof = RangeProof::create(
-            vec![55],
-            vec![32],
-            vec![&open],
-            &mut transcript_create,
-        );
+        let proof = RangeProof::create(vec![55], vec![32], vec![&open], &mut transcript_create);
 
         assert!(proof
             .verify(
@@ -410,4 +450,6 @@ mod tests {
             )
             .is_ok());
     }
+
+    // TODO: write test for serialization/deserialization
 }
