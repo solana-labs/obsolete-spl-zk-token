@@ -11,16 +11,23 @@ use {
         signature::{Keypair, Signer},
         transaction::Transaction,
     },
-    spl_zk_token::{self, pod::*, *},
+    spl_zk_token::{self, *},
     spl_zk_token_crypto::{encryption::elgamal::ElGamal, pod::*},
 };
 
 fn program_test() -> ProgramTest {
-    ProgramTest::new(
+    let mut pc = ProgramTest::new(
         "spl_zk_token",
         id(),
         processor!(processor::process_instruction),
-    )
+    );
+
+    pc.add_builtin_program(
+        "spl_zk_token_crypto",
+        spl_zk_token_crypto::id(),
+        spl_zk_token_crypto_native::process_instruction,
+    );
+    pc
 }
 
 const ACCOUNT_RENT_EXEMPTION: u64 = 1_000_000_000; // go with something big to be safe
@@ -162,7 +169,7 @@ async fn test_update_account_pk() {
         Epoch::default(),
     );
 
-    let available_balance = 0;
+    let available_balance = 123;
     let available_balance_ct = elgamal_pk.encrypt(available_balance);
     let zk_token_account_state = spl_zk_token::state::ConfidentialAccount {
         mint: token_account_state.mint.into(),
@@ -186,21 +193,23 @@ async fn test_update_account_pk() {
 
     let (new_elgamal_pk, new_elgamal_sk) = ElGamal::keygen();
 
+    let data = spl_zk_token::instruction::UpdateAccountPkData::new(
+        available_balance,
+        available_balance_ct,
+        elgamal_pk,
+        &elgamal_sk,
+        new_elgamal_pk,
+        &new_elgamal_sk,
+    );
+
     let mut transaction = Transaction::new_with_payer(
-        &[spl_zk_token::instruction::update_account_pk(
+        &spl_zk_token::instruction::update_account_pk(
             zk_token_account_keypair.pubkey(),
             token_account_keypair.pubkey(),
             owner_keypair.pubkey(),
             &[],
-            spl_zk_token::instruction::UpdateAccountPkData::new(
-                available_balance,
-                available_balance_ct,
-                elgamal_pk,
-                &elgamal_sk,
-                new_elgamal_pk,
-                &new_elgamal_sk,
-            ),
-        )],
+            data,
+        ),
         Some(&payer.pubkey()),
     );
     transaction.sign(&[&payer, &owner_keypair], recent_blockhash);

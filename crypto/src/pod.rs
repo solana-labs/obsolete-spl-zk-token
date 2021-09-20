@@ -5,9 +5,20 @@ use {
         encryption::pedersen::{PedersenComm, PedersenDecHandle},
         errors::ProofError,
     },
+    bytemuck::Pod,
     curve25519_dalek::{ristretto::CompressedRistretto, scalar::Scalar},
     std::{convert::TryFrom, fmt},
 };
+
+/// Convert a `Pod` into a slice (zero copy)
+pub fn pod_bytes_of<T: Pod>(t: &T) -> &[u8] {
+    bytemuck::bytes_of(t)
+}
+
+/// Convert a slice into a `Pod` (zero copy)
+pub fn pod_from_bytes<T: Pod>(bytes: &[u8]) -> Option<&T> {
+    bytemuck::try_from_bytes(bytes).ok()
+}
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]

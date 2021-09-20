@@ -5,6 +5,7 @@ use {
         account_info::AccountInfo, instruction::Instruction, program_error::ProgramError,
         pubkey::Pubkey,
     },
+    spl_zk_token_crypto::pod::pod_from_bytes,
     std::{
         cell::RefMut,
         marker::PhantomData,
@@ -64,11 +65,6 @@ pub fn pod_get_packed_len<T: Pod>() -> usize {
     std::mem::size_of::<T>()
 }
 
-/// Convert a slice into a `Pod` (zero copy)
-pub fn pod_from_bytes<T: Pod>(bytes: &[u8]) -> Result<&T, ProgramError> {
-    bytemuck::try_from_bytes(bytes).map_err(|_| ProgramError::InvalidArgument)
-}
-
 /// Convert `Instruction` data into a `Pod` (zero copy)
 pub fn pod_from_instruction_data<'a, T: Pod>(
     instruction: &'a Instruction,
@@ -77,7 +73,7 @@ pub fn pod_from_instruction_data<'a, T: Pod>(
     if instruction.program_id != *program_id {
         Err(ProgramError::InvalidArgument)
     } else {
-        pod_from_bytes(&instruction.data)
+        pod_from_bytes(&instruction.data).ok_or(ProgramError::InvalidArgument)
     }
 }
 
@@ -98,11 +94,6 @@ pub fn pod_maybe_from_bytes<T: Pod>(bytes: &[u8]) -> Result<Option<&T>, ProgramE
 /// Convert a slice into a mutable `Pod` (zero copy)
 pub fn pod_from_bytes_mut<T: Pod>(bytes: &mut [u8]) -> Result<&mut T, ProgramError> {
     bytemuck::try_from_bytes_mut(bytes).map_err(|_| ProgramError::InvalidArgument)
-}
-
-/// Convert a `Pod` into a slice (zero copy)
-pub fn pod_bytes_of<T: Pod>(t: &T) -> &[u8] {
-    bytemuck::bytes_of(t)
 }
 
 /// Represents a `Pod` within `AccountInfo::data`
@@ -136,7 +127,7 @@ pub trait PodAccountInfo<'a, 'b>: bytemuck::Pod {
         }
 
         let account_data = account_info.data.borrow_mut();
-        let _ = pod_from_bytes::<Self>(&account_data)?;
+        let _ = pod_from_bytes::<Self>(&account_data).ok_or(ProgramError::InvalidArgument)?;
         Ok(PodAccountInfoData {
             account_data,
             phantom: PhantomData::default(),
@@ -155,8 +146,8 @@ mod tests {
 
     #[test]
     fn test_pod_bool() {
-        assert!(pod_from_bytes::<PodBool>(&[]).is_err());
-        assert!(pod_from_bytes::<PodBool>(&[0, 0]).is_err());
+        assert!(pod_from_bytes::<PodBool>(&[]).is_none());
+        assert!(pod_from_bytes::<PodBool>(&[0, 0]).is_none());
 
         for i in 0..=u8::MAX {
             assert_eq!(i != 0, pod_from_bytes::<PodBool>(&[i]).unwrap().into());
@@ -165,7 +156,7 @@ mod tests {
 
     #[test]
     fn test_pod_u64() {
-        assert!(pod_from_bytes::<PodU64>(&[]).is_err());
+        assert!(pod_from_bytes::<PodU64>(&[]).is_none());
         assert_eq!(
             1u64,
             (*pod_from_bytes::<PodU64>(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap()).into()
