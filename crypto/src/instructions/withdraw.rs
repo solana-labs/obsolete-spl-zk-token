@@ -131,10 +131,7 @@ impl WithdrawProof {
         // generate a random masking factor that also serves as a nonce
         let y = Scalar::random(&mut OsRng);
 
-        let R = RistrettoPoint::multiscalar_mul(
-            vec![y, r_new],
-            vec![D, H],
-        ).compress();
+        let R = RistrettoPoint::multiscalar_mul(vec![y, r_new], vec![D, H]).compress();
 
         // record R on transcript and receive a challenge scalar
         transcript.append_point(b"R", &R);

@@ -356,8 +356,8 @@ impl RangeProof {
             return Err(ProofError::FormatError);
         }
 
-        let A = CompressedRistretto(util::read32(&slice[0 * 32..]));
-        let S = CompressedRistretto(util::read32(&slice[1 * 32..]));
+        let A = CompressedRistretto(util::read32(&slice[0..]));
+        let S = CompressedRistretto(util::read32(&slice[32..]));
         let T_1 = CompressedRistretto(util::read32(&slice[2 * 32..]));
         let T_2 = CompressedRistretto(util::read32(&slice[3 * 32..]));
 
