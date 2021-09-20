@@ -12,6 +12,7 @@ use crate::transcript::TranscriptProtocol;
 use merlin::Transcript;
 
 #[allow(non_snake_case)]
+#[derive(Clone)]
 pub struct InnerProductProof {
     pub L_vec: Vec<CompressedRistretto>, // 32 * log(bit_length)
     pub R_vec: Vec<CompressedRistretto>, // 32 * log(bit_length)

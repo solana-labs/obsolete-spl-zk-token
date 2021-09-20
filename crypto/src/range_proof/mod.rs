@@ -25,6 +25,7 @@ pub mod inner_product;
 pub mod util;
 
 #[allow(non_snake_case)]
+#[derive(Clone)]
 pub struct RangeProof {
     pub A: CompressedRistretto,       // 32 bytes
     pub S: CompressedRistretto,       // 32 bytes

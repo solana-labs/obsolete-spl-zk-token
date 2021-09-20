@@ -15,8 +15,13 @@ use {
         range_proof::RangeProof,
         transcript::TranscriptProtocol,
     },
-    curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar, traits::MultiscalarMul},
+    curve25519_dalek::{
+        ristretto::{CompressedRistretto, RistrettoPoint},
+        scalar::Scalar,
+        traits::{IsIdentity, MultiscalarMul, VartimeMultiscalarMul},
+    },
     merlin::Transcript,
+    std::convert::TryInto,
 };
 
 /// NOTE: I think the logical way to divide up the proof is as before:
@@ -129,6 +134,7 @@ impl TransferData {
             decryption_handles_lo,
             decryption_handles_hi,
             transfer_public_keys,
+            new_spendable_ct: new_spendable_ct.into(),
             proof: transfer_proofs.validity_proof,
             ephemeral_state,
         };
@@ -181,6 +187,9 @@ pub struct TransferWithValidityProofData {
     /// The public encryption keys associated with the transfer: source, dest, and auditor
     pub transfer_public_keys: TransferPubKeys,
 
+    /// The final spendable ciphertext after the transfer
+    pub new_spendable_ct: PodElGamalCT,
+
     /// Proof that certifies that the decryption handles are generated correctly
     pub proof: ValidityProof,
 
@@ -188,17 +197,27 @@ pub struct TransferWithValidityProofData {
     pub ephemeral_state: TransferEphemeralState,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct TransferEphemeralState {
     pub spendable_comm_verification: PodPedersenComm,
     pub x: PodScalar,
     pub z: PodScalar,
+    pub t_x_blinding: PodScalar,
 }
 
 impl TransferWithValidityProofData {
     pub fn verify(&self) -> Result<(), ProofError> {
-        // TODO
-        Ok(())
+        let new_spendable_ct = self.new_spendable_ct.try_into()?;
+        let proof = self.proof.clone(); // cloning here for now TODO: figure out how we handle serialization
+
+        proof.verify(
+            &new_spendable_ct,
+            &self.decryption_handles_lo,
+            &self.decryption_handles_hi,
+            &self.transfer_public_keys,
+            &self.ephemeral_state,
+        )
     }
 }
 
@@ -226,7 +245,7 @@ impl TransferProofs {
         new_spendable_balance: u64,
         new_spendable_ct: &ElGamalCT,
     ) -> (Self, TransferEphemeralState) {
-        // TODO: commit to pubkeys and commitments
+        // TODO: should also commit to pubkeys and commitments
         let mut transcript_validity_proof = merlin::Transcript::new(b"TransferWithValidityProof");
 
         let H = PedersenBase::default().H;
@@ -243,10 +262,6 @@ impl TransferProofs {
 
         let z = s + c * y;
         let new_spendable_open = PedersenOpen(c * r_new);
-        let T_src = source_pk
-            .gen_decrypt_handle(&new_spendable_open)
-            .get_point()
-            .compress();
 
         let spendable_comm_verification =
             Pedersen::commit_with(new_spendable_balance, &new_spendable_open);
@@ -264,7 +279,7 @@ impl TransferProofs {
                 auditor_pk.get_point(),
             ],
         );
-
+        let T_joint = (new_spendable_open.get_scalar() * P_joint).compress();
         let T_1 = (t_1_blinding.get_scalar() * P_joint).compress();
         let T_2 = (t_2_blinding.get_scalar() * P_joint).compress();
 
@@ -274,7 +289,7 @@ impl TransferProofs {
         let validity_proof = ValidityProof {
             R: R.into(),
             z: z.into(),
-            T_src: T_src.into(),
+            T_joint: T_joint.into(),
             T_1: T_1.into(),
             T_2: T_2.into(),
         };
@@ -294,6 +309,7 @@ impl TransferProofs {
             spendable_comm_verification: spendable_comm_verification.into(),
             x: x.into(),
             z: z.into(),
+            t_x_blinding: range_proof.t_x_blinding.into(),
         };
 
         (
@@ -310,17 +326,126 @@ impl TransferProofs {
 ///
 /// These two components should be output by a RangeProof creation function.
 #[allow(non_snake_case)]
+#[derive(Clone)]
 pub struct ValidityProof {
     // Proof component for the spendable ciphertext components: R
     pub R: PodCompressedRistretto,
     // Proof component for the spendable ciphertext components: z
     pub z: PodScalar,
-    // Proof component for the transaction amount components: P_src
-    pub T_src: PodCompressedRistretto,
+    // Proof component for the transaction amount components: T_src
+    pub T_joint: PodCompressedRistretto,
     // Proof component for the transaction amount components: T_1
     pub T_1: PodCompressedRistretto,
     // Proof component for the transaction amount components: T_2
     pub T_2: PodCompressedRistretto,
+}
+
+#[allow(non_snake_case)]
+impl ValidityProof {
+    pub fn verify(
+        self,
+        new_spendable_ct: &ElGamalCT,
+        decryption_handles_lo: &TransferHandles,
+        decryption_handles_hi: &TransferHandles,
+        transfer_public_keys: &TransferPubKeys,
+        ephemeral_state: &TransferEphemeralState,
+    ) -> Result<(), ProofError> {
+        let mut transcript = Transcript::new(b"TransferWithValidityProof");
+
+        let source_pk: ElGamalPK = transfer_public_keys.source_pk.try_into()?;
+        let dest_pk: ElGamalPK = transfer_public_keys.dest_pk.try_into()?;
+        let auditor_pk: ElGamalPK = transfer_public_keys.auditor_pk.try_into()?;
+
+        // verify Pedersen commitment in the ephemeral state
+        let C_ephemeral: CompressedRistretto = ephemeral_state.spendable_comm_verification.into();
+
+        let C = new_spendable_ct.message_comm.get_point();
+        let D = new_spendable_ct.decrypt_handle.get_point();
+
+        let R = self.R.into();
+        let z: Scalar = self.z.into();
+
+        transcript.validate_and_append_point(b"R", &R)?;
+        let c = transcript.challenge_scalar(b"c");
+
+        let R = R.decompress().ok_or(ProofError::VerificationError)?;
+
+        let spendable_comm_verification =
+            RistrettoPoint::multiscalar_mul(vec![Scalar::one(), -z, c], vec![C, D, R]).compress();
+
+        if C_ephemeral != spendable_comm_verification {
+            return Err(ProofError::VerificationError);
+        }
+
+        // derive joint public key
+        let u = transcript.challenge_scalar(b"u");
+        let P_joint = RistrettoPoint::vartime_multiscalar_mul(
+            vec![Scalar::one(), u, u * u],
+            vec![
+                source_pk.get_point(),
+                dest_pk.get_point(),
+                auditor_pk.get_point(),
+            ],
+        );
+
+        // check well-formedness of decryption handles
+        let t_x_blinding: Scalar = ephemeral_state.t_x_blinding.into();
+        let T_1: CompressedRistretto = self.T_1.into();
+        let T_2: CompressedRistretto = self.T_2.into();
+
+        let x = ephemeral_state.x.into();
+        let z: Scalar = ephemeral_state.z.into();
+
+        let handle_source_lo: PedersenDecHandle = decryption_handles_lo.source.try_into()?;
+        let handle_dest_lo: PedersenDecHandle = decryption_handles_lo.dest.try_into()?;
+        let handle_auditor_lo: PedersenDecHandle = decryption_handles_lo.auditor.try_into()?;
+
+        let D_joint: CompressedRistretto = self.T_joint.into();
+        let D_joint = D_joint.decompress().ok_or(ProofError::VerificationError)?;
+
+        let D_joint_lo = RistrettoPoint::vartime_multiscalar_mul(
+            vec![Scalar::one(), u, u * u],
+            vec![
+                handle_source_lo.get_point(),
+                handle_dest_lo.get_point(),
+                handle_auditor_lo.get_point(),
+            ],
+        );
+
+        let handle_source_hi: PedersenDecHandle = decryption_handles_hi.source.try_into()?;
+        let handle_dest_hi: PedersenDecHandle = decryption_handles_hi.dest.try_into()?;
+        let handle_auditor_hi: PedersenDecHandle = decryption_handles_hi.auditor.try_into()?;
+
+        let D_joint_hi = RistrettoPoint::vartime_multiscalar_mul(
+            vec![Scalar::one(), u, u * u],
+            vec![
+                handle_source_hi.get_point(),
+                handle_dest_hi.get_point(),
+                handle_auditor_hi.get_point(),
+            ],
+        );
+
+        // TODO: combine Pedersen commitment verification above to here for efficiency
+        // TODO: might need to add an additional proof-of-knowledge here
+        let mega_check = RistrettoPoint::optional_multiscalar_mul(
+            vec![-t_x_blinding, x, x * x, z * z, z * z * z, z * z * z * z],
+            vec![
+                Some(P_joint),
+                T_1.decompress(),
+                T_2.decompress(),
+                Some(D_joint),
+                Some(D_joint_lo),
+                Some(D_joint_hi),
+            ],
+        )
+        .ok_or(ProofError::VerificationError)?;
+
+        if mega_check.is_identity() {
+            Ok(())
+        } else {
+            Err(ProofError::VerificationError)
+        }
+    }
 }
 
 /// The ElGamal public keys needed for a transfer
