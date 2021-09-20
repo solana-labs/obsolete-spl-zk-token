@@ -1,6 +1,6 @@
 [package]
-name = "spl-zk-token"
-description = "Solana Program Library ZkToken Program"
+name = "spl-zk-token-crypto-native"
+description = "Solana Program Library ZkToken Proof Program"
 authors = ["Solana Maintainers <maintainers@solana.foundation>"]
 repository = "https://github.com/solana-labs/solana-program-library"
 version = "0.1.0"
@@ -12,9 +12,8 @@ bytemuck = "1.7.2"
 bytemuck_derive = "1.0.1"
 num-derive = "0.3"
 num-traits = "0.2"
-solana-program = "=1.7.11"
+solana-sdk = "=1.7.11"
 spl-zk-token-crypto = { path = "../crypto" }
-spl-token = { version = "3.2.0", features = ["no-entrypoint"] }
 zeroable = "0.2.0"
 getrandom = { version = "0.1", features = ["dummy"] }
 
@@ -24,9 +23,4 @@ test-bpf = []
 [dev-dependencies]
 assert_matches = "1.4.0"
 solana-program-test = "=1.7.11"
-solana-sdk = "=1.7.11"
 solana-validator = "=1.7.11"
-spl-zk-token-crypto-native = { path = "../native-program" }
-
-[lib]
-crate-type = ["cdylib", "lib"]

@@ -39,7 +39,7 @@ pub struct TransDataRangeProof {
 }
 // ==== fin crypto placeholders ====
 
-solana_program::declare_id!("Gcat1YXHhH6t1juaWF74WLcfv4XoNocjXA6sPWHNgAse"); // TODO: grind a `CToken...` keypair
+solana_program::declare_id!("ZkTokenXHhH6t1juaWF74WLcfv4XoNocjXA6sPWHNg1"); // TODO: grind a `ZkToken...` keypair
 
 pub(crate) fn get_omnibus_token_address_with_seed(spl_token_mint: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[spl_token_mint.as_ref(), br"omnibus"], &id())

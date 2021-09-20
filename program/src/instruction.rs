@@ -12,7 +12,7 @@ use {
         pubkey::Pubkey,
         sysvar,
     },
-    spl_zk_token_crypto::pod::*,
+    spl_zk_token_crypto::{instructions::ProofInstruction, pod::*},
     zeroable::Zeroable,
 };
 
@@ -231,7 +231,7 @@ pub enum ConfidentialTokenInstruction {
     ///   4.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     /// Data expected by this instruction:
-    ///   `UpdateAccountPkData`
+    ///   None
     ///
     UpdateAccountPk,
 
@@ -405,7 +405,7 @@ pub(crate) fn decode_instruction_data<T: Pod>(input: &[u8]) -> Result<&T, Progra
     if input.is_empty() {
         Err(ProgramError::InvalidInstructionData)
     } else {
-        pod_from_bytes(&input[1..])
+        pod_from_bytes(&input[1..]).ok_or(ProgramError::InvalidArgument)
     }
 }
 
@@ -492,7 +492,7 @@ pub fn update_account_pk(
     owner: Pubkey,
     multisig_signers: &[&Pubkey],
     data: UpdateAccountPkData,
-) -> Instruction {
+) -> Vec<Instruction> {
     let mut accounts = vec![
         AccountMeta::new(zk_token_account, false),
         AccountMeta::new_readonly(token_account, false),
@@ -503,57 +503,9 @@ pub fn update_account_pk(
     for multisig_signer in multisig_signers.iter() {
         accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
     }
-    encode_instruction(
-        accounts,
-        ConfidentialTokenInstruction::UpdateAccountPk,
-        &data,
-    )
-}
 
-#[cfg(test)]
-mod tests {
-    /*
-    use super::*;
-    #[test]
-    fn test_get_packed_len() {
-        assert_eq!(
-            ConfidentialTokenInstruction::get_packed_len(),
-            solana_program::borsh::get_packed_len::<ConfidentialTokenInstruction>()
-        )
-    }
-
-    #[test]
-    fn test_instruction_size() {
-        assert_eq!(
-            ConfidentialTokenInstruction::SubmitTransferProof {
-                receiver_pk: PodElGamalPK::default(),
-                receiver_pending_balance: PodElGamalCT::default(),
-                transfer_proof: TransferProof::CiphertextValidity(TransDataCTValidity::default()),
-            }
-            .pack_into_vec()
-            .len(),
-            99,
-        );
-        assert_eq!(
-            ConfidentialTokenInstruction::SubmitTransferProof {
-                receiver_pk: PodElGamalPK::default(),
-                receiver_pending_balance: PodElGamalCT::default(),
-                transfer_proof: TransferProof::Range(TransDataRangeProof::default()),
-            }
-            .pack_into_vec()
-            .len(),
-            99,
-        );
-        assert_eq!(
-            ConfidentialTokenInstruction::Transfer {
-                receiver_pk: PodElGamalPK::default(),
-                receiver_transfer_split_amount: ElGamalSplitCT::default(),
-                transfer_audit: Some((PodElGamalPK::default(), ElGamalSplitCT::default(), ())),
-            }
-            .pack_into_vec()
-            .len(),
-            194,
-        );
-    }
-    */
+    vec![
+        ProofInstruction::VerifyUpdateAccountPkData.encode(&data),
+        encode_instruction(accounts, ConfidentialTokenInstruction::UpdateAccountPk, &()),
+    ]
 }

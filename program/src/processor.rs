@@ -2,6 +2,7 @@
 
 use {
     crate::{instruction::*, pod::*, state::*, *},
+    bytemuck::Pod,
     solana_program::{
         account_info::{next_account_info, AccountInfo},
         entrypoint::ProgramResult,
@@ -16,7 +17,7 @@ use {
         system_instruction,
         sysvar::{self, Sysvar},
     },
-    spl_zk_token_crypto::instructions::update_account_pk::UpdateAccountPkData,
+    spl_zk_token_crypto::instructions::{update_account_pk::UpdateAccountPkData, ProofInstruction},
     spl_zk_token_crypto::pod::*,
     std::result::Result,
 };
@@ -36,6 +37,21 @@ fn get_previous_instruction(
     }
     sysvar::instructions::load_instruction_at(current_instruction as usize - 1, &instruction_sysvar)
         .map_err(|_| ProgramError::InvalidInstructionData)
+}
+
+/// Returns the previous `Instruction` in the currently executing `Transaction`
+fn decode_proof_instruction<T: Pod>(
+    expected: ProofInstruction,
+    instruction: &Instruction,
+) -> Result<&T, ProgramError> {
+    if ProofInstruction::decode_type(&spl_zk_token_crypto::id(), &instruction.data)
+        != Some(expected)
+    {
+        msg!("Unexpected proof instruction");
+        return Err(ProgramError::InvalidInstructionData);
+    }
+
+    ProofInstruction::decode_data(&instruction.data).ok_or(ProgramError::InvalidInstructionData)
 }
 
 /// Validates that the provided `owner_account_info` is the expected owner, and is either a single
@@ -454,7 +470,7 @@ fn process_close_account(
 }
 
 /// Processes an [UpdateAccountPk] instruction.
-fn process_update_account_pk(input: &[u8], accounts: &[AccountInfo]) -> ProgramResult {
+fn process_update_account_pk(accounts: &[AccountInfo]) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let confidential_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
@@ -468,46 +484,29 @@ fn process_update_account_pk(input: &[u8], accounts: &[AccountInfo]) -> ProgramR
         account_info_iter.as_slice(),
     )?;
 
+    let previous_instruction = get_previous_instruction(instructions_sysvar_info)?;
+    let data = decode_proof_instruction::<UpdateAccountPkData>(
+        ProofInstruction::VerifyUpdateAccountPkData,
+        &previous_instruction,
+    )?;
+
+    if confidential_account.elgamal_pk != data.current_pk {
+        msg!("ElGamal PK mismatch");
+        return Err(ProgramError::InvalidInstructionData);
+    }
+
     if confidential_account.pending_balance != PodElGamalCT::zeroed() {
         msg!("Pending balance is not zero");
         return Err(ProgramError::InvalidAccountData);
     }
 
-    // TODO: Read `data` and confirm proof from reading the data of the previous instruction
-    // instead of using `decode_instruction_data()` on this instruction input....
-    msg!(
-        "TODO: {:?}",
-        get_previous_instruction(instructions_sysvar_info)
-    );
-
-    let data = decode_instruction_data::<UpdateAccountPkData>(input)?;
-
-    // Proof verification causes a BPF stack overflow
-    #[cfg(not(target_arch = "bpf"))]
-    {
-        if let Err(err) = data.verify() {
-            msg!("proof verification failed: {:?}", err);
-            return Err(ProgramError::InvalidInstructionData);
-        }
-    }
-
-    let elgamal_pk = data.current_pk;
-    let available_balance = data.current_ct;
-    let new_elgamal_pk = data.new_pk;
-    let new_available_balance = data.new_ct;
-
-    if confidential_account.elgamal_pk != elgamal_pk {
-        msg!("ElGamal PK mismatch");
-        return Err(ProgramError::InvalidInstructionData);
-    }
-
-    if confidential_account.available_balance != available_balance {
+    if confidential_account.available_balance != data.current_ct {
         msg!("Available balance mismatch");
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    confidential_account.elgamal_pk = new_elgamal_pk;
-    confidential_account.available_balance = new_available_balance;
+    confidential_account.elgamal_pk = data.new_pk;
+    confidential_account.available_balance = data.new_ct;
     confidential_account.outbound_transfer = OutboundTransfer::zeroed();
 
     Ok(())
@@ -886,7 +885,7 @@ pub fn process_instruction(
         }
         ConfidentialTokenInstruction::UpdateAccountPk => {
             msg!("UpdateAccountPk");
-            process_update_account_pk(input, accounts)
+            process_update_account_pk(accounts)
         }
         ConfidentialTokenInstruction::Deposit => {
             msg!("Deposit");
