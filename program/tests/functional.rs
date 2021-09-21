@@ -16,6 +16,15 @@ use {
 };
 
 fn program_test() -> ProgramTest {
+    ProgramTest::new(
+        "spl_zk_token",
+        id(),
+        processor!(processor::process_instruction),
+    )
+}
+// TODO: Use this `program_test()` implementation once Solana 1.7.13 ships
+/*
+fn program_test() -> ProgramTest {
     let mut pc = ProgramTest::new(
         "spl_zk_token",
         id(),
@@ -29,6 +38,7 @@ fn program_test() -> ProgramTest {
     );
     pc
 }
+*/
 
 const ACCOUNT_RENT_EXEMPTION: u64 = 1_000_000_000; // go with something big to be safe
 
@@ -126,6 +136,7 @@ async fn test_configure_mint_sanity() {
 }
 
 #[tokio::test]
+#[ignore] // TODO: remove once Solana 1.7.13 ships
 async fn test_update_account_pk() {
     let owner_keypair = Keypair::new();
     let token_mint_keypair = Keypair::new();
