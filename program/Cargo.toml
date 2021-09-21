@@ -26,7 +26,7 @@ assert_matches = "1.4.0"
 solana-program-test = "=1.7.11"
 solana-sdk = "=1.7.11"
 solana-validator = "=1.7.11"
-spl-zk-token-crypto-native = { path = "../native-program" }
+spl-zk-token-proof= { path = "../proof-program" }
 
 [lib]
 crate-type = ["cdylib", "lib"]

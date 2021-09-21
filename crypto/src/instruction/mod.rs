@@ -1,8 +1,10 @@
-///! Instructions provided by the ZkToken Native Proof program
-pub mod close_account;
-pub mod transfer;
-pub mod update_account_pk;
-pub mod withdraw;
+///! Instructions provided by the ZkToken Proof program
+pub mod close_account; // TODO: remove pub
+pub mod transfer; // TODO: remove pub
+mod update_account_pk;
+pub mod withdraw; // TODO: remove pub
+
+pub use update_account_pk::UpdateAccountPkData;
 
 use {
     crate::{id, pod::*},

@@ -2,5 +2,5 @@
 members = [
   "crypto",
   "program",
-  "native-program",
+  "proof-program",
 ]

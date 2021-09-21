@@ -1,5 +1,5 @@
 [package]
-name = "spl-zk-token-crypto-native"
+name = "spl-zk-token-proof"
 description = "Solana Program Library ZkToken Proof Program"
 authors = ["Solana Maintainers <maintainers@solana.foundation>"]
 repository = "https://github.com/solana-labs/solana-program-library"

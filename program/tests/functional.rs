@@ -34,7 +34,7 @@ fn program_test() -> ProgramTest {
     pc.add_builtin_program(
         "spl_zk_token_crypto",
         spl_zk_token_crypto::id(),
-        spl_zk_token_crypto_native::process_instruction,
+        spl_zk_token_proof::process_instruction,
     );
     pc
 }

@@ -17,8 +17,7 @@ use {
         system_instruction,
         sysvar::{self, Sysvar},
     },
-    spl_zk_token_crypto::instructions::{update_account_pk::UpdateAccountPkData, ProofInstruction},
-    spl_zk_token_crypto::pod::*,
+    spl_zk_token_crypto::{instruction::*, pod::*},
     std::result::Result,
 };
 

@@ -4746,7 +4746,7 @@ dependencies = [
  "solana-validator",
  "spl-token",
  "spl-zk-token-crypto",
- "spl-zk-token-crypto-native",
+ "spl-zk-token-proof",
  "zeroable",
 ]
 
@@ -4779,7 +4779,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "spl-zk-token-crypto-native"
+name = "spl-zk-token-proof"
 version = "0.1.0"
 dependencies = [
  "assert_matches",

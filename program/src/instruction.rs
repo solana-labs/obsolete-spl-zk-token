@@ -1,6 +1,5 @@
 //! Program instructions
 
-pub use spl_zk_token_crypto::instructions::update_account_pk::UpdateAccountPkData;
 use {
     crate::{pod::*, *},
     bytemuck::Pod,
@@ -12,9 +11,11 @@ use {
         pubkey::Pubkey,
         sysvar,
     },
-    spl_zk_token_crypto::{instructions::ProofInstruction, pod::*},
+    spl_zk_token_crypto::{instruction::*, pod::*},
     zeroable::Zeroable,
 };
+
+pub use spl_zk_token_crypto::instruction::UpdateAccountPkData;
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
