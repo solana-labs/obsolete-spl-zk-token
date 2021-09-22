@@ -202,6 +202,22 @@ pub struct ElGamalCT {
     pub decrypt_handle: PedersenDecHandle,
 }
 impl ElGamalCT {
+    pub fn add_to_msg<T: Into<Scalar>>(&self, message: T) -> Self {
+        let diff_comm = Pedersen::commit_with(message, &PedersenOpen::default());
+        ElGamalCT {
+            message_comm: self.message_comm + diff_comm,
+            decrypt_handle: self.decrypt_handle,
+        }
+    }
+
+    pub fn sub_to_msg<T: Into<Scalar>>(&self, message: T) -> Self {
+        let diff_comm = Pedersen::commit_with(message, &PedersenOpen::default());
+        ElGamalCT {
+            message_comm: self.message_comm - diff_comm,
+            decrypt_handle: self.decrypt_handle,
+        }
+    }
+
     #[allow(clippy::wrong_self_convention)]
     pub fn to_bytes(&self) -> [u8; 64] {
         let mut bytes = [0u8; 64];
@@ -342,6 +358,7 @@ mod tests {
         let msg_0: u64 = 57;
         let msg_1: u64 = 77;
 
+        // Add two ElGamal ciphertexts
         let open_0 = PedersenOpen::random(&mut OsRng);
         let open_1 = PedersenOpen::random(&mut OsRng);
 
@@ -351,6 +368,13 @@ mod tests {
         let ct_sum = ElGamal::encrypt_with(&pk, msg_0 + msg_1, &(open_0 + open_1));
 
         assert_eq!(ct_sum, ct_0 + ct_1);
+
+        // Add to ElGamal ciphertext
+        let open = PedersenOpen::random(&mut OsRng);
+        let ct = ElGamal::encrypt_with(&pk, msg_0, &open);
+        let ct_sum = ElGamal::encrypt_with(&pk, msg_0 + msg_1, &open);
+
+        assert_eq!(ct_sum, ct.add_to_msg(msg_1));
     }
 
     #[test]
@@ -359,6 +383,7 @@ mod tests {
         let msg_0: u64 = 77;
         let msg_1: u64 = 55;
 
+        // Subtract two ElGamal ciphertexts
         let open_0 = PedersenOpen::random(&mut OsRng);
         let open_1 = PedersenOpen::random(&mut OsRng);
 
@@ -368,6 +393,13 @@ mod tests {
         let ct_sub = ElGamal::encrypt_with(&pk, msg_0 - msg_1, &(open_0 - open_1));
 
         assert_eq!(ct_sub, ct_0 - ct_1);
+
+        // Subtract to ElGamal ciphertext
+        let open = PedersenOpen::random(&mut OsRng);
+        let ct = ElGamal::encrypt_with(&pk, msg_0, &open);
+        let ct_sub = ElGamal::encrypt_with(&pk, msg_0 - msg_1, &open);
+
+        assert_eq!(ct_sub, ct.sub_to_msg(msg_1));
     }
 
     #[test]
