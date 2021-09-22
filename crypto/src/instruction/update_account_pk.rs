@@ -21,6 +21,13 @@ use {
     zeroable::Zeroable,
 };
 
+/// This struct includes the cryptographic proof *and* the account data information needed to verify
+/// the proof
+///
+/// - The pre-instruction should call UpdateAccountPKData::verify(&self)
+/// - The actual program should check that `current_ct` is consistent with what is
+///   currently stored in the confidential token account
+///
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct UpdateAccountPkData {
