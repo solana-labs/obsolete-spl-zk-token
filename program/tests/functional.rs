@@ -232,3 +232,9 @@ async fn test_update_account_pk() {
 async fn test_close_account() {
     todo!()
 }
+
+#[tokio::test]
+#[ignore]
+async fn test_withdraw() {
+    todo!()
+}

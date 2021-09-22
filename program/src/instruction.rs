@@ -11,11 +11,11 @@ use {
         pubkey::Pubkey,
         sysvar,
     },
-    spl_zk_token_crypto::{instruction::*, pod::*},
+    spl_zk_token_crypto::pod::*,
     zeroable::Zeroable,
 };
 
-pub use spl_zk_token_crypto::instruction::{CloseAccountData, UpdateAccountPkData};
+pub use spl_zk_token_crypto::instruction::*;
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
@@ -267,10 +267,11 @@ pub enum ConfidentialTokenInstruction {
     ///   3. `[]` The token mint.
     ///   4. `[writable]` The omnibus SPL Token account for this token mint, computed by `get_omnibus_token_address()`
     ///   5. `[]` SPL Token program
-    ///   6. `[signer]` The single source account owner
+    ///   6. `[]` Instructions sysvar
+    ///   7. `[signer]` The single source account owner
     /// or:
-    ///   6. `[]` The multisig  source account owner
-    ///   7.. `[signer]` Required M signer accounts for the SPL Token Multisig account
+    ///   7. `[]` The multisig  source account owner
+    ///   8.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     /// Data expected by this instruction:
     ///   `WithdrawInstructionData`
