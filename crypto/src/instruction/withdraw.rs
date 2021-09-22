@@ -1,8 +1,10 @@
+#[allow(unused_imports)]
 #[cfg(not(target_arch = "bpf"))]
 use {
     crate::encryption::elgamal::{ElGamal, ElGamalPK, ElGamalSK},
     rand::rngs::OsRng,
 };
+#[allow(unused_imports)]
 use {
     crate::{
         encryption::{
@@ -142,6 +144,7 @@ impl WithdrawProof {
         }
     }
 
+    #[allow(dead_code)]
     pub fn verify(&self, final_balance_ct: &ElGamalCT) -> Result<(), ProofError> {
         let mut transcript = Self::transcript_new();
 
