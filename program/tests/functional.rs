@@ -226,3 +226,9 @@ async fn test_update_account_pk() {
     transaction.sign(&[&payer, &owner_keypair], recent_blockhash);
     banks_client.process_transaction(transaction).await.unwrap();
 }
+
+#[tokio::test]
+#[ignore]
+async fn test_close_account() {
+    todo!()
+}
