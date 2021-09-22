@@ -34,7 +34,7 @@ pub struct RangeProof {
     pub t_x: Scalar,                  // 32 bytes
     pub t_x_blinding: Scalar,         // 32 bytes
     pub e_blinding: Scalar,           // 32 bytes
-    pub ipp_proof: InnerProductProof, // 448 bytes for withdraw
+    pub ipp_proof: InnerProductProof, // 448 bytes for withdraw; 512 for transfer
 }
 
 #[allow(non_snake_case)]

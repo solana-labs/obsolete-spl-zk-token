@@ -34,15 +34,18 @@ use {
 ///   to fit other things in the same instruction.
 ///
 
+/// The instructions
 pub struct TransferWithRangeProof {
-    pub proof_component: TransferWithRangeProofData,
+    pub proof_component: TransferWithRangeProofData, // 928 bytes
 }
 
 pub struct TransferWithValidityProof {
-    pub proof_component: TransferWithValidityProofData,
+    pub proof_component: TransferWithValidityProofData, // 640 bytes
     pub other_component: OtherComponents,
 }
 
+/// Just a grouping struct for the data required for the two transfer instructions. It is
+/// convenient to generate the two components jointly as they share common components.
 pub struct TransferData {
     pub range_proof_data: TransferWithRangeProofData,
     pub validity_proof_data: TransferWithValidityProofData,
@@ -60,6 +63,9 @@ impl TransferData {
         auditor_pk: ElGamalPK,
     ) -> Self {
         // split and encrypt transfer amount
+        //
+        // encryption is a bit more involved since we are generating each components of an ElGamal
+        // ciphertext separately.
         let (amount_lo, amount_hi) = split_u64_into_u32(transfer_amount);
 
         let (comm_lo, open_lo) = Pedersen::commit(amount_lo);
@@ -73,11 +79,13 @@ impl TransferData {
         let handle_dest_hi = dest_pk.gen_decrypt_handle(&open_hi);
         let handle_auditor_hi = auditor_pk.gen_decrypt_handle(&open_hi);
 
+        // message encoding as Pedersen commitments, which will be included in range proof data
         let amount_comms = TransferComms {
             lo: comm_lo.into(),
             hi: comm_hi.into(),
         };
 
+        // decryption handles, which will be included in the validity proof data
         let decryption_handles_lo = TransferHandles {
             source: handle_source_lo.into(),
             dest: handle_dest_lo.into(),
@@ -90,6 +98,7 @@ impl TransferData {
             auditor: handle_auditor_hi.into(),
         };
 
+        // grouping of the public keys for the transfer
         let transfer_public_keys = TransferPubKeys {
             source_pk: source_pk.into(),
             dest_pk: dest_pk.into(),
@@ -148,21 +157,23 @@ impl TransferData {
 
 pub struct TransferWithRangeProofData {
     /// The transfer amount encoded as Pedersen commitments
-    pub amount_comms: TransferComms,
+    pub amount_comms: TransferComms, // 64 bytes
 
     /// Proof that certifies:
-    ///   1. the source account has enough funds for the transfer
+    ///   1. the source account has enough funds for the transfer (i.e. the final balance is a
+    ///      64-bit positive number)
     ///   2. the transfer amount is a 64-bit positive number
-    pub proof: RangeProof,
+    pub proof: RangeProof, // 736 bytes
 
     /// Ephemeral state between the two transfer instruction data
-    pub ephemeral_state: TransferEphemeralState,
+    pub ephemeral_state: TransferEphemeralState, // 128 bytes
 }
 
 impl TransferWithRangeProofData {
     pub fn verify(&self) -> Result<(), ProofError> {
         let mut transcript = Transcript::new(b"TransferWithRangeProof");
 
+        // standard range proof verification
         self.proof.verify_with(
             vec![
                 &self.ephemeral_state.spendable_comm_verification.into(),
@@ -179,31 +190,35 @@ impl TransferWithRangeProofData {
 
 pub struct TransferWithValidityProofData {
     /// The decryption handles that allow decryption of the lo-bits
-    pub decryption_handles_lo: TransferHandles,
+    pub decryption_handles_lo: TransferHandles, // 96 bytes
 
     /// The decryption handles that allow decryption of the hi-bits
-    pub decryption_handles_hi: TransferHandles,
+    pub decryption_handles_hi: TransferHandles, // 96 bytes
 
     /// The public encryption keys associated with the transfer: source, dest, and auditor
-    pub transfer_public_keys: TransferPubKeys,
+    pub transfer_public_keys: TransferPubKeys, // 96 bytes
 
     /// The final spendable ciphertext after the transfer
-    pub new_spendable_ct: PodElGamalCT,
+    pub new_spendable_ct: PodElGamalCT, // 64 bytes
 
     /// Proof that certifies that the decryption handles are generated correctly
-    pub proof: ValidityProof,
+    pub proof: ValidityProof, // 160 bytes
 
     /// Ephemeral state between the two transfer instruction data
-    pub ephemeral_state: TransferEphemeralState,
+    pub ephemeral_state: TransferEphemeralState, // 128 bytes
 }
 
+/// The joint data that is shared between the two transfer instructions.
+///
+/// Identical ephemeral data should be included in the two transfer instructions and this should be
+/// checked by the ZK Token program.
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct TransferEphemeralState {
-    pub spendable_comm_verification: PodPedersenComm,
-    pub x: PodScalar,
-    pub z: PodScalar,
-    pub t_x_blinding: PodScalar,
+    pub spendable_comm_verification: PodPedersenComm, // 32 bytes
+    pub x: PodScalar,                                 // 32 bytes
+    pub z: PodScalar,                                 // 32 bytes
+    pub t_x_blinding: PodScalar,                      // 32 bytes
 }
 
 impl TransferWithValidityProofData {
@@ -221,9 +236,11 @@ impl TransferWithValidityProofData {
     }
 }
 
-/// Other components needed for transfer excluding the crypto components
+/// Other components (like memo?) needed for transfer excluding the crypto components
 pub struct OtherComponents;
 
+/// Just a grouping struct for the two proofs that are needed for a transfer instruction. The two
+/// proofs have to be generated together as they share joint data.
 pub struct TransferProofs {
     pub range_proof: RangeProof,
     pub validity_proof: ValidityProof,
@@ -245,7 +262,7 @@ impl TransferProofs {
         new_spendable_balance: u64,
         new_spendable_ct: &ElGamalCT,
     ) -> (Self, TransferEphemeralState) {
-        // TODO: should also commit to pubkeys and commitments
+        // TODO: should also commit to pubkeys and commitments later
         let mut transcript_validity_proof = merlin::Transcript::new(b"TransferWithValidityProof");
 
         let H = PedersenBase::default().H;
@@ -286,6 +303,7 @@ impl TransferProofs {
         transcript_validity_proof.append_point(b"T_1", &T_1);
         transcript_validity_proof.append_point(b"T_2", &T_2);
 
+        // define the validity proof
         let validity_proof = ValidityProof {
             R: R.into(),
             z: z.into(),
@@ -294,7 +312,7 @@ impl TransferProofs {
             T_2: T_2.into(),
         };
 
-        // Generate aggregated range proof
+        // generate the range proof
         let mut transcript_range_proof = Transcript::new(b"TransferWithRangeProof");
         let (range_proof, x, z) = RangeProof::create_with(
             vec![new_spendable_balance, transfer_amt.0, transfer_amt.1],
@@ -305,6 +323,7 @@ impl TransferProofs {
             &mut transcript_range_proof,
         );
 
+        // define ephemeral state
         let ephemeral_state = TransferEphemeralState {
             spendable_comm_verification: spendable_comm_verification.into(),
             x: x.into(),
@@ -329,15 +348,15 @@ impl TransferProofs {
 #[derive(Clone)]
 pub struct ValidityProof {
     // Proof component for the spendable ciphertext components: R
-    pub R: PodCompressedRistretto,
+    pub R: PodCompressedRistretto, // 32 bytes
     // Proof component for the spendable ciphertext components: z
-    pub z: PodScalar,
+    pub z: PodScalar, // 32 bytes
     // Proof component for the transaction amount components: T_src
-    pub T_joint: PodCompressedRistretto,
+    pub T_joint: PodCompressedRistretto, // 32 bytes
     // Proof component for the transaction amount components: T_1
-    pub T_1: PodCompressedRistretto,
+    pub T_1: PodCompressedRistretto, // 32 bytes
     // Proof component for the transaction amount components: T_2
-    pub T_2: PodCompressedRistretto,
+    pub T_2: PodCompressedRistretto, // 32 bytes
 }
 
 #[allow(non_snake_case)]
@@ -426,7 +445,7 @@ impl ValidityProof {
         );
 
         // TODO: combine Pedersen commitment verification above to here for efficiency
-        // TODO: might need to add an additional proof-of-knowledge here
+        // TODO: might need to add an additional proof-of-knowledge here (additional 64 byte)
         let mega_check = RistrettoPoint::optional_multiscalar_mul(
             vec![-t_x_blinding, x, x * x, z * z, z * z * z, z * z * z * z],
             vec![
@@ -450,24 +469,25 @@ impl ValidityProof {
 
 /// The ElGamal public keys needed for a transfer
 pub struct TransferPubKeys {
-    pub source_pk: PodElGamalPK,
-    pub dest_pk: PodElGamalPK,
-    pub auditor_pk: PodElGamalPK,
+    pub source_pk: PodElGamalPK,  // 32 bytes
+    pub dest_pk: PodElGamalPK,    // 32 bytes
+    pub auditor_pk: PodElGamalPK, // 32 bytes
 }
 
 /// The transfer amount commitments needed for a transfer
 pub struct TransferComms {
-    pub lo: PodPedersenComm,
-    pub hi: PodPedersenComm,
+    pub lo: PodPedersenComm, // 32 bytes
+    pub hi: PodPedersenComm, // 32 bytes
 }
 
 /// The decryption handles needed for a transfer
 pub struct TransferHandles {
-    pub source: PodPedersenDecHandle,
-    pub dest: PodPedersenDecHandle,
-    pub auditor: PodPedersenDecHandle,
+    pub source: PodPedersenDecHandle,  // 32 bytes
+    pub dest: PodPedersenDecHandle,    // 32 bytes
+    pub auditor: PodPedersenDecHandle, // 32 bytes
 }
 
+/// Split u64 number into two u32 numbers
 #[cfg(not(target_arch = "bpf"))]
 fn split_u64_into_u32(amt: u64) -> (u32, u32) {
     let lo = amt as u32;
@@ -476,6 +496,7 @@ fn split_u64_into_u32(amt: u64) -> (u32, u32) {
     (lo, hi)
 }
 
+/// Constant for 2^32
 const TWO_32: u64 = 4294967296;
 
 pub fn combine_u32_comms(comm_lo: PedersenComm, comm_hi: PedersenComm) -> PedersenComm {
