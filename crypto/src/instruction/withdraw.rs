@@ -10,6 +10,7 @@ use {
             pedersen::{PedersenBase, PedersenOpen},
         },
         errors::ProofError,
+        instruction::Verifiable,
         pod::*,
         range_proof::RangeProof,
         transcript::TranscriptProtocol,
@@ -26,11 +27,9 @@ use {
 /// - The actual program should check that `current_ct` is consistent with what is
 ///   currently stored in the confidential token account TODO: update this statement
 ///
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct WithdrawData {
-    /// The amount of tokens to withdraw.
-    pub amount: u64,
-    /// Expected number of base 10 digits to the right of the decimal place.
-    pub decimals: u8,
     /// The source account available balance *after* the withdraw (encrypted by
     /// `source_pk`
     pub final_balance_ct: PodElGamalCT, // 64 bytes
@@ -42,7 +41,6 @@ impl WithdrawData {
     #[cfg(not(target_arch = "bpf"))]
     pub fn new(
         amount: u64,
-        decimals: u8,
         source_pk: ElGamalPK,
         source_sk: &ElGamalSK,
         current_balance: u64,
@@ -61,14 +59,14 @@ impl WithdrawData {
         let proof = WithdrawProof::new(source_sk, final_balance, &final_balance_ct);
 
         Self {
-            amount,
-            decimals,
             final_balance_ct: final_balance_ct.into(),
             proof,
         }
     }
+}
 
-    pub fn verify(&self) -> Result<(), ProofError> {
+impl Verifiable for WithdrawData {
+    fn verify(&self) -> Result<(), ProofError> {
         let final_balance_ct = self.final_balance_ct.try_into()?;
         self.proof.verify(&final_balance_ct)
     }
@@ -76,6 +74,8 @@ impl WithdrawData {
 
 /// This struct represents the cryptographic proof component that certifies the account's solvency
 /// for withdrawal
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 #[allow(non_snake_case)]
 pub struct WithdrawProof {
     /// Wrapper for range proof: R component
@@ -164,31 +164,6 @@ impl WithdrawProof {
     }
 }
 
-pub fn process_withdraw(data: WithdrawData) -> Result<(), ProofError> {
-    // ...
-
-    // for demonstration purposes
-    let (source_pk, _) = ElGamal::keygen();
-    let current_pending_balance = source_pk.encrypt(55_u64).into();
-
-    // 1. check that the instruction data verified correctly
-
-    // 2. add `data.amount` to `current_pending_balance` as syscall
-    let final_pending_balance =
-        crate::pod::sub_to_pod_ciphertext(current_pending_balance, data.amount)?;
-
-    // 3. check that final_pending_balance equals to the final_balance_ct in data
-    if final_pending_balance != data.final_balance_ct {
-        return Err(ProofError::VerificationError);
-    }
-
-    // 4. store `final_pending_balance` in the destination zk-token account
-
-    // ...
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -206,7 +181,6 @@ mod test {
 
         let data = WithdrawData::new(
             withdraw_amount,
-            0,
             source_pk,
             &source_sk,
             current_balance,
@@ -218,7 +192,6 @@ mod test {
         let wrong_balance: u64 = 99;
         let data = WithdrawData::new(
             withdraw_amount,
-            0,
             source_pk,
             &source_sk,
             wrong_balance,

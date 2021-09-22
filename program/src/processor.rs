@@ -17,7 +17,7 @@ use {
         system_instruction,
         sysvar::{self, Sysvar},
     },
-    spl_zk_token_crypto::{instruction::*, pod::*},
+    spl_zk_token_crypto::pod::*,
     std::result::Result,
 };
 
@@ -591,9 +591,10 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
     let omnibus_info = next_account_info(account_info_iter)?;
     let mint_info = next_account_info(account_info_iter)?;
     let spl_token_program_info = next_account_info(account_info_iter)?;
+    let instructions_sysvar_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
-    let (_confidential_account, token_account) = validate_confidential_account_is_signer(
+    let (mut confidential_account, token_account) = validate_confidential_account_is_signer(
         confidential_account_info,
         token_account_info,
         owner_info,
@@ -603,6 +604,21 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
     if token_account.is_frozen() {
         msg!("Error: Account frozen");
         return Err(ProgramError::InvalidAccountData);
+    }
+
+    let previous_instruction = get_previous_instruction(instructions_sysvar_info)?;
+    let data = decode_proof_instruction::<WithdrawData>(
+        ProofInstruction::VerifyWithdraw,
+        &previous_instruction,
+    )?;
+
+    confidential_account.available_balance =
+        sub_to_pod_ciphertext(confidential_account.available_balance, amount)
+            .map_err(|_| ProgramError::InvalidInstructionData)?;
+
+    if confidential_account.available_balance != data.final_balance_ct {
+        msg!("Available balance mismatch");
+        return Err(ProgramError::InvalidInstructionData);
     }
 
     // Ensure omnibus token account address derivation is correct
@@ -640,9 +656,6 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
         ],
         &[omnibus_token_account_signer_seeds],
     )?;
-
-    // TODO: implement and uncomment the PodElGamalCT addition
-    //confidential_account.available_balance -= GroupEncoding::encode(amount)
 
     Ok(())
 }

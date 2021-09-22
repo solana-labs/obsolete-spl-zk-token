@@ -1,12 +1,14 @@
 ///! Instructions provided by the ZkToken Proof program
-pub mod close_account; // TODO: remove pub
+mod close_account;
 pub mod create_account; // TODO: remove pub
 pub mod deposit; // TODO: remove pub
-pub mod transfer; // TODO: remove pub
+pub mod transfer;
 mod update_account_pk;
-pub mod withdraw; // TODO: remove pub
+mod withdraw; // TODO: remove pub
 
-pub use {close_account::CloseAccountData, update_account_pk::UpdateAccountPkData};
+pub use {
+    close_account::CloseAccountData, update_account_pk::UpdateAccountPkData, withdraw::WithdrawData,
+};
 
 use {
     crate::{errors::ProofError, id, pod::*},
@@ -39,6 +41,16 @@ pub enum ProofInstruction {
     ///   `CloseAccountData`
     ///
     VerifyCloseAccount,
+
+    /// Verify a `WithdrawData` struct
+    ///
+    /// Accounts expected by this instruction:
+    ///   None
+    ///
+    /// Data expected by this instruction:
+    ///   `WithdrawData`
+    ///
+    VerifyWithdraw,
 }
 
 impl ProofInstruction {
