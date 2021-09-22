@@ -36,12 +36,6 @@ pub struct UpdateTransferAuditorInstructionData {
 pub struct CreateAccountInstructionData {
     /// The public key associated with the account
     pub elgamal_pk: PodElGamalPK,
-
-    /// 0, encrypted with `elgamal_pk`
-    pub zero_balance: PodElGamalCT,
-
-    // TODO: Proof that `zero_balance` equals 0
-    pub crypto_zero_balance_proof: [u8; 256],
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]

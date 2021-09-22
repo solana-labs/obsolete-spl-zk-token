@@ -1,10 +1,9 @@
 ///! Instructions provided by the ZkToken Proof program
 mod close_account;
-pub mod create_account; // TODO: remove pub
 pub mod deposit; // TODO: remove pub
 pub mod transfer;
 mod update_account_pk;
-mod withdraw; // TODO: remove pub
+mod withdraw;
 
 pub use {
     close_account::CloseAccountData, update_account_pk::UpdateAccountPkData, withdraw::WithdrawData,

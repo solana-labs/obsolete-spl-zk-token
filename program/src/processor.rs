@@ -426,6 +426,38 @@ fn process_create_account(
     confidential_account.token_account = (*token_account_info.key).into();
     confidential_account.elgamal_pk = data.elgamal_pk;
     confidential_account.accept_incoming_transfers = true.into();
+
+    /*
+        An ElGamal ciphertext is of the form
+          ElGamalCT {
+            msg_comm: r * H + x * G
+            decrypt_handle: r * P
+          }
+
+        where
+        - G, H: constants for the system (RistrettoPoint)
+        - P: ElGamal public key component (RistrettoPoint)
+        - r: encryption randomness (Scalar)
+        - x: message (Scalar)
+
+        Upon receiving a `CreateAccount` instruction, the ZK Token program should encrypt x=0 (i.e.
+        Scalar::zero()) and store it as `pending_balance` and `available_balance`.
+
+        For regular encryption, it is important that r is generated from a proper randomness source. But
+        for the `CreateAccount` instruction, it is already known that x is always 0. So r can just be
+        set Scalar::zero().
+
+        This means that the ElGamalCT should simply be
+          ElGamalCT {
+            msg_comm: 0 * H + 0 * G = 0
+            decrypt_handle: 0 * P = 0
+          }
+
+        This should just be encoded as [0; 64]
+    */
+    confidential_account.pending_balance = PodElGamalCT::zeroed();
+    confidential_account.available_balance = PodElGamalCT::zeroed();
+
     Ok(())
 }
 
