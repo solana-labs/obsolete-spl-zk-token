@@ -7,6 +7,7 @@ use {
     crate::{
         encryption::{elgamal::ElGamalCT, pedersen::PedersenBase},
         errors::ProofError,
+        instruction::Verifiable,
         pod::*,
         transcript::TranscriptProtocol,
     },
@@ -20,13 +21,6 @@ use {
     zeroable::Zeroable,
 };
 
-/// This struct includes the cryptographic proof *and* the account data information needed to verify
-/// the proof
-///
-/// - The pre-instruction should call UpdateAccountPKProofData::verify_proof(&self, &new_ct)
-/// - The actual program should check that `current_ct` is consistent with what is
-///   currently stored in the confidential token account
-///
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct UpdateAccountPkData {
@@ -69,8 +63,10 @@ impl UpdateAccountPkData {
             proof,
         }
     }
+}
 
-    pub fn verify(&self) -> Result<(), ProofError> {
+impl Verifiable for UpdateAccountPkData {
+    fn verify(&self) -> Result<(), ProofError> {
         let current_ct = self.current_ct.try_into()?;
         let new_ct = self.new_ct.try_into()?;
         self.proof.verify(&current_ct, &new_ct)

@@ -15,7 +15,7 @@ use {
     zeroable::Zeroable,
 };
 
-pub use spl_zk_token_crypto::instruction::UpdateAccountPkData;
+pub use spl_zk_token_crypto::instruction::{CloseAccountData, UpdateAccountPkData};
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
@@ -41,13 +41,6 @@ pub struct CreateAccountInstructionData {
     pub zero_balance: PodElGamalCT,
 
     // TODO: Proof that `zero_balance` equals 0
-    pub crypto_zero_balance_proof: [u8; 256],
-}
-
-#[derive(Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct CloseAccountInstructionData {
-    // TODO: Proof that the encrypted balance is 0
     pub crypto_zero_balance_proof: [u8; 256],
 }
 
@@ -203,13 +196,14 @@ pub enum ConfidentialTokenInstruction {
     ///   0. `[writable]` The CToken account to close
     ///   1. `[]` Corresponding SPL Token account
     ///   2. `[writable]` The destination account
-    ///   3. `[signer]` The single account owner
+    ///   3. `[]` Instructions sysvar
+    ///   4. `[signer]` The single account owner
     /// or:
-    ///   3. `[]` The multisig account owner
-    ///   4.. `[signer]` Required M signer accounts for the SPL Token Multisig account
+    ///   4. `[]` The multisig account owner
+    ///   5.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     /// Data expected by this instruction:
-    ///   `CloseAccountInstructionData`
+    ///   None
     ///
     CloseAccount,
 
@@ -506,7 +500,7 @@ pub fn update_account_pk(
     }
 
     vec![
-        ProofInstruction::VerifyUpdateAccountPkData.encode(&data),
+        ProofInstruction::VerifyUpdateAccountPk.encode(&data),
         encode_instruction(accounts, ConfidentialTokenInstruction::UpdateAccountPk, &()),
     ]
 }

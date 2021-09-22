@@ -430,14 +430,12 @@ fn process_create_account(
 }
 
 /// Processes an [CloseAccount] instruction.
-fn process_close_account(
-    accounts: &[AccountInfo],
-    _data: &CloseAccountInstructionData,
-) -> ProgramResult {
+fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let confidential_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
     let dest_info = next_account_info(account_info_iter)?;
+    let instructions_sysvar_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
     let (mut confidential_account, _token_account) = validate_confidential_account_is_signer(
@@ -447,12 +445,20 @@ fn process_close_account(
         account_info_iter.as_slice(),
     )?;
 
-    // TODO: Add real zero token balance check
-    if confidential_account.pending_balance != PodElGamalCT::zeroed()
-        || confidential_account.available_balance != PodElGamalCT::zeroed()
-    {
-        msg!("Confidential account balance is not zero");
+    let previous_instruction = get_previous_instruction(instructions_sysvar_info)?;
+    let data = decode_proof_instruction::<CloseAccountData>(
+        ProofInstruction::VerifyCloseAccount,
+        &previous_instruction,
+    )?;
+
+    if confidential_account.pending_balance != PodElGamalCT::zeroed() {
+        msg!("Pending balance is not zero");
         return Err(ProgramError::InvalidAccountData);
+    }
+
+    if confidential_account.available_balance != data.balance {
+        msg!("Available balance mismatch");
+        return Err(ProgramError::InvalidInstructionData);
     }
 
     // Zero account data
@@ -485,7 +491,7 @@ fn process_update_account_pk(accounts: &[AccountInfo]) -> ProgramResult {
 
     let previous_instruction = get_previous_instruction(instructions_sysvar_info)?;
     let data = decode_proof_instruction::<UpdateAccountPkData>(
-        ProofInstruction::VerifyUpdateAccountPkData,
+        ProofInstruction::VerifyUpdateAccountPk,
         &previous_instruction,
     )?;
 
@@ -877,10 +883,7 @@ pub fn process_instruction(
         }
         ConfidentialTokenInstruction::CloseAccount => {
             msg!("CloseAccount");
-            process_close_account(
-                accounts,
-                decode_instruction_data::<CloseAccountInstructionData>(input)?,
-            )
+            process_close_account(accounts)
         }
         ConfidentialTokenInstruction::UpdateAccountPk => {
             msg!("UpdateAccountPk");

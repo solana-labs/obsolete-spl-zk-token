@@ -1,105 +1,81 @@
-use merlin::Transcript;
-
 #[cfg(not(target_arch = "bpf"))]
-use rand::rngs::OsRng;
-
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::{IsIdentity, MultiscalarMul};
-
-use crate::encryption::elgamal::ElGamalCT;
-#[cfg(not(target_arch = "bpf"))]
-use crate::encryption::elgamal::ElGamalSK;
-use crate::errors::ProofError;
-use crate::transcript::TranscriptProtocol;
-
-/// Close a confidential token account by transferring all lamports it holds to the destination
-/// account. The account must not hold any confidential tokens in its pending or available
-/// balances. Use `DisableInboundTransfers` to block inbound transfers first if necessary.
-///
-///   0. `[writable]` The CToken account to close
-///   1. `[]` Corresponding SPL Token account
-///   2. `[writable]` The destination account
-///   3. `[signer]` The single account owner
-/// or:
-///   3. `[]` The multisig account owner
-///   4.. `[signer]` Required M signer accounts for the SPL Token Multisig account
-///
-/// Implementing it here as a struct for demonstration
-#[allow(dead_code)]
-struct CloseAccount {
-    /// Proof that the encrypted balance is 0
-    proof_component: CloseAccountProofData, // 128 bytes
-}
+use {crate::encryption::elgamal::ElGamalSK, rand::rngs::OsRng};
+use {
+    crate::{
+        encryption::elgamal::ElGamalCT, errors::ProofError, instruction::Verifiable, pod::*,
+        transcript::TranscriptProtocol,
+    },
+    curve25519_dalek::{
+        ristretto::RistrettoPoint,
+        scalar::Scalar,
+        traits::{IsIdentity, MultiscalarMul},
+    },
+    merlin::Transcript,
+    std::convert::TryInto,
+};
 
 /// This struct includes the cryptographic proof *and* the account data information needed to verify
 /// the proof
 ///
-/// - The pre-instruction should call CloseAccountProofData::verify_proof(&self)
-/// - The actual program should check that `source_available_balance` is consistent with what is
+/// - The pre-instruction should call CloseAccountData::verify_proof(&self)
+/// - The actual program should check that `balance` is consistent with what is
 ///   currently stored in the confidential token account
 ///
-pub struct CloseAccountProofData {
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub struct CloseAccountData {
     /// The source account available balance in encrypted form
-    pub source_available_balance: ElGamalCT, // 64 bytes
+    pub balance: PodElGamalCT, // 64 bytes
 
     /// Proof that the source account available balance is zero
     pub proof: CloseAccountProof, // 64 bytes
 }
 
-impl CloseAccountProofData {
-    /// Create CloseAccountProofData including the proof
+impl CloseAccountData {
     #[cfg(not(target_arch = "bpf"))]
-    pub fn create(source_sk: &ElGamalSK, source_available_balance: &ElGamalCT) -> Self {
-        // generate a new transcript
-        //
-        // we can alteratively define the function to take in a transcript as
-        // input see https://merlin.cool/use/passing.html
-        let mut transcript = Transcript::new(b"Solana CToken on testnet: CloseAccountData");
+    pub fn new(source_sk: &ElGamalSK, balance: ElGamalCT) -> Self {
+        let proof = CloseAccountProof::new(source_sk, &balance);
 
-        // generate proof that the current balance is zero
-        let proof = CloseAccountProof::create(source_sk, source_available_balance, &mut transcript);
-
-        CloseAccountProofData {
-            source_available_balance: *source_available_balance,
+        CloseAccountData {
+            balance: balance.into(),
             proof,
         }
     }
+}
 
-    /// Verify CloseAccountProof
-    pub fn verify_proof(&self) -> Result<(), ProofError> {
-        let Self {
-            source_available_balance,
-            proof,
-        } = self;
-
-        let mut transcript = Transcript::new(b"Solana CToken on testnet: CloseAccountData");
-        proof.verify(source_available_balance, &mut transcript)
+impl Verifiable for CloseAccountData {
+    fn verify(&self) -> Result<(), ProofError> {
+        let balance = self.balance.try_into()?;
+        self.proof.verify(&balance)
     }
 }
 
 /// This struct represents the cryptographic proof component that certifies that the encrypted
-/// spendable balance is zero
+/// balance is zero
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 #[allow(non_snake_case)]
 pub struct CloseAccountProof {
-    pub R: CompressedRistretto, // 32 bytes
-    pub z: Scalar,              // 32 bytes
+    pub R: PodCompressedRistretto, // 32 bytes
+    pub z: PodScalar,              // 32 bytes
 }
 
 #[allow(non_snake_case)]
 impl CloseAccountProof {
+    fn transcript_new() -> Transcript {
+        Transcript::new(b"CloseAccountProof")
+    }
+
     #[cfg(not(target_arch = "bpf"))]
-    pub fn create(
-        source_sk: &ElGamalSK,
-        source_current_balance: &ElGamalCT,
-        transcript: &mut Transcript,
-    ) -> Self {
+    pub fn new(source_sk: &ElGamalSK, balance: &ElGamalCT) -> Self {
+        let mut transcript = Self::transcript_new();
+
         // add a domain separator to record the start of the protocol
         transcript.close_account_proof_domain_sep();
 
         // extract the relevant scalar and Ristretto points from the input
         let s = source_sk.get_scalar();
-        let C = source_current_balance.decrypt_handle.get_point();
+        let C = balance.decrypt_handle.get_point();
 
         // generate a random masking factor that also serves as a nonce
         let r = Scalar::random(&mut OsRng); // using OsRng for now
@@ -112,23 +88,24 @@ impl CloseAccountProof {
         // compute the masked secret key
         let z = c * s + r;
 
-        CloseAccountProof { R, z }
+        CloseAccountProof {
+            R: R.into(),
+            z: z.into(),
+        }
     }
 
-    pub fn verify(
-        &self,
-        source_current_balance: &ElGamalCT,
-        transcript: &mut Transcript,
-    ) -> Result<(), ProofError> {
+    pub fn verify(&self, balance: &ElGamalCT) -> Result<(), ProofError> {
+        let mut transcript = Self::transcript_new();
+
         // add a domain separator to record the start of the protocol
         transcript.close_account_proof_domain_sep();
 
         // extract the relevant scalar and Ristretto points from the input
-        let C = source_current_balance.message_comm.get_point();
-        let D = source_current_balance.decrypt_handle.get_point();
+        let C = balance.message_comm.get_point();
+        let D = balance.decrypt_handle.get_point();
 
-        let R = self.R;
-        let z = self.z;
+        let R = self.R.into();
+        let z = self.z.into();
 
         // generate a challenge scalar
         transcript.validate_and_append_point(b"R", &R)?;
@@ -158,27 +135,15 @@ mod test {
         let (source_pk, source_sk) = ElGamal::keygen();
 
         // If account balance is 0, then the proof should succeed
-        let source_current_balance = source_pk.encrypt(0_u64);
+        let balance = source_pk.encrypt(0_u64);
 
-        let mut transcript_prove = Transcript::new(b"CloseAccountProof Test");
-        let mut transcript_verify = Transcript::new(b"CloseAccountProof Test");
-
-        let proof =
-            CloseAccountProof::create(&source_sk, &source_current_balance, &mut transcript_prove);
-        assert!(proof
-            .verify(&source_current_balance, &mut transcript_verify)
-            .is_ok());
+        let proof = CloseAccountProof::new(&source_sk, &balance);
+        assert!(proof.verify(&balance).is_ok());
 
         // If account balance is not zero, then the proof verification should fail
-        let source_current_balance = source_pk.encrypt(55_u64);
+        let balance = source_pk.encrypt(55_u64);
 
-        let mut transcript_prove = Transcript::new(b"CloseAccountProof Test");
-        let mut transcript_verify = Transcript::new(b"CloseAccountProof Test");
-
-        let proof =
-            CloseAccountProof::create(&source_sk, &source_current_balance, &mut transcript_prove);
-        assert!(proof
-            .verify(&source_current_balance, &mut transcript_verify)
-            .is_err());
+        let proof = CloseAccountProof::new(&source_sk, &balance);
+        assert!(proof.verify(&balance).is_err());
     }
 }

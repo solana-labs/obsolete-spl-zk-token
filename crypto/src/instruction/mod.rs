@@ -4,10 +4,10 @@ pub mod transfer; // TODO: remove pub
 mod update_account_pk;
 pub mod withdraw; // TODO: remove pub
 
-pub use update_account_pk::UpdateAccountPkData;
+pub use {close_account::CloseAccountData, update_account_pk::UpdateAccountPkData};
 
 use {
-    crate::{id, pod::*},
+    crate::{errors::ProofError, id, pod::*},
     bytemuck::Pod,
     num_derive::{FromPrimitive, ToPrimitive},
     num_traits::{FromPrimitive, ToPrimitive},
@@ -18,15 +18,25 @@ use {
 #[derive(Clone, Copy, Debug, Zeroable, FromPrimitive, ToPrimitive, PartialEq)]
 #[repr(u8)]
 pub enum ProofInstruction {
-    /// Verify an `UpdateAccountPkData` proof
+    /// Verify a `UpdateAccountPkData` struct
     ///
     /// Accounts expected by this instruction:
     ///   None
     ///
     /// Data expected by this instruction:
-    ///   `update_account_pk::UpdateAccountPkData`
+    ///   `UpdateAccountPkData`
     ///
-    VerifyUpdateAccountPkData,
+    VerifyUpdateAccountPk,
+
+    /// Verify a `CloseAccountData` struct
+    ///
+    /// Accounts expected by this instruction:
+    ///   None
+    ///
+    /// Data expected by this instruction:
+    ///   `CloseAccountData`
+    ///
+    VerifyCloseAccount,
 }
 
 impl ProofInstruction {
@@ -55,4 +65,8 @@ impl ProofInstruction {
             pod_from_bytes(&input[1..])
         }
     }
+}
+
+pub trait Verifiable {
+    fn verify(&self) -> Result<(), ProofError>;
 }
