@@ -1,6 +1,5 @@
 ///! Instructions provided by the ZkToken Proof program
 mod close_account;
-pub mod deposit; // TODO: remove pub
 pub mod transfer;
 mod update_account_pk;
 mod withdraw;
