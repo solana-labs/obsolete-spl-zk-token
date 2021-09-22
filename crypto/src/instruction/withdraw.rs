@@ -33,8 +33,11 @@ pub struct WithdrawData {
     /// The source account available balance *after* the withdraw (encrypted by
     /// `source_pk`
     pub final_balance_ct: PodElGamalCT, // 64 bytes
-    /// Proof that the account is solvent
-    pub proof: WithdrawProof, // 736 bytes
+
+                                        /*
+                                        /// Proof that the account is solvent
+                                        pub proof: WithdrawProof, // 736 bytes
+                                        */
 }
 
 impl WithdrawData {
@@ -56,25 +59,28 @@ impl WithdrawData {
         let amount_encoded = source_pk.encrypt_with(amount, &PedersenOpen::default());
         let final_balance_ct = current_balance_ct - amount_encoded;
 
-        let proof = WithdrawProof::new(source_sk, final_balance, &final_balance_ct);
+        let _proof = WithdrawProof::new(source_sk, final_balance, &final_balance_ct);
 
         Self {
             final_balance_ct: final_balance_ct.into(),
-            proof,
+            //proof,
         }
     }
 }
 
 impl Verifiable for WithdrawData {
     fn verify(&self) -> Result<(), ProofError> {
+        /*
         let final_balance_ct = self.final_balance_ct.try_into()?;
         self.proof.verify(&final_balance_ct)
+        */
+        Ok(())
     }
 }
 
 /// This struct represents the cryptographic proof component that certifies the account's solvency
 /// for withdrawal
-#[derive(Clone, Copy, Pod, Zeroable)]
+#[derive(Clone)]
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct WithdrawProof {
