@@ -7,7 +7,7 @@ use {
     },
     bytemuck::Pod,
     curve25519_dalek::{ristretto::CompressedRistretto, scalar::Scalar},
-    std::{convert::TryFrom, fmt},
+    std::{convert::{TryFrom, TryInto}, fmt},
 };
 
 /// Convert a `Pod` into a slice (zero copy)
@@ -107,7 +107,7 @@ impl From<PedersenComm> for PodPedersenComm {
     }
 }
 
-// For proof verification, interpret PodPedersenComm as CompressedRistretto
+// For proof verification, interpret PodPedersenComm directly as CompressedRistretto
 impl From<PodPedersenComm> for CompressedRistretto {
     fn from(pod: PodPedersenComm) -> Self {
         Self(pod.0)
@@ -156,4 +156,44 @@ impl fmt::Debug for PodPedersenDecHandle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.0)
     }
+}
+
+// Arithmetic functions on PodElGamalCT's.
+//
+// The conversion PodElGamalCT --> ElGamalCT require the use of 
+//      CompressedRistretto::decompress(&self) -> Option<RistrettoPoint>
+//
+// which is about 310k BPF instructions. Hence, we need syscalls for the following functions for
+// the ZK Token program to add/subtract balances without needing to do type conversion as BPF
+// instructions.
+//
+// This is regarding the discussion: 
+//  https://discord.com/channels/428295358100013066/774014770402689065/880529250246082611
+//
+pub fn add_pod_ciphertexts(ct_0: PodElGamalCT, ct_1: PodElGamalCT) -> Result<PodElGamalCT, ProofError> {
+    let ct_0: ElGamalCT = ct_0.try_into()?;
+    let ct_1: ElGamalCT = ct_1.try_into()?;
+
+    let ct_sum = ct_0 + ct_1;
+    Ok(ct_sum.into())
+}
+
+pub fn sub_pod_ciphertexts(ct_0: PodElGamalCT, ct_1: PodElGamalCT) -> Result<PodElGamalCT, ProofError> {
+    let ct_0: ElGamalCT = ct_0.try_into()?;
+    let ct_1: ElGamalCT = ct_1.try_into()?;
+
+    let ct_sum = ct_0 - ct_1;
+    Ok(ct_sum.into())
+}
+
+pub fn add_to_pod_ciphertext(ct: PodElGamalCT, amount: u64) -> Result<PodElGamalCT, ProofError> {
+    let ct: ElGamalCT = ct.try_into()?;
+    let ct_sum = ct.add_to_msg(amount);
+    Ok(ct_sum.into())
+}
+
+pub fn sub_to_pod_ciphertext(ct: PodElGamalCT, amount: u64) -> Result<PodElGamalCT, ProofError> {
+    let ct: ElGamalCT = ct.try_into()?;
+    let ct_sub = ct.sub_to_msg(amount);
+    Ok(ct_sub.into())
 }
