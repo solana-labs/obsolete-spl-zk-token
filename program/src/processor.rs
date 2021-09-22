@@ -562,7 +562,7 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
     let owner_info = next_account_info(account_info_iter)?;
     let signers = account_info_iter.as_slice();
 
-    let (confidential_account, token_account) =
+    let (mut confidential_account, token_account) =
         validate_confidential_account(confidential_account_info, token_account_info)?;
 
     if token_account.is_frozen() {
@@ -607,8 +607,9 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
         &accounts,
     )?;
 
-    // TODO: implement and uncomment the PodElGamalCT addition
-    //confidential_account.pending_balance += GroupEncoding::encode(amount)
+    confidential_account.pending_balance =
+        add_to_pod_ciphertext(confidential_account.pending_balance, amount)
+            .map_err(|_| ProgramError::InvalidInstructionData)?;
 
     Ok(())
 }

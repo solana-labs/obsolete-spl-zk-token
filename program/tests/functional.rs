@@ -229,7 +229,19 @@ async fn test_update_account_pk() {
 
 #[tokio::test]
 #[ignore]
+async fn test_create_account() {
+    todo!()
+}
+
+#[tokio::test]
+#[ignore]
 async fn test_close_account() {
+    todo!()
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_deposit() {
     todo!()
 }
 
