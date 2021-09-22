@@ -17,6 +17,7 @@ impl DepositData {
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 pub fn process_deposit(data: DepositData) -> Result<(), ProofError> {
     // ...
 

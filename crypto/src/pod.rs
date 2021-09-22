@@ -206,3 +206,42 @@ pub fn sub_to_pod_ciphertext(ct: PodElGamalCT, amount: u64) -> Result<PodElGamal
     let ct_sub = ct.sub_to_msg(amount);
     Ok(ct_sub.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use {
+        super::*,
+        crate::encryption::{
+            elgamal::{ElGamal, ElGamalCT},
+            pedersen::PedersenOpen,
+        },
+        rand::rngs::OsRng,
+        std::convert::TryInto,
+        zeroable::Zeroable,
+    };
+
+    #[test]
+    fn test_zero_ct() {
+        let spendable_balance = PodElGamalCT::zeroed();
+        let spendable_ct: ElGamalCT = spendable_balance.try_into().unwrap();
+
+        // spendable_ct should be an encryption of 0 for any public key when
+        // `PedersenOpen::default()` is used
+        let (pk, _) = ElGamal::keygen();
+        let balance: u64 = 0;
+        assert_eq!(
+            spendable_ct,
+            pk.encrypt_with(balance, &PedersenOpen::default())
+        );
+
+        // homomorphism should work like any other ciphertext
+        let open = PedersenOpen::random(&mut OsRng);
+        let transfer_amount_ct = pk.encrypt_with(55_u64, &open);
+        let transfer_amount_pod: PodElGamalCT = transfer_amount_ct.into();
+
+        let sum = crate::pod::add_pod_ciphertexts(spendable_balance, transfer_amount_pod).unwrap();
+
+        let expected: PodElGamalCT = pk.encrypt_with(55_u64, &open).into();
+        assert_eq!(expected, sum);
+    }
+}
