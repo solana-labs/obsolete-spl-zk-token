@@ -1,6 +1,6 @@
 #[cfg(not(target_arch = "bpf"))]
 use {
-    crate::encryption::elgamal::{ElGamalPK, ElGamalSK},
+    crate::encryption::elgamal::{ElGamal, ElGamalPK, ElGamalSK},
     rand::rngs::OsRng,
 };
 use {
@@ -19,34 +19,6 @@ use {
     std::convert::TryInto,
 };
 
-/// Withdraw SPL Tokens from the available balance of a confidential token account.
-///
-/// Fails if the source or destination accounts are frozen.
-///
-/// Accounts expected by this instruction:
-///
-///   0. `[writable]` The source confidential token account
-///   1. `[]` The source's corresponding SPL token account
-///   2. `[writable]` The destination SPL Token account
-///   3. `[]` The token mint.
-///   4. `[writable]` The omnibus SPL Token account for this token mint, computed by `get_omnibus_token_address()`
-///   5. `[]` SPL Token program
-///   6. `[signer]` The single source account owner
-/// or:
-///   6. `[]` The multisig  source account owner
-///   7.. `[signer]` Required M signer accounts for the SPL Token Multisig account
-///
-/// Implementing it here as a struct for demonstration
-#[allow(dead_code)]
-struct Withdraw {
-    /// The amount of tokens to withdraw.
-    amount: u64,
-    /// Expected number of base 10 digits to the right of the decimal place.
-    decimals: u8,
-    /// Proof that the encrypted balance is >= `amount`
-    proof_component: WithdrawData, // 800 bytes
-}
-
 /// This struct includes the cryptographic proof *and* the account data information needed to verify
 /// the proof
 ///
@@ -55,6 +27,10 @@ struct Withdraw {
 ///   currently stored in the confidential token account TODO: update this statement
 ///
 pub struct WithdrawData {
+    /// The amount of tokens to withdraw.
+    pub amount: u64,
+    /// Expected number of base 10 digits to the right of the decimal place.
+    pub decimals: u8,
     /// The source account available balance *after* the withdraw (encrypted by
     /// `source_pk`
     pub final_balance_ct: PodElGamalCT, // 64 bytes
@@ -66,6 +42,7 @@ impl WithdrawData {
     #[cfg(not(target_arch = "bpf"))]
     pub fn new(
         amount: u64,
+        decimals: u8,
         source_pk: ElGamalPK,
         source_sk: &ElGamalSK,
         current_balance: u64,
@@ -84,6 +61,8 @@ impl WithdrawData {
         let proof = WithdrawProof::new(source_sk, final_balance, &final_balance_ct);
 
         Self {
+            amount,
+            decimals,
             final_balance_ct: final_balance_ct.into(),
             proof,
         }
@@ -185,6 +164,31 @@ impl WithdrawProof {
     }
 }
 
+pub fn process_withdraw(data: WithdrawData) -> Result<(), ProofError> {
+    // ...
+
+    // for demonstration purposes
+    let (source_pk, _) = ElGamal::keygen();
+    let current_pending_balance = source_pk.encrypt(55_u64).into();
+
+    // 1. check that the instruction data verified correctly
+
+    // 2. add `data.amount` to `current_pending_balance` as syscall
+    let final_pending_balance =
+        crate::pod::sub_to_pod_ciphertext(current_pending_balance, data.amount)?;
+
+    // 3. check that final_pending_balance equals to the final_balance_ct in data
+    if final_pending_balance != data.final_balance_ct {
+        return Err(ProofError::VerificationError);
+    }
+
+    // 4. store `final_pending_balance` in the destination zk-token account
+
+    // ...
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -202,6 +206,7 @@ mod test {
 
         let data = WithdrawData::new(
             withdraw_amount,
+            0,
             source_pk,
             &source_sk,
             current_balance,
@@ -213,6 +218,7 @@ mod test {
         let wrong_balance: u64 = 99;
         let data = WithdrawData::new(
             withdraw_amount,
+            0,
             source_pk,
             &source_sk,
             wrong_balance,

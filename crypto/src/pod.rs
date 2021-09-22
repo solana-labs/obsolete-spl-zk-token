@@ -7,7 +7,10 @@ use {
     },
     bytemuck::Pod,
     curve25519_dalek::{ristretto::CompressedRistretto, scalar::Scalar},
-    std::{convert::{TryFrom, TryInto}, fmt},
+    std::{
+        convert::{TryFrom, TryInto},
+        fmt,
+    },
 };
 
 /// Convert a `Pod` into a slice (zero copy)
@@ -160,17 +163,20 @@ impl fmt::Debug for PodPedersenDecHandle {
 
 // Arithmetic functions on PodElGamalCT's.
 //
-// The conversion PodElGamalCT --> ElGamalCT require the use of 
+// The conversion PodElGamalCT --> ElGamalCT require the use of
 //      CompressedRistretto::decompress(&self) -> Option<RistrettoPoint>
 //
 // which is about 310k BPF instructions. Hence, we need syscalls for the following functions for
 // the ZK Token program to add/subtract balances without needing to do type conversion as BPF
 // instructions.
 //
-// This is regarding the discussion: 
+// This is regarding the discussion:
 //  https://discord.com/channels/428295358100013066/774014770402689065/880529250246082611
 //
-pub fn add_pod_ciphertexts(ct_0: PodElGamalCT, ct_1: PodElGamalCT) -> Result<PodElGamalCT, ProofError> {
+pub fn add_pod_ciphertexts(
+    ct_0: PodElGamalCT,
+    ct_1: PodElGamalCT,
+) -> Result<PodElGamalCT, ProofError> {
     let ct_0: ElGamalCT = ct_0.try_into()?;
     let ct_1: ElGamalCT = ct_1.try_into()?;
 
@@ -178,7 +184,10 @@ pub fn add_pod_ciphertexts(ct_0: PodElGamalCT, ct_1: PodElGamalCT) -> Result<Pod
     Ok(ct_sum.into())
 }
 
-pub fn sub_pod_ciphertexts(ct_0: PodElGamalCT, ct_1: PodElGamalCT) -> Result<PodElGamalCT, ProofError> {
+pub fn sub_pod_ciphertexts(
+    ct_0: PodElGamalCT,
+    ct_1: PodElGamalCT,
+) -> Result<PodElGamalCT, ProofError> {
     let ct_0: ElGamalCT = ct_0.try_into()?;
     let ct_1: ElGamalCT = ct_1.try_into()?;
 
