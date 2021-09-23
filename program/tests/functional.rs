@@ -11,7 +11,7 @@ use {
         signature::{Keypair, Signer},
         transaction::Transaction,
     },
-    spl_zk_token::{self, *},
+    spl_zk_token::{self, pod::*, *},
     spl_zk_token_crypto::{
         encryption::elgamal::{ElGamal, ElGamalCT, ElGamalPK},
         pod::*,
@@ -107,7 +107,7 @@ fn add_zk_token_account(
     elgamal_pk: ElGamalPK,
     balance: ElGamalCT,
 ) -> Pubkey {
-    let zk_token_account_keypair = Keypair::new();
+    let zk_token_address = get_confidential_token_address(&mint, &token_account);
 
     let zk_token_account_state = spl_zk_token::state::ConfidentialAccount {
         mint: mint.into(),
@@ -124,20 +124,19 @@ fn add_zk_token_account(
         Epoch::default(),
     );
 
-    program_test.add_account(zk_token_account_keypair.pubkey(), zk_token_account);
-
-    zk_token_account_keypair.pubkey()
+    program_test.add_account(zk_token_address, zk_token_account);
+    zk_token_address
 }
 
 #[tokio::test]
 async fn test_configure_mint() {
-    let owner_keypair = Keypair::new();
+    let owner = Keypair::new();
     let freeze_authority = Keypair::new();
     let transfer_auditor_elgamal_pk = ElGamal::keygen().0;
 
     let mut program_test = program_test();
     let mint = add_token_mint_account(&mut program_test, Some(freeze_authority.pubkey()));
-    let _token_account = add_token_account(&mut program_test, mint, owner_keypair.pubkey(), 123);
+    let _token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 123);
 
     let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
 
@@ -153,7 +152,10 @@ async fn test_configure_mint() {
         Some(&payer.pubkey()),
     );
     transaction.sign(&[&payer], recent_blockhash);
-    banks_client.process_transaction(transaction).await.unwrap_err();
+    banks_client
+        .process_transaction(transaction)
+        .await
+        .unwrap_err();
 
     // Success case: configure the zk mint
     let mut transaction = Transaction::new_with_payer(
@@ -197,16 +199,71 @@ async fn test_configure_mint() {
 }
 
 #[tokio::test]
+#[ignore]
+async fn test_update_transfer_auditor() {
+    todo!()
+}
+
+#[tokio::test]
+#[ignore] // TODO: remove once Solana 1.7.13 ships
+async fn test_create_account() {
+    let owner = Keypair::new();
+
+    let mut program_test = program_test();
+
+    let mint = add_token_mint_account(&mut program_test, None);
+    let token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 123);
+    let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
+
+    let zk_token_account = get_confidential_token_address(&mint, &token_account);
+    let (elgamal_pk, _elgamal_sk) = ElGamal::keygen();
+
+    let mut transaction = Transaction::new_with_payer(
+        &spl_zk_token::instruction::create_account(
+            payer.pubkey(),
+            zk_token_account,
+            elgamal_pk,
+            token_account,
+            owner.pubkey(),
+            &[],
+        ),
+        Some(&payer.pubkey()),
+    );
+    transaction.sign(&[&payer, &owner], recent_blockhash);
+    banks_client.process_transaction(transaction).await.unwrap();
+
+    // Zk token account now exists
+    let account = banks_client
+        .get_account(zk_token_account)
+        .await
+        .expect("get_account")
+        .expect("zk_token_account not found");
+    assert_eq!(account.owner, id());
+    let zk_token_state =
+        spl_zk_token::state::ConfidentialAccount::from_bytes(&account.data).unwrap();
+    assert_eq!(zk_token_state.mint, mint.into());
+    assert_eq!(zk_token_state.token_account, token_account.into());
+    assert_eq!(zk_token_state.elgamal_pk, elgamal_pk.into());
+    assert_eq!(zk_token_state.accept_incoming_transfers, true.into());
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_close_account() {
+    todo!()
+}
+
+#[tokio::test]
 #[ignore] // TODO: remove once Solana 1.7.13 ships
 async fn test_update_account_pk() {
-    let owner_keypair = Keypair::new();
+    let owner = Keypair::new();
 
     let (elgamal_pk, elgamal_sk) = ElGamal::keygen();
 
     let mut program_test = program_test();
 
     let mint = add_token_mint_account(&mut program_test, None);
-    let token_account = add_token_account(&mut program_test, mint, owner_keypair.pubkey(), 123);
+    let token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 123);
 
     let zk_available_balance = 123;
     let zk_available_balance_ct = elgamal_pk.encrypt(zk_available_balance);
@@ -235,26 +292,23 @@ async fn test_update_account_pk() {
         &spl_zk_token::instruction::update_account_pk(
             zk_token_account,
             token_account,
-            owner_keypair.pubkey(),
+            owner.pubkey(),
             &[],
             data,
         ),
         Some(&payer.pubkey()),
     );
-    transaction.sign(&[&payer, &owner_keypair], recent_blockhash);
+    transaction.sign(&[&payer, &owner], recent_blockhash);
     banks_client.process_transaction(transaction).await.unwrap();
-}
 
-#[tokio::test]
-#[ignore]
-async fn test_create_account() {
-    todo!()
-}
-
-#[tokio::test]
-#[ignore]
-async fn test_close_account() {
-    todo!()
+    let account = banks_client
+        .get_account(zk_token_account)
+        .await
+        .expect("get_account")
+        .expect("zk_token_account not found");
+    let zk_token_state =
+        spl_zk_token::state::ConfidentialAccount::from_bytes(&account.data).unwrap();
+    assert_eq!(zk_token_state.elgamal_pk, new_elgamal_pk.into());
 }
 
 #[tokio::test]
@@ -266,5 +320,17 @@ async fn test_deposit() {
 #[tokio::test]
 #[ignore]
 async fn test_withdraw() {
+    todo!()
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_transfer() {
+    todo!()
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_multisig() {
     todo!()
 }
