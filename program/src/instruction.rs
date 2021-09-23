@@ -481,7 +481,7 @@ pub fn create_account(
     zk_token_account: Pubkey,
     elgamal_pk: ElGamalPK,
     token_account: Pubkey,
-    owner: Pubkey,
+    authority: Pubkey,
     multisig_signers: &[&Pubkey],
 ) -> Vec<Instruction> {
     let mut accounts = vec![
@@ -490,7 +490,7 @@ pub fn create_account(
         AccountMeta::new_readonly(token_account, false),
         AccountMeta::new_readonly(solana_program::system_program::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
-        AccountMeta::new_readonly(owner, multisig_signers.is_empty()),
+        AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
     ];
 
     for multisig_signer in multisig_signers.iter() {
@@ -505,11 +505,12 @@ pub fn create_account(
         },
     )]
 }
+
 /// Create a `UpdateAccountPk` instruction
 pub fn update_account_pk(
     zk_token_account: Pubkey,
     token_account: Pubkey,
-    owner: Pubkey,
+    authority: Pubkey,
     multisig_signers: &[&Pubkey],
     data: UpdateAccountPkData,
 ) -> Vec<Instruction> {
@@ -517,7 +518,7 @@ pub fn update_account_pk(
         AccountMeta::new(zk_token_account, false),
         AccountMeta::new_readonly(token_account, false),
         AccountMeta::new_readonly(sysvar::instructions::id(), false),
-        AccountMeta::new_readonly(owner, multisig_signers.is_empty()),
+        AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
     ];
 
     for multisig_signer in multisig_signers.iter() {
@@ -528,4 +529,63 @@ pub fn update_account_pk(
         ProofInstruction::VerifyUpdateAccountPk.encode(&data),
         encode_instruction(accounts, ConfidentialTokenInstruction::UpdateAccountPk, &()),
     ]
+}
+
+/// Create a `Deposit` instruction
+pub fn deposit(
+    source_token_account: Pubkey,
+    mint: &Pubkey,
+    destination_zk_token_account: Pubkey,
+    destination_token_account: Pubkey,
+    authority: Pubkey,
+    multisig_signers: &[&Pubkey],
+    amount: u64,
+    decimals: u8,
+) -> Vec<Instruction> {
+    let mut accounts = vec![
+        AccountMeta::new(source_token_account, false),
+        AccountMeta::new(destination_zk_token_account, false),
+        AccountMeta::new_readonly(destination_token_account, false),
+        AccountMeta::new(get_omnibus_token_address(mint), false),
+        AccountMeta::new_readonly(*mint, false),
+        AccountMeta::new_readonly(spl_token::id(), false),
+        AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
+    ];
+
+    for multisig_signer in multisig_signers.iter() {
+        accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
+    }
+
+    vec![encode_instruction(
+        accounts,
+        ConfidentialTokenInstruction::Deposit,
+        &DepositInstructionData {
+            amount: amount.into(),
+            decimals,
+        },
+    )]
+}
+
+/// Create a `ApplyPendingBalance` instruction
+pub fn apply_pending_balance(
+    zk_token_account: Pubkey,
+    token_account: Pubkey,
+    authority: Pubkey,
+    multisig_signers: &[&Pubkey],
+) -> Vec<Instruction> {
+    let mut accounts = vec![
+        AccountMeta::new(zk_token_account, false),
+        AccountMeta::new_readonly(token_account, false),
+        AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
+    ];
+
+    for multisig_signer in multisig_signers.iter() {
+        accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
+    }
+
+    vec![encode_instruction(
+        accounts,
+        ConfidentialTokenInstruction::ApplyPendingBalance,
+        &(),
+    )]
 }
