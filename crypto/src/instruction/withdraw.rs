@@ -1,21 +1,15 @@
-#[allow(unused_imports)]
 #[cfg(not(target_arch = "bpf"))]
 use {
-    crate::encryption::elgamal::{ElGamal, ElGamalPK, ElGamalSK},
+    crate::encryption::{
+        elgamal::{ElGamalPK, ElGamalSK},
+        pedersen::{PedersenBase, PedersenOpen},
+    },
     rand::rngs::OsRng,
 };
-#[allow(unused_imports)]
 use {
     crate::{
-        encryption::{
-            elgamal::ElGamalCT,
-            pedersen::{PedersenBase, PedersenOpen},
-        },
-        errors::ProofError,
-        instruction::Verifiable,
-        pod::*,
-        range_proof::RangeProof,
-        transcript::TranscriptProtocol,
+        encryption::elgamal::ElGamalCT, errors::ProofError, instruction::Verifiable, pod::*,
+        range_proof::RangeProof, transcript::TranscriptProtocol,
     },
     curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar, traits::MultiscalarMul},
     merlin::Transcript,
@@ -36,10 +30,8 @@ pub struct WithdrawData {
     /// `source_pk`
     pub final_balance_ct: PodElGamalCT, // 64 bytes
 
-                                        /*
-                                        /// Proof that the account is solvent
-                                        pub proof: WithdrawProof, // 736 bytes
-                                        */
+    /// Proof that the account is solvent
+    pub proof: WithdrawProof, // 736 bytes
 }
 
 impl WithdrawData {
@@ -61,28 +53,25 @@ impl WithdrawData {
         let amount_encoded = source_pk.encrypt_with(amount, &PedersenOpen::default());
         let final_balance_ct = current_balance_ct - amount_encoded;
 
-        let _proof = WithdrawProof::new(source_sk, final_balance, &final_balance_ct);
+        let proof = WithdrawProof::new(source_sk, final_balance, &final_balance_ct);
 
         Self {
             final_balance_ct: final_balance_ct.into(),
-            //proof,
+            proof,
         }
     }
 }
 
 impl Verifiable for WithdrawData {
     fn verify(&self) -> Result<(), ProofError> {
-        /*
         let final_balance_ct = self.final_balance_ct.try_into()?;
         self.proof.verify(&final_balance_ct)
-        */
-        Ok(())
     }
 }
 
 /// This struct represents the cryptographic proof component that certifies the account's solvency
 /// for withdrawal
-#[derive(Clone)]
+#[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct WithdrawProof {
@@ -91,7 +80,7 @@ pub struct WithdrawProof {
     /// Wrapper for range proof: z component
     pub z: PodScalar, // 32 bytes
     /// Associated range proof
-    pub range_proof: RangeProof, // 672 bytes TODO: Create PodRangeProof
+    pub range_proof: PodRangeProof64, // 672 bytes
 }
 
 #[allow(non_snake_case)]
@@ -140,11 +129,10 @@ impl WithdrawProof {
         WithdrawProof {
             R: R.into(),
             z: z.into(),
-            range_proof,
+            range_proof: range_proof.try_into().expect("range proof"),
         }
     }
 
-    #[allow(dead_code)]
     pub fn verify(&self, final_balance_ct: &ElGamalCT) -> Result<(), ProofError> {
         let mut transcript = Self::transcript_new();
 
@@ -168,8 +156,8 @@ impl WithdrawProof {
         // compute new Pedersen commitment to verify range proof with
         let new_comm = RistrettoPoint::multiscalar_mul(vec![Scalar::one(), -z, c], vec![C, D, R]);
 
-        self.range_proof
-            .verify(vec![&new_comm.compress()], vec![64_usize], &mut transcript)
+        let range_proof: RangeProof = self.range_proof.try_into()?;
+        range_proof.verify(vec![&new_comm.compress()], vec![64_usize], &mut transcript)
     }
 }
 
