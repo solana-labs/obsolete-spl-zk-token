@@ -49,7 +49,7 @@ pub(crate) fn get_transfer_auditor_address_with_seed(spl_token_mint: &Pubkey) ->
     Pubkey::find_program_address(&[spl_token_mint.as_ref(), br"transfer auditor"], &id())
 }
 
-pub(crate) fn get_confidential_address_with_seed(
+pub(crate) fn get_confidential_token_address_with_seed(
     spl_token_mint: &Pubkey,
     spl_token_account: &Pubkey,
 ) -> (Pubkey, u8) {
@@ -87,6 +87,9 @@ pub fn get_transfer_auditor_address(spl_token_mint: &Pubkey) -> Pubkey {
 ///
 /// This account is created when the token holder executes
 /// `ConfidentialTokenInstruction::CreateAccount` to disclose their ElGamal public key
-pub fn get_confidential_address(spl_token_mint: &Pubkey, spl_token_account: &Pubkey) -> Pubkey {
-    get_confidential_address_with_seed(spl_token_mint, spl_token_account).0
+pub fn get_confidential_token_address(
+    spl_token_mint: &Pubkey,
+    spl_token_account: &Pubkey,
+) -> Pubkey {
+    get_confidential_token_address_with_seed(spl_token_mint, spl_token_account).0
 }

@@ -118,6 +118,10 @@ impl<'a, 'b, T: Pod> DerefMut for PodAccountInfoData<'a, 'b, T> {
 
 /// Utility trait to add a `from_account_info()` function to any `Pod` struct
 pub trait PodAccountInfo<'a, 'b>: bytemuck::Pod {
+    fn from_bytes(bytes: &[u8]) -> Option<&Self> {
+        pod_from_bytes::<Self>(bytes)
+    }
+
     fn from_account_info(
         account_info: &'a AccountInfo<'b>,
         owner: &Pubkey,
@@ -127,7 +131,7 @@ pub trait PodAccountInfo<'a, 'b>: bytemuck::Pod {
         }
 
         let account_data = account_info.data.borrow_mut();
-        let _ = pod_from_bytes::<Self>(&account_data).ok_or(ProgramError::InvalidArgument)?;
+        let _ = Self::from_bytes(&account_data).ok_or(ProgramError::InvalidArgument)?;
         Ok(PodAccountInfoData {
             account_data,
             phantom: PhantomData::default(),

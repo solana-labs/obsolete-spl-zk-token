@@ -391,7 +391,7 @@ fn process_create_account(
 
     // Ensure confidential account address derivation is correct
     let (confidential_address, bump_seed) =
-        get_confidential_address_with_seed(&token_account.mint, token_account_info.key);
+        get_confidential_token_address_with_seed(&token_account.mint, token_account_info.key);
     if confidential_address != *confidential_account_info.key {
         msg!("Error: Confidential address does not match seed derivation");
         return Err(ProgramError::InvalidSeeds);

@@ -11,7 +11,7 @@ use {
         pubkey::Pubkey,
         sysvar,
     },
-    spl_zk_token_crypto::pod::*,
+    spl_zk_token_crypto::{encryption::elgamal::ElGamalPK, pod::*},
     zeroable::Zeroable,
 };
 
@@ -132,7 +132,7 @@ pub enum ConfidentialTokenInstruction {
     ///   4. `[]` System program
     ///   5. `[]` SPL Token program
     ///   6. `[]` Rent sysvar (remove once https://github.com/solana-labs/solana-program-library/pull/2282 is deployed)
-    ///   7. `[signer]` (optional) The SPL Token mint freeze authority, if not `None`
+    ///   7. `[signer]` (optional) The SPL Token mint freeze authority if not `None`
     ///
     //
     /// Data expected by this instruction:
@@ -456,12 +456,12 @@ fn _configure_mint(
     }
 }
 
-/// Create a `ConfidentialTokenInstruction::ConfigureMint` instruction
+/// Create a `ConfigureMint` instruction
 pub fn configure_mint(funding_address: Pubkey, token_mint_address: Pubkey) -> Instruction {
     _configure_mint(funding_address, token_mint_address, None)
 }
 
-/// Create a `ConfidentialTokenInstruction::ConfigureMint` instruction with a transfer auditor
+/// Create a `ConfigureMint` instruction with a transfer auditor
 pub fn configure_mint_with_transfer_auditor(
     funding_address: Pubkey,
     token_mint_address: Pubkey,
@@ -475,7 +475,37 @@ pub fn configure_mint_with_transfer_auditor(
     )
 }
 
-/// Create a `ConfidentialTokenInstruction::UpdateAccountPk` instruction
+/// Create a `CreateAccount` instruction
+pub fn create_account(
+    funding_address: Pubkey,
+    zk_token_account: Pubkey,
+    elgamal_pk: ElGamalPK,
+    token_account: Pubkey,
+    owner: Pubkey,
+    multisig_signers: &[&Pubkey],
+) -> Vec<Instruction> {
+    let mut accounts = vec![
+        AccountMeta::new(funding_address, true),
+        AccountMeta::new(zk_token_account, false),
+        AccountMeta::new_readonly(token_account, false),
+        AccountMeta::new_readonly(solana_program::system_program::id(), false),
+        AccountMeta::new_readonly(sysvar::rent::id(), false),
+        AccountMeta::new_readonly(owner, multisig_signers.is_empty()),
+    ];
+
+    for multisig_signer in multisig_signers.iter() {
+        accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
+    }
+
+    vec![encode_instruction(
+        accounts,
+        ConfidentialTokenInstruction::CreateAccount,
+        &CreateAccountInstructionData {
+            elgamal_pk: elgamal_pk.into(),
+        },
+    )]
+}
+/// Create a `UpdateAccountPk` instruction
 pub fn update_account_pk(
     zk_token_account: Pubkey,
     token_account: Pubkey,
