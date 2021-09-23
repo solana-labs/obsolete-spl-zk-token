@@ -6,7 +6,7 @@ use {
         errors::ProofError,
         range_proof::RangeProof,
     },
-    bytemuck::Pod,
+    bytemuck::{Pod, Zeroable},
     curve25519_dalek::{ristretto::CompressedRistretto, scalar::Scalar},
     std::{
         convert::{TryFrom, TryInto},
@@ -163,7 +163,14 @@ impl fmt::Debug for PodPedersenDecHandle {
 }
 
 /// Serialization of range proofs for 64-bit numbers (for `Withdraw` instruction)
+#[derive(Clone, Copy)]
+#[repr(transparent)]
 pub struct PodRangeProof64([u8; 672]);
+
+// `PodRangeProof64` is a Pod and Zeroable.
+// Add the marker traits manually because `bytemuck` only adds them for some `u8` arrays
+unsafe impl Zeroable for PodRangeProof64 {}
+unsafe impl Pod for PodRangeProof64 {}
 
 impl TryFrom<RangeProof> for PodRangeProof64 {
     type Error = ProofError;
@@ -195,7 +202,14 @@ impl TryFrom<PodRangeProof64> for RangeProof {
 }
 
 /// Serialization of range proofs for 128-bit numbers (for `TransferWithRangeProof` instruction)
+#[derive(Clone, Copy)]
+#[repr(transparent)]
 pub struct PodRangeProof128([u8; 736]);
+
+// `PodRangeProof128` is a Pod and Zeroable.
+// Add the marker traits manually because `bytemuck` only adds them for some `u8` arrays
+unsafe impl Zeroable for PodRangeProof128 {}
+unsafe impl Pod for PodRangeProof128 {}
 
 impl TryFrom<RangeProof> for PodRangeProof128 {
     type Error = ProofError;
