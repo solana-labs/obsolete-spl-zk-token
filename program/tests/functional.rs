@@ -16,6 +16,7 @@ use {
         encryption::elgamal::{ElGamal, ElGamalCT, ElGamalPK},
         pod::*,
     },
+    std::{borrow::Borrow, convert::TryInto},
 };
 
 fn program_test() -> ProgramTest {
@@ -44,6 +45,7 @@ fn program_test() -> ProgramTest {
 */
 
 const ACCOUNT_RENT_EXEMPTION: u64 = 1_000_000_000; // go with something big to be safe
+const DECIMALS: u8 = 0;
 
 fn add_token_mint_account(
     program_test: &mut ProgramTest,
@@ -54,7 +56,7 @@ fn add_token_mint_account(
     let mut token_mint_data = vec![0u8; spl_token::state::Mint::LEN];
     let token_mint = spl_token::state::Mint {
         supply: 123456789,
-        decimals: 0,
+        decimals: DECIMALS,
         is_initialized: true,
         freeze_authority: freeze_authority.into(),
         ..spl_token::state::Mint::default()
@@ -72,14 +74,13 @@ fn add_token_mint_account(
     token_mint_keypair.pubkey()
 }
 
-fn add_token_account(
+fn add_token_account_with_address(
     program_test: &mut ProgramTest,
+    token_address: Pubkey,
     mint: Pubkey,
     owner: Pubkey,
     balance: u64,
-) -> Pubkey {
-    let token_account_keypair = Keypair::new();
-
+) {
     let mut token_account_data = vec![0u8; spl_token::state::Account::LEN];
     let token_account_state = spl_token::state::Account {
         mint,
@@ -96,8 +97,36 @@ fn add_token_account(
         false,
         Epoch::default(),
     );
-    program_test.add_account(token_account_keypair.pubkey(), token_account);
+    program_test.add_account(token_address, token_account);
+}
+
+fn add_token_account(
+    program_test: &mut ProgramTest,
+    mint: Pubkey,
+    owner: Pubkey,
+    balance: u64,
+) -> Pubkey {
+    let token_account_keypair = Keypair::new();
+    add_token_account_with_address(
+        program_test,
+        token_account_keypair.pubkey(),
+        mint,
+        owner,
+        balance,
+    );
     token_account_keypair.pubkey()
+}
+
+fn add_omnibus_token_account(program_test: &mut ProgramTest, mint: Pubkey) -> Pubkey {
+    let omnibus_token_address = get_omnibus_token_address(&mint);
+    add_token_account_with_address(
+        program_test,
+        omnibus_token_address,
+        mint,
+        omnibus_token_address,
+        0,
+    );
+    omnibus_token_address
 }
 
 fn add_zk_token_account(
@@ -114,6 +143,7 @@ fn add_zk_token_account(
         token_account: token_account.into(),
         elgamal_pk: elgamal_pk.into(),
         available_balance: balance.into(),
+        accept_incoming_transfers: true.into(),
         ..spl_zk_token::state::ConfidentialAccount::zeroed()
     };
     let zk_token_account = Account::create(
@@ -126,6 +156,36 @@ fn add_zk_token_account(
 
     program_test.add_account(zk_token_address, zk_token_account);
     zk_token_address
+}
+
+async fn get_token_balance(banks_client: &mut BanksClient, token_address: Pubkey) -> u64 {
+    let token_account = banks_client
+        .get_account(token_address)
+        .await
+        .expect("get_account")
+        .expect("omnibus_token_account not found");
+    assert_eq!(token_account.data.len(), spl_token::state::Account::LEN);
+    assert_eq!(token_account.owner, spl_token::id());
+    let state = spl_token::state::Account::unpack(&token_account.data.borrow()).expect("unpack");
+    state.amount
+}
+
+async fn get_zk_token_balance(
+    banks_client: &mut BanksClient,
+    zk_token_account: Pubkey,
+) -> (ElGamalCT, ElGamalCT) {
+    let account = banks_client
+        .get_account(zk_token_account)
+        .await
+        .expect("get_account")
+        .expect("zk_token_account not found");
+    let zk_token_state =
+        spl_zk_token::state::ConfidentialAccount::from_bytes(&account.data).unwrap();
+
+    (
+        zk_token_state.pending_balance.try_into().unwrap(),
+        zk_token_state.available_balance.try_into().unwrap(),
+    )
 }
 
 #[tokio::test]
@@ -173,16 +233,10 @@ async fn test_configure_mint() {
     banks_client.process_transaction(transaction).await.unwrap();
 
     // Omnibus account now exists
-    let omnibus_token_account = banks_client
-        .get_account(omnibus_token_address)
-        .await
-        .expect("get_account")
-        .expect("omnibus_token_account not found");
     assert_eq!(
-        omnibus_token_account.data.len(),
-        spl_token::state::Account::LEN
+        get_token_balance(&mut banks_client, omnibus_token_address).await,
+        0
     );
-    assert_eq!(omnibus_token_account.owner, spl_token::id());
 
     // TransferAuditor account now exists
     let transfer_auditor_account = banks_client
@@ -272,13 +326,11 @@ async fn test_update_account_pk() {
         mint,
         token_account,
         elgamal_pk,
-        zk_available_balance_ct,
+        ElGamalCT::default(), /* available_balance = 0 */
     );
 
     let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
-
     let (new_elgamal_pk, new_elgamal_sk) = ElGamal::keygen();
-
     let data = spl_zk_token::instruction::UpdateAccountPkData::new(
         zk_available_balance,
         zk_available_balance_ct,
@@ -312,9 +364,82 @@ async fn test_update_account_pk() {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore] // TODO: remove once Solana 1.7.13 ships
 async fn test_deposit() {
-    todo!()
+    let owner = Keypair::new();
+
+    let (elgamal_pk, _elgamal_sk) = ElGamal::keygen();
+
+    let mut program_test = program_test();
+
+    let mint = add_token_mint_account(&mut program_test, None);
+    let omnibus_token_address = add_omnibus_token_account(&mut program_test, mint);
+    let token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 123);
+
+    let zk_token_account = add_zk_token_account(
+        &mut program_test,
+        mint,
+        token_account,
+        elgamal_pk,
+        ElGamalCT::default(), /* 0 balance */
+    );
+
+    let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
+    assert_eq!(
+        get_token_balance(&mut banks_client, token_account).await,
+        123
+    );
+    assert_eq!(
+        get_token_balance(&mut banks_client, omnibus_token_address).await,
+        0
+    );
+
+    let mut transaction = Transaction::new_with_payer(
+        &spl_zk_token::instruction::deposit(
+            token_account,
+            &mint,
+            zk_token_account,
+            token_account,
+            owner.pubkey(),
+            &[],
+            1,
+            DECIMALS,
+        ),
+        Some(&payer.pubkey()),
+    );
+    transaction.sign(&[&payer, &owner], recent_blockhash);
+    banks_client.process_transaction(transaction).await.unwrap();
+
+    assert_eq!(
+        get_token_balance(&mut banks_client, token_account).await,
+        122
+    );
+    assert_eq!(
+        get_token_balance(&mut banks_client, omnibus_token_address).await,
+        1
+    );
+
+    assert_eq!(
+        get_zk_token_balance(&mut banks_client, zk_token_account).await,
+        (ElGamalCT::default(), ElGamalCT::default())
+    );
+
+    let mut transaction = Transaction::new_with_payer(
+        &spl_zk_token::instruction::apply_pending_balance(
+            zk_token_account,
+            token_account,
+            owner.pubkey(),
+            &[],
+        ),
+        Some(&payer.pubkey()),
+    );
+    transaction.sign(&[&payer, &owner], recent_blockhash);
+    banks_client.process_transaction(transaction).await.unwrap();
+
+    assert_eq!(
+        get_zk_token_balance(&mut banks_client, zk_token_account).await,
+        (ElGamalCT::default(), ElGamalCT::default())
+    );
 }
 
 #[tokio::test]
