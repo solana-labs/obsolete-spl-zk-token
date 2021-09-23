@@ -349,6 +349,17 @@ impl InnerProductProof {
         buf
     }
 
+    // pub fn to_bytes_64(&self) -> Result<InnerProductProof64, ProofError> {
+    //     let mut bytes = [0u8; 448];
+
+    //     self.L_vec.iter().chain(self.R_vec.iter()).enumerate().for_each(
+    //         |(i, x)| bytes[i*32..(i+1)*32].copy_from_slice(x.as_bytes())
+    //     );
+    //     bytes[384..416].copy_from_slice(self.a.as_bytes());
+    //     bytes[416..448].copy_from_slice(self.a.as_bytes());
+    //     Ok(InnerProductProof64(bytes))
+    // }
+
     /*
     /// Converts the proof into a byte iterator over serialized view of the proof.
     /// The layout of the inner product proof is:

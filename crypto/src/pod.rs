@@ -4,6 +4,7 @@ use {
         encryption::elgamal::{ElGamalCT, ElGamalPK},
         encryption::pedersen::{PedersenComm, PedersenDecHandle},
         errors::ProofError,
+        range_proof::RangeProof,
     },
     bytemuck::Pod,
     curve25519_dalek::{ristretto::CompressedRistretto, scalar::Scalar},
@@ -161,6 +162,70 @@ impl fmt::Debug for PodPedersenDecHandle {
     }
 }
 
+/// Serialization of range proofs for 64-bit numbers (for `Withdraw` instruction)
+pub struct PodRangeProof64([u8; 672]);
+
+impl TryFrom<RangeProof> for PodRangeProof64 {
+    type Error = ProofError;
+
+    fn try_from(proof: RangeProof) -> Result<Self, Self::Error> {
+        if proof.ipp_proof.serialized_size() != 448 {
+            return Err(ProofError::VerificationError);
+        }
+
+        let mut buf = [0_u8; 672];
+        buf[..32].copy_from_slice(proof.A.as_bytes());
+        buf[32..64].copy_from_slice(proof.S.as_bytes());
+        buf[64..96].copy_from_slice(proof.T_1.as_bytes());
+        buf[96..128].copy_from_slice(proof.T_2.as_bytes());
+        buf[128..160].copy_from_slice(proof.t_x.as_bytes());
+        buf[160..192].copy_from_slice(proof.t_x_blinding.as_bytes());
+        buf[192..224].copy_from_slice(proof.e_blinding.as_bytes());
+        buf[224..672].copy_from_slice(&proof.ipp_proof.to_bytes());
+        Ok(PodRangeProof64(buf))
+    }
+}
+
+impl TryFrom<PodRangeProof64> for RangeProof {
+    type Error = ProofError;
+
+    fn try_from(pod: PodRangeProof64) -> Result<Self, Self::Error> {
+        Self::from_bytes(&pod.0)
+    }
+}
+
+/// Serialization of range proofs for 128-bit numbers (for `TransferWithRangeProof` instruction)
+pub struct PodRangeProof128([u8; 736]);
+
+impl TryFrom<RangeProof> for PodRangeProof128 {
+    type Error = ProofError;
+
+    fn try_from(proof: RangeProof) -> Result<Self, Self::Error> {
+        if proof.ipp_proof.serialized_size() != 512 {
+            return Err(ProofError::VerificationError);
+        }
+
+        let mut buf = [0_u8; 736];
+        buf[..32].copy_from_slice(proof.A.as_bytes());
+        buf[32..64].copy_from_slice(proof.S.as_bytes());
+        buf[64..96].copy_from_slice(proof.T_1.as_bytes());
+        buf[96..128].copy_from_slice(proof.T_2.as_bytes());
+        buf[128..160].copy_from_slice(proof.t_x.as_bytes());
+        buf[160..192].copy_from_slice(proof.t_x_blinding.as_bytes());
+        buf[192..224].copy_from_slice(proof.e_blinding.as_bytes());
+        buf[224..736].copy_from_slice(&proof.ipp_proof.to_bytes());
+        Ok(PodRangeProof128(buf))
+    }
+}
+
+impl TryFrom<PodRangeProof128> for RangeProof {
+    type Error = ProofError;
+
+    fn try_from(pod: PodRangeProof128) -> Result<Self, Self::Error> {
+        Self::from_bytes(&pod.0)
+    }
+}
+
 // Arithmetic functions on PodElGamalCT's.
 //
 // The conversion PodElGamalCT --> ElGamalCT require the use of
@@ -213,8 +278,9 @@ mod tests {
         super::*,
         crate::encryption::{
             elgamal::{ElGamal, ElGamalCT},
-            pedersen::PedersenOpen,
+            pedersen::{Pedersen, PedersenOpen},
         },
+        merlin::Transcript,
         rand::rngs::OsRng,
         std::convert::TryInto,
         zeroable::Zeroable,
@@ -243,5 +309,73 @@ mod tests {
 
         let expected: PodElGamalCT = pk.encrypt_with(55_u64, &open).into();
         assert_eq!(expected, sum);
+    }
+
+    #[test]
+    fn test_pod_range_proof_64() {
+        let (comm, open) = Pedersen::commit(55_u64);
+
+        let mut transcript_create = Transcript::new(b"Test");
+        let mut transcript_verify = Transcript::new(b"Test");
+
+        let proof = RangeProof::create(vec![55], vec![64], vec![&open], &mut transcript_create);
+
+        let proof_serialized: PodRangeProof64 = proof.try_into().unwrap();
+        let proof_deserialized: RangeProof = proof_serialized.try_into().unwrap();
+
+        assert!(proof_deserialized
+            .verify(
+                vec![&comm.get_point().compress()],
+                vec![64],
+                &mut transcript_verify
+            )
+            .is_ok());
+
+        // should fail to serialize to PodRangeProof128
+        let proof = RangeProof::create(vec![55], vec![64], vec![&open], &mut transcript_create);
+
+        assert!(TryInto::<PodRangeProof128>::try_into(proof).is_err());
+    }
+
+    #[test]
+    fn test_pod_range_proof_128() {
+        let (comm_1, open_1) = Pedersen::commit(55_u64);
+        let (comm_2, open_2) = Pedersen::commit(77_u64);
+        let (comm_3, open_3) = Pedersen::commit(99_u64);
+
+        let mut transcript_create = Transcript::new(b"Test");
+        let mut transcript_verify = Transcript::new(b"Test");
+
+        let proof = RangeProof::create(
+            vec![55, 77, 99],
+            vec![64, 32, 32],
+            vec![&open_1, &open_2, &open_3],
+            &mut transcript_create,
+        );
+
+        let comm_1_point = comm_1.get_point().compress();
+        let comm_2_point = comm_2.get_point().compress();
+        let comm_3_point = comm_3.get_point().compress();
+
+        let proof_serialized: PodRangeProof128 = proof.try_into().unwrap();
+        let proof_deserialized: RangeProof = proof_serialized.try_into().unwrap();
+
+        assert!(proof_deserialized
+            .verify(
+                vec![&comm_1_point, &comm_2_point, &comm_3_point],
+                vec![64, 32, 32],
+                &mut transcript_verify,
+            )
+            .is_ok());
+
+        // should fail to serialize to PodRangeProof64
+        let proof = RangeProof::create(
+            vec![55, 77, 99],
+            vec![64, 32, 32],
+            vec![&open_1, &open_2, &open_3],
+            &mut transcript_create,
+        );
+
+        assert!(TryInto::<PodRangeProof64>::try_into(proof).is_err());
     }
 }
