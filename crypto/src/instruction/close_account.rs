@@ -127,8 +127,7 @@ impl CloseAccountProof {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::encryption::elgamal::ElGamal;
+    use {super::*, crate::encryption::elgamal::ElGamal, zeroable::Zeroable};
 
     #[test]
     fn test_close_account_correctness() {
@@ -145,5 +144,9 @@ mod test {
 
         let proof = CloseAccountProof::new(&source_sk, &balance);
         assert!(proof.verify(&balance).is_err());
+
+        // A zeroed cyphertext should be considered as an account balance of 0
+        let proof = CloseAccountProof::new(&source_sk, &PodElGamalCT::zeroed().try_into().unwrap());
+        assert!(proof.verify(&balance).is_ok());
     }
 }
