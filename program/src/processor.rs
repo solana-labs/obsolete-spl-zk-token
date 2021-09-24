@@ -608,7 +608,7 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
     )?;
 
     // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY ONLY TO PACIFY CLIPPY
-    confidential_account.pending_balance = confidential_account.pending_balance;
+    confidential_account.pending_balance = PodElGamalCT::zeroed();
     /*
     confidential_account.pending_balance =
         add_to_pod_ciphertext(confidential_account.pending_balance, amount)

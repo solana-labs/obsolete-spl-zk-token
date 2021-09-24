@@ -532,6 +532,7 @@ pub fn update_account_pk(
 }
 
 /// Create a `Deposit` instruction
+#[allow(clippy::too_many_arguments)]
 pub fn deposit(
     source_token_account: Pubkey,
     mint: &Pubkey,
