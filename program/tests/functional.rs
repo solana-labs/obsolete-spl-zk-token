@@ -20,15 +20,6 @@ use {
 };
 
 fn program_test() -> ProgramTest {
-    ProgramTest::new(
-        "spl_zk_token",
-        id(),
-        processor!(processor::process_instruction),
-    )
-}
-// TODO: Use this `program_test()` implementation once Solana 1.7.13 ships
-/*
-fn program_test() -> ProgramTest {
     let mut pc = ProgramTest::new(
         "spl_zk_token",
         id(),
@@ -42,7 +33,6 @@ fn program_test() -> ProgramTest {
     );
     pc
 }
-*/
 
 const ACCOUNT_RENT_EXEMPTION: u64 = 1_000_000_000; // go with something big to be safe
 const DECIMALS: u8 = 0;
@@ -134,7 +124,7 @@ fn add_zk_token_account(
     mint: Pubkey,
     token_account: Pubkey,
     elgamal_pk: ElGamalPK,
-    balance: ElGamalCT,
+    available_balance: ElGamalCT,
 ) -> Pubkey {
     let zk_token_address = get_confidential_token_address(&mint, &token_account);
 
@@ -142,7 +132,7 @@ fn add_zk_token_account(
         mint: mint.into(),
         token_account: token_account.into(),
         elgamal_pk: elgamal_pk.into(),
-        available_balance: balance.into(),
+        available_balance: available_balance.into(),
         accept_incoming_transfers: true.into(),
         ..spl_zk_token::state::ConfidentialAccount::zeroed()
     };
@@ -170,17 +160,26 @@ async fn get_token_balance(banks_client: &mut BanksClient, token_address: Pubkey
     state.amount
 }
 
-async fn get_zk_token_balance(
+async fn get_zk_token_state(
     banks_client: &mut BanksClient,
     zk_token_account: Pubkey,
-) -> (ElGamalCT, ElGamalCT) {
+) -> spl_zk_token::state::ConfidentialAccount {
     let account = banks_client
         .get_account(zk_token_account)
         .await
         .expect("get_account")
         .expect("zk_token_account not found");
-    let zk_token_state =
-        spl_zk_token::state::ConfidentialAccount::from_bytes(&account.data).unwrap();
+    *spl_zk_token::state::ConfidentialAccount::from_bytes(&account.data).unwrap()
+}
+
+async fn get_zk_token_balance(
+    banks_client: &mut BanksClient,
+    zk_token_account: Pubkey,
+) -> (
+    /* pending_balance: */ ElGamalCT,
+    /* available_balance: */ ElGamalCT,
+) {
+    let zk_token_state = get_zk_token_state(banks_client, zk_token_account).await;
 
     (
         zk_token_state.pending_balance.try_into().unwrap(),
@@ -259,7 +258,6 @@ async fn test_update_transfer_auditor() {
 }
 
 #[tokio::test]
-#[ignore] // TODO: remove once Solana 1.7.13 ships
 async fn test_create_account() {
     let owner = Keypair::new();
 
@@ -302,13 +300,66 @@ async fn test_create_account() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn test_close_account() {
-    todo!()
+    let owner = Keypair::new();
+    let reclaim_account = Keypair::new();
+
+    let (elgamal_pk, elgamal_sk) = ElGamal::keygen();
+
+    let mut program_test = program_test();
+
+    let mint = add_token_mint_account(&mut program_test, None);
+    let token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 123);
+
+    let zk_available_balance = 0u64;
+    let zk_available_balance_ct = elgamal_pk.encrypt(zk_available_balance);
+    let zk_token_account = add_zk_token_account(
+        &mut program_test,
+        mint,
+        token_account,
+        elgamal_pk,
+        zk_available_balance_ct,
+    );
+
+    let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
+    let (new_elgamal_pk, new_elgamal_sk) = ElGamal::keygen();
+    let data =
+        spl_zk_token::instruction::CloseAccountData::new(&elgamal_sk, zk_available_balance_ct);
+
+    let mut transaction = Transaction::new_with_payer(
+        &spl_zk_token::instruction::close_account(
+            zk_token_account,
+            token_account,
+            reclaim_account.pubkey(),
+            owner.pubkey(),
+            &[],
+            data,
+        ),
+        Some(&payer.pubkey()),
+    );
+    transaction.sign(&[&payer, &owner], recent_blockhash);
+    banks_client.process_transaction(transaction).await.unwrap();
+
+    // zk_token_account is now gone
+    assert_eq!(
+        banks_client
+            .get_account(zk_token_account)
+            .await
+            .expect("get_account"),
+        None
+    );
+
+    //confirm reclaim_account balance is correct
+    assert_eq!(
+        banks_client
+            .get_balance(reclaim_account.pubkey())
+            .await
+            .expect("get_balance"),
+        ACCOUNT_RENT_EXEMPTION
+    );
 }
 
 #[tokio::test]
-#[ignore] // TODO: remove once Solana 1.7.13 ships
 async fn test_update_account_pk() {
     let owner = Keypair::new();
 
@@ -326,7 +377,7 @@ async fn test_update_account_pk() {
         mint,
         token_account,
         elgamal_pk,
-        ElGamalCT::default(), /* available_balance = 0 */
+        zk_available_balance_ct,
     );
 
     let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
@@ -364,18 +415,14 @@ async fn test_update_account_pk() {
 }
 
 #[tokio::test]
-#[ignore] // TODO: remove once Solana 1.7.13 ships
 async fn test_deposit() {
     let owner = Keypair::new();
-
     let (elgamal_pk, _elgamal_sk) = ElGamal::keygen();
 
     let mut program_test = program_test();
-
     let mint = add_token_mint_account(&mut program_test, None);
     let omnibus_token_address = add_omnibus_token_account(&mut program_test, mint);
     let token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 123);
-
     let zk_token_account = add_zk_token_account(
         &mut program_test,
         mint,
@@ -383,8 +430,8 @@ async fn test_deposit() {
         elgamal_pk,
         ElGamalCT::default(), /* 0 balance */
     );
-
     let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
+
     assert_eq!(
         get_token_balance(&mut banks_client, token_account).await,
         123
