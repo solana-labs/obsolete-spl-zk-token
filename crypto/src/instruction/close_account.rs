@@ -108,6 +108,9 @@ impl CloseAccountProof {
         let z = self.z.into();
 
         // generate a challenge scalar
+        //
+        // use `append_point` as opposed to `validate_and_append_point` as the ciphertext is
+        // already guaranteed to be well-formed
         transcript.append_point(b"R", &R);
         let c = transcript.challenge_scalar(b"c");
 

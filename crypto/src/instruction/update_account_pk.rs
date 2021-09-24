@@ -227,5 +227,42 @@ mod test {
 
         let proof = UpdateAccountPkProof::new(balance, &current_sk, &new_sk, &current_ct, &new_ct);
         assert!(proof.verify(&current_ct, &new_ct).is_err());
+
+        // A zeroed cipehrtext should be considered as an account balance of 0
+        let balance: u64 = 0;
+        let zeroed_ct_as_current_ct: ElGamalCT = PodElGamalCT::zeroed().try_into().unwrap();
+        let new_ct: ElGamalCT = new_pk.encrypt(balance);
+        let proof = UpdateAccountPkProof::new(
+            balance,
+            &current_sk,
+            &new_sk,
+            &zeroed_ct_as_current_ct,
+            &new_ct,
+        );
+        assert!(proof.verify(&zeroed_ct_as_current_ct, &new_ct).is_ok());
+
+        let current_ct: ElGamalCT = PodElGamalCT::zeroed().try_into().unwrap();
+        let zeroed_ct_as_new_ct: ElGamalCT = PodElGamalCT::zeroed().try_into().unwrap();
+        let proof = UpdateAccountPkProof::new(
+            balance,
+            &current_sk,
+            &new_sk,
+            &current_ct,
+            &zeroed_ct_as_new_ct,
+        );
+        assert!(proof.verify(&current_ct, &zeroed_ct_as_new_ct).is_ok());
+
+        let zeroed_ct_as_current_ct: ElGamalCT = PodElGamalCT::zeroed().try_into().unwrap();
+        let zeroed_ct_as_new_ct: ElGamalCT = PodElGamalCT::zeroed().try_into().unwrap();
+        let proof = UpdateAccountPkProof::new(
+            balance,
+            &current_sk,
+            &new_sk,
+            &zeroed_ct_as_current_ct,
+            &zeroed_ct_as_new_ct,
+        );
+        assert!(proof
+            .verify(&zeroed_ct_as_current_ct, &zeroed_ct_as_new_ct)
+            .is_ok());
     }
 }
