@@ -146,7 +146,7 @@ impl From<RistrettoPoint> for ElGamalPK {
 }
 
 /// Secret key for the ElGamal encryption scheme.
-#[derive(Serialize, Deserialize, Clone, Debug, Zeroize)]
+#[derive(Serialize, Deserialize, Debug, Zeroize)]
 #[zeroize(drop)]
 pub struct ElGamalSK(Scalar);
 impl ElGamalSK {
