@@ -108,7 +108,7 @@ impl CloseAccountProof {
         let z = self.z.into();
 
         // generate a challenge scalar
-        transcript.validate_and_append_point(b"R", &R)?;
+        transcript.append_point(b"R", &R);
         let c = transcript.challenge_scalar(b"c");
 
         // decompress R or return verification error
@@ -146,7 +146,8 @@ mod test {
         assert!(proof.verify(&balance).is_err());
 
         // A zeroed cyphertext should be considered as an account balance of 0
-        let proof = CloseAccountProof::new(&source_sk, &PodElGamalCT::zeroed().try_into().unwrap());
-        assert!(proof.verify(&balance).is_ok());
+        let zeroed_ct: ElGamalCT = PodElGamalCT::zeroed().try_into().unwrap();
+        let proof = CloseAccountProof::new(&source_sk, &zeroed_ct);
+        assert!(proof.verify(&zeroed_ct).is_ok());
     }
 }
