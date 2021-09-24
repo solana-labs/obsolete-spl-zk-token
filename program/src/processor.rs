@@ -466,7 +466,7 @@ fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let confidential_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
-    let dest_info = next_account_info(account_info_iter)?;
+    let reclaim_info = next_account_info(account_info_iter)?;
     let instructions_sysvar_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
@@ -497,8 +497,8 @@ fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
     *confidential_account = ConfidentialAccount::zeroed();
 
     // Drain lamports
-    let dest_starting_lamports = dest_info.lamports();
-    **dest_info.lamports.borrow_mut() = dest_starting_lamports
+    let dest_starting_lamports = reclaim_info.lamports();
+    **reclaim_info.lamports.borrow_mut() = dest_starting_lamports
         .checked_add(confidential_account_info.lamports())
         .ok_or(ProgramError::InvalidAccountData)?;
     **confidential_account_info.lamports.borrow_mut() = 0;

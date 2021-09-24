@@ -183,13 +183,13 @@ pub enum ConfidentialTokenInstruction {
     ///
     CreateAccount,
 
-    /// Close a confidential token account by transferring all lamports it holds to the destination
+    /// Close a confidential token account by transferring all lamports it holds to the reclaim
     /// account. The account must not hold any confidential tokens in its pending or available
     /// balances. Use `DisableInboundTransfers` to block inbound transfers first if necessary.
     ///
     ///   0. `[writable]` The CToken account to close
     ///   1. `[]` Corresponding SPL Token account
-    ///   2. `[writable]` The destination account
+    ///   2. `[writable]` The reclaim account
     ///   3. `[]` Instructions sysvar
     ///   4. `[signer]` The single account owner
     /// or:
@@ -504,6 +504,33 @@ pub fn create_account(
             elgamal_pk: elgamal_pk.into(),
         },
     )]
+}
+
+/// Create a `CloseAccount` instruction
+pub fn close_account(
+    zk_token_account: Pubkey,
+    token_account: Pubkey,
+    reclaim_account: Pubkey,
+    authority: Pubkey,
+    multisig_signers: &[&Pubkey],
+    data: CloseAccountData,
+) -> Vec<Instruction> {
+    let mut accounts = vec![
+        AccountMeta::new(zk_token_account, false),
+        AccountMeta::new_readonly(token_account, false),
+        AccountMeta::new(reclaim_account, false),
+        AccountMeta::new_readonly(sysvar::instructions::id(), false),
+        AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
+    ];
+
+    for multisig_signer in multisig_signers.iter() {
+        accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
+    }
+
+    vec![
+        ProofInstruction::VerifyCloseAccount.encode(&data),
+        encode_instruction(accounts, ConfidentialTokenInstruction::CloseAccount, &()),
+    ]
 }
 
 /// Create a `UpdateAccountPk` instruction
