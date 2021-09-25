@@ -54,8 +54,6 @@ pub struct WithdrawInstructionData {
     pub amount: PodU64,
     /// Expected number of base 10 digits to the right of the decimal place.
     pub decimals: u8,
-    // TODO: Proof that the encrypted balance is >= `amount`
-    pub crypto_sufficient_balance_proof: [u8; 256],
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -513,7 +511,7 @@ pub fn close_account(
     reclaim_account: Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
-    data: CloseAccountData,
+    proof_data: CloseAccountData,
 ) -> Vec<Instruction> {
     let mut accounts = vec![
         AccountMeta::new(zk_token_account, false),
@@ -528,7 +526,7 @@ pub fn close_account(
     }
 
     vec![
-        ProofInstruction::VerifyCloseAccount.encode(&data),
+        ProofInstruction::VerifyCloseAccount.encode(&proof_data),
         encode_instruction(accounts, ConfidentialTokenInstruction::CloseAccount, &()),
     ]
 }
@@ -539,7 +537,7 @@ pub fn update_account_pk(
     token_account: Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
-    data: UpdateAccountPkData,
+    proof_data: UpdateAccountPkData,
 ) -> Vec<Instruction> {
     let mut accounts = vec![
         AccountMeta::new(zk_token_account, false),
@@ -553,7 +551,7 @@ pub fn update_account_pk(
     }
 
     vec![
-        ProofInstruction::VerifyUpdateAccountPk.encode(&data),
+        ProofInstruction::VerifyUpdateAccountPk.encode(&proof_data),
         encode_instruction(accounts, ConfidentialTokenInstruction::UpdateAccountPk, &()),
     ]
 }
@@ -592,6 +590,47 @@ pub fn deposit(
             decimals,
         },
     )]
+}
+
+/// Create a `Withdraw` instruction
+#[allow(clippy::too_many_arguments)]
+pub fn withdraw(
+    source_zk_token_account: Pubkey,
+    source_token_account: Pubkey,
+    destination_token_account: Pubkey,
+    mint: &Pubkey,
+    authority: Pubkey,
+    multisig_signers: &[&Pubkey],
+    amount: u64,
+    decimals: u8,
+    proof_data: WithdrawData,
+) -> Vec<Instruction> {
+    let mut accounts = vec![
+        AccountMeta::new(source_zk_token_account, false),
+        AccountMeta::new_readonly(source_token_account, false),
+        AccountMeta::new(destination_token_account, false),
+        AccountMeta::new_readonly(*mint, false),
+        AccountMeta::new(get_omnibus_token_address(mint), false),
+        AccountMeta::new_readonly(spl_token::id(), false),
+        AccountMeta::new_readonly(sysvar::instructions::id(), false),
+        AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
+    ];
+
+    for multisig_signer in multisig_signers.iter() {
+        accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
+    }
+
+    vec![
+        ProofInstruction::VerifyWithdraw.encode(&proof_data),
+        encode_instruction(
+            accounts,
+            ConfidentialTokenInstruction::Withdraw,
+            &WithdrawInstructionData {
+                amount: amount.into(),
+                decimals,
+            },
+        ),
+    ]
 }
 
 /// Create a `ApplyPendingBalance` instruction
