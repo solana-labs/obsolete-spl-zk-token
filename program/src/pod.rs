@@ -1,6 +1,6 @@
 //! Solana program utilities for Plain Old Data types
 use {
-    bytemuck::Pod,
+    bytemuck::{Pod, Zeroable},
     solana_program::{
         account_info::AccountInfo, instruction::Instruction, program_error::ProgramError,
         pubkey::Pubkey,

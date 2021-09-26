@@ -10,8 +10,7 @@ publish = false
 [dependencies]
 arrayref = "0.3.6"
 bincode = "1"
-bytemuck = "1.7.2"
-bytemuck_derive = "1.0.1"
+bytemuck = { version = "1.7.2", features = ["derive"] }
 byteorder = { version = "1", default-features = false }
 clear_on_drop = { version = "0.2", default-features = false }
 curve25519-dalek = { version = "2", default-features = false, features = ["u64_backend", "alloc", "serde"] }
@@ -27,7 +26,6 @@ sha3 = { version = "0.8", default-features = false }
 solana-program = "=1.7.11"
 subtle = { version = "2", default-features = false }
 thiserror = "1"
-zeroable = "0.2.0"
 zeroize = { version = "1.2.0", default-features = false, features = ["zeroize_derive"] }
 
 [dev-dependencies]

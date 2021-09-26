@@ -11,6 +11,7 @@ use {
         pod::*,
         transcript::TranscriptProtocol,
     },
+    bytemuck::{Pod, Zeroable},
     curve25519_dalek::{
         ristretto::RistrettoPoint,
         scalar::Scalar,
@@ -18,7 +19,6 @@ use {
     },
     merlin::Transcript,
     std::convert::TryInto,
-    zeroable::Zeroable,
 };
 
 /// This struct includes the cryptographic proof *and* the account data information needed to verify

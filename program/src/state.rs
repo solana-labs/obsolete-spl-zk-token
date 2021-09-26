@@ -1,4 +1,8 @@
-use {crate::pod::*, spl_zk_token_crypto::pod::*, zeroable::Zeroable};
+use {
+    crate::pod::*,
+    bytemuck::{Pod, Zeroable},
+    spl_zk_token_crypto::pod::*,
+};
 
 /// Account used for auditing confidential transfers
 #[derive(Clone, Copy, Pod, Zeroable)]
