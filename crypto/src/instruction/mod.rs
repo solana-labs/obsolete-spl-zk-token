@@ -14,10 +14,9 @@ use {
     num_derive::{FromPrimitive, ToPrimitive},
     num_traits::{FromPrimitive, ToPrimitive},
     solana_program::{instruction::Instruction, pubkey::Pubkey},
-    zeroable::Zeroable,
 };
 
-#[derive(Clone, Copy, Debug, Zeroable, FromPrimitive, ToPrimitive, PartialEq)]
+#[derive(Clone, Copy, Debug, FromPrimitive, ToPrimitive, PartialEq)]
 #[repr(u8)]
 pub enum ProofInstruction {
     /// Verify a `UpdateAccountPkData` struct

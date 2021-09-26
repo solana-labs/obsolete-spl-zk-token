@@ -2,7 +2,7 @@
 
 use {
     crate::{pod::*, *},
-    bytemuck::Pod,
+    bytemuck::{Pod, Zeroable},
     num_derive::{FromPrimitive, ToPrimitive},
     num_traits::{FromPrimitive, ToPrimitive},
     solana_program::{
@@ -12,7 +12,6 @@ use {
         sysvar,
     },
     spl_zk_token_crypto::{encryption::elgamal::ElGamalPK, pod::*},
-    zeroable::Zeroable,
 };
 
 pub use spl_zk_token_crypto::instruction::*;
@@ -105,7 +104,7 @@ pub struct TransferWithAuditorInstructionData {
     pub crypto_auditor_amount_equality_proof: (),
 }
 
-#[derive(Clone, Copy, Debug, Zeroable, FromPrimitive, ToPrimitive)]
+#[derive(Clone, Copy, Debug, FromPrimitive, ToPrimitive)]
 #[repr(u8)]
 pub enum ConfidentialTokenInstruction {
     /// Configures confidential transfers for a given SPL Token mint

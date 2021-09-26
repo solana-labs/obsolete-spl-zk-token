@@ -15,6 +15,7 @@ use {
         range_proof::RangeProof,
         transcript::TranscriptProtocol,
     },
+    bytemuck::{Pod, Zeroable},
     curve25519_dalek::{
         ristretto::{CompressedRistretto, RistrettoPoint},
         scalar::Scalar,

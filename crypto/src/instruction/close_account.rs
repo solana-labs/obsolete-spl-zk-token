@@ -5,6 +5,7 @@ use {
         encryption::elgamal::ElGamalCT, errors::ProofError, instruction::Verifiable, pod::*,
         transcript::TranscriptProtocol,
     },
+    bytemuck::{Pod, Zeroable},
     curve25519_dalek::{
         ristretto::RistrettoPoint,
         scalar::Scalar,

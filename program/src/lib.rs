@@ -1,9 +1,10 @@
 //#![deny(missing_docs)]
 #![forbid(unsafe_code)]
 
-use {solana_program::pubkey::Pubkey, zeroable::Zeroable};
-#[macro_use]
-extern crate bytemuck_derive;
+use {
+    bytemuck::{Pod, Zeroable},
+    solana_program::pubkey::Pubkey,
+};
 
 mod entrypoint;
 pub mod instruction;

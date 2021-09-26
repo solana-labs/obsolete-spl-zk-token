@@ -11,6 +11,7 @@ use {
         encryption::elgamal::ElGamalCT, errors::ProofError, instruction::Verifiable, pod::*,
         range_proof::RangeProof, transcript::TranscriptProtocol,
     },
+    bytemuck::{Pod, Zeroable},
     curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar, traits::MultiscalarMul},
     merlin::Transcript,
     std::convert::TryInto,
