@@ -252,28 +252,99 @@ impl TryFrom<PodRangeProof128> for RangeProof {
 // This is regarding the discussion:
 //  https://discord.com/channels/428295358100013066/774014770402689065/880529250246082611
 //
-pub fn add_pod_ciphertexts(
-    ct_0: PodElGamalCT,
-    ct_1: PodElGamalCT,
+
+pub const TWO_32: u64 = 4294967296;
+
+// One option is to have a general add function
+//
+// Addition can be performed:
+//   general_add_pod_ciphertexts(Scalar::one(), pod_ct_0, Scalar::one(), pod_ct_1);
+//
+// Subtraction can be performed:
+//   general_add_pod_ciphertexts(-Scalar::one(), pod_ct_0, -Scalar::one(), pod_ct_1);
+//
+// `lo` and `hi` ciphertexts can first be combined
+//   general_add_pod_ciphertexts(Scalar::one(), pod_ct_lo, Scalar::from(TWO_32), pod_ct_hi);
+//
+// then it can be added to the recipient ciphertext
+//
+// The disadvantage is that multiplying a scalar and an ElGamal ciphertext is quite costly
+// so for simple addition and subtraction, it may make sense to have a designated function
+//
+
+// The following function takes in x_0, ct_0, x_1, ct_1 and computes x_0 * ct_0 + x_1 * ct_1
+pub fn general_add_pod_ciphertexts(
+    pod_scalar_0: PodScalar,
+    pod_ct_0: PodElGamalCT,
+    pod_scalar_1: PodScalar,
+    pod_ct_1: PodElGamalCT,
 ) -> Result<PodElGamalCT, ProofError> {
-    let ct_0: ElGamalCT = ct_0.try_into()?;
-    let ct_1: ElGamalCT = ct_1.try_into()?;
+    let scalar_0: Scalar = pod_scalar_0.into();
+    let ct_0: ElGamalCT = pod_ct_0.try_into()?;
+
+    let scalar_1: Scalar = pod_scalar_1.into();
+    let ct_1: ElGamalCT = pod_ct_1.try_into()?;
+
+    let ct_sum = ct_0 * scalar_0 + ct_1 * scalar_1;
+    Ok(ct_sum.into())
+}
+
+// To have a dedicated arithmetic function for each operation, we can have:
+
+// this function is needed for ApplyPendingBalance
+pub fn add_pod_ciphertexts(
+    pod_ct_0: PodElGamalCT,
+    pod_ct_1: PodElGamalCT,
+) -> Result<PodElGamalCT, ProofError> {
+    let ct_0: ElGamalCT = pod_ct_0.try_into()?;
+    let ct_1: ElGamalCT = pod_ct_1.try_into()?;
 
     let ct_sum = ct_0 + ct_1;
     Ok(ct_sum.into())
 }
 
+// it seems like this function is not used anywhere
 pub fn sub_pod_ciphertexts(
-    ct_0: PodElGamalCT,
-    ct_1: PodElGamalCT,
+    pod_ct_0: PodElGamalCT,
+    pod_ct_1: PodElGamalCT,
 ) -> Result<PodElGamalCT, ProofError> {
-    let ct_0: ElGamalCT = ct_0.try_into()?;
-    let ct_1: ElGamalCT = ct_1.try_into()?;
+    let ct_0: ElGamalCT = pod_ct_0.try_into()?;
+    let ct_1: ElGamalCT = pod_ct_1.try_into()?;
 
-    let ct_sum = ct_0 - ct_1;
+    let ct_sub = ct_0 - ct_1;
+    Ok(ct_sub.into())
+}
+
+// this function is needed for transfer
+pub fn add_pod_ciphertexts_for_transfer(
+    pod_ct_lo: PodElGamalCT,
+    pod_ct_hi: PodElGamalCT,
+    pod_ct_dest: PodElGamalCT,
+) -> Result<PodElGamalCT, ProofError> {
+    let ct_lo: ElGamalCT = pod_ct_lo.try_into()?;
+    let ct_hi: ElGamalCT = pod_ct_hi.try_into()?;
+    let pod_ct_dest: ElGamalCT = pod_ct_dest.try_into()?;
+
+    let ct_sum = pod_ct_dest + (ct_lo + ct_hi * Scalar::from(TWO_32));
     Ok(ct_sum.into())
 }
 
+// this function is needed for transfer
+pub fn sub_pod_ciphertexts_for_transfer(
+    pod_ct_lo: PodElGamalCT,
+    pod_ct_hi: PodElGamalCT,
+    pod_ct_source: PodElGamalCT,
+) -> Result<PodElGamalCT, ProofError> {
+    let ct_lo: ElGamalCT = pod_ct_lo.try_into()?;
+    let ct_hi: ElGamalCT = pod_ct_hi.try_into()?;
+    let pod_ct_dest: ElGamalCT = pod_ct_source.try_into()?;
+
+    let ct_sub = pod_ct_dest - (ct_lo + ct_hi * Scalar::from(TWO_32));
+    Ok(ct_sub.into())
+}
+
+// The following two functions are used for `Deposit` and `Withdraw`, and they can also be replaced
+// with a generic function if we go that route
 pub fn add_to_pod_ciphertext(ct: PodElGamalCT, amount: u64) -> Result<PodElGamalCT, ProofError> {
     let ct: ElGamalCT = ct.try_into()?;
     let ct_sum = ct.add_to_msg(amount);
