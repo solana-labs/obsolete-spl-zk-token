@@ -131,7 +131,7 @@ impl CloseAccountProof {
 
 #[cfg(test)]
 mod test {
-    use {super::*, crate::encryption::elgamal::ElGamal, zeroable::Zeroable};
+    use {super::*, crate::encryption::elgamal::ElGamal};
 
     #[test]
     fn test_close_account_correctness() {

@@ -297,7 +297,6 @@ mod tests {
         merlin::Transcript,
         rand::rngs::OsRng,
         std::convert::TryInto,
-        zeroable::Zeroable,
     };
 
     #[test]
