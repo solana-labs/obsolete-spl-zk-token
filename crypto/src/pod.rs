@@ -476,13 +476,16 @@ mod tests {
             auditor_pk.gen_decrypt_handle(&open_hi).into();
 
         // source spendable and recipient pending
-        let source_spendable_ct: PodElGamalCT = source_pk.encrypt(77_u64).into();
-        let dest_pending_ct: PodElGamalCT = source_pk.encrypt(77_u64).into();
+        let source_open = PedersenOpen::random(&mut OsRng);
+        let dest_open = PedersenOpen::random(&mut OsRng);
+
+        let source_spendable_ct: PodElGamalCT = source_pk.encrypt_with(77_u64, &source_open).into();
+        let dest_pending_ct: PodElGamalCT = dest_pk.encrypt_with(77_u64, &dest_open).into();
 
         // program arithmetic
 
         // subtracting from source
-        let _final_source_spendable_ct = sub_pod_ciphertexts_for_transfer(
+        let final_source_spendable_ct = sub_pod_ciphertexts_for_transfer(
             comm_lo,
             handle_source_lo,
             comm_hi,
@@ -491,8 +494,12 @@ mod tests {
         )
         .unwrap();
 
+        let final_source_open = source_open - (open_lo.clone() + open_hi.clone() * Scalar::from(TWO_32));
+        let expected_source_ct: PodElGamalCT = source_pk.encrypt_with(22_u64, &final_source_open).into();
+        assert_eq!(expected_source_ct, final_source_spendable_ct);
+
         // adding to destination
-        let _final_dest_pending_ct = add_pod_ciphertexts_for_transfer(
+        let final_dest_pending_ct = add_pod_ciphertexts_for_transfer(
             comm_lo,
             handle_dest_lo,
             comm_hi,
@@ -500,5 +507,9 @@ mod tests {
             dest_pending_ct,
         )
         .unwrap();
+
+        let final_dest_open = dest_open + (open_lo + open_hi * Scalar::from(TWO_32));
+        let expected_dest_ct: PodElGamalCT = dest_pk.encrypt_with(132_u64, &final_dest_open).into();
+        assert_eq!(expected_dest_ct, final_dest_pending_ct);
     }
 }
