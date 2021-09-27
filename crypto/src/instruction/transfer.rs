@@ -8,10 +8,10 @@ use {
 };
 use {
     crate::{
-        instruction::Verifiable,
         encryption::elgamal::{ElGamalCT, ElGamalPK},
         encryption::pedersen::{PedersenComm, PedersenDecHandle},
         errors::ProofError,
+        instruction::Verifiable,
         pod::*,
         range_proof::RangeProof,
         transcript::TranscriptProtocol,
