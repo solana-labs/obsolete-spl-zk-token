@@ -255,43 +255,7 @@ impl TryFrom<PodRangeProof128> for RangeProof {
 
 pub const TWO_32: u64 = 4294967296;
 
-// One option is to have a general add function
-//
-// Addition can be performed:
-//   general_add_pod_ciphertexts(Scalar::one(), pod_ct_0, Scalar::one(), pod_ct_1);
-//
-// Subtraction can be performed:
-//   general_add_pod_ciphertexts(-Scalar::one(), pod_ct_0, -Scalar::one(), pod_ct_1);
-//
-// `lo` and `hi` ciphertexts can first be combined
-//   general_add_pod_ciphertexts(Scalar::one(), pod_ct_lo, Scalar::from(TWO_32), pod_ct_hi);
-//
-// then it can be added to the recipient ciphertext
-//
-// The disadvantage is that multiplying a scalar and an ElGamal ciphertext is quite costly
-// so for simple addition and subtraction, it may make sense to have a designated function
-//
-
-// The following function takes in x_0, ct_0, x_1, ct_1 and computes x_0 * ct_0 + x_1 * ct_1
-pub fn general_add_pod_ciphertexts(
-    pod_scalar_0: PodScalar,
-    pod_ct_0: PodElGamalCT,
-    pod_scalar_1: PodScalar,
-    pod_ct_1: PodElGamalCT,
-) -> Result<PodElGamalCT, ProofError> {
-    let scalar_0: Scalar = pod_scalar_0.into();
-    let ct_0: ElGamalCT = pod_ct_0.try_into()?;
-
-    let scalar_1: Scalar = pod_scalar_1.into();
-    let ct_1: ElGamalCT = pod_ct_1.try_into()?;
-
-    let ct_sum = ct_0 * scalar_0 + ct_1 * scalar_1;
-    Ok(ct_sum.into())
-}
-
-// To have a dedicated arithmetic function for each operation, we can have:
-
-// this function is needed for ApplyPendingBalance
+// this function is needed for `ApplyPendingBalance`
 pub fn add_pod_ciphertexts(
     pod_ct_0: PodElGamalCT,
     pod_ct_1: PodElGamalCT,
@@ -317,40 +281,56 @@ pub fn sub_pod_ciphertexts(
 
 // this function is needed for transfer
 pub fn add_pod_ciphertexts_for_transfer(
-    pod_ct_lo: PodElGamalCT,
-    pod_ct_hi: PodElGamalCT,
+    pod_comm_lo: PodPedersenComm,
+    pod_dec_handle_lo: PodPedersenDecHandle,
+    pod_comm_hi: PodPedersenComm,
+    pod_dec_handle_hi: PodPedersenDecHandle,
     pod_ct_dest: PodElGamalCT,
 ) -> Result<PodElGamalCT, ProofError> {
-    let ct_lo: ElGamalCT = pod_ct_lo.try_into()?;
-    let ct_hi: ElGamalCT = pod_ct_hi.try_into()?;
-    let pod_ct_dest: ElGamalCT = pod_ct_dest.try_into()?;
+    let comm_lo: PedersenComm = pod_comm_lo.try_into()?;
+    let dec_handle_lo: PedersenDecHandle = pod_dec_handle_lo.try_into()?;
+    let ct_lo = dec_handle_lo.to_elgamal_ctxt(comm_lo); // convert into ElGamalCT
 
-    let ct_sum = pod_ct_dest + (ct_lo + ct_hi * Scalar::from(TWO_32));
+    let comm_hi: PedersenComm = pod_comm_hi.try_into()?;
+    let dec_handle_hi: PedersenDecHandle = pod_dec_handle_hi.try_into()?;
+    let ct_hi = dec_handle_hi.to_elgamal_ctxt(comm_hi); // convert into ElGamalCT
+
+    let ct_dest: ElGamalCT = pod_ct_dest.try_into()?;
+
+    let ct_sum = ct_dest + (ct_lo + ct_hi * Scalar::from(TWO_32));
     Ok(ct_sum.into())
 }
 
 // this function is needed for transfer
 pub fn sub_pod_ciphertexts_for_transfer(
-    pod_ct_lo: PodElGamalCT,
-    pod_ct_hi: PodElGamalCT,
-    pod_ct_source: PodElGamalCT,
+    pod_comm_lo: PodPedersenComm,
+    pod_dec_handle_lo: PodPedersenDecHandle,
+    pod_comm_hi: PodPedersenComm,
+    pod_dec_handle_hi: PodPedersenDecHandle,
+    pod_ct_dest: PodElGamalCT,
 ) -> Result<PodElGamalCT, ProofError> {
-    let ct_lo: ElGamalCT = pod_ct_lo.try_into()?;
-    let ct_hi: ElGamalCT = pod_ct_hi.try_into()?;
-    let pod_ct_dest: ElGamalCT = pod_ct_source.try_into()?;
+    let comm_lo: PedersenComm = pod_comm_lo.try_into()?;
+    let dec_handle_lo: PedersenDecHandle = pod_dec_handle_lo.try_into()?;
+    let ct_lo = dec_handle_lo.to_elgamal_ctxt(comm_lo); // convert into ElGamalCT
 
-    let ct_sub = pod_ct_dest - (ct_lo + ct_hi * Scalar::from(TWO_32));
+    let comm_hi: PedersenComm = pod_comm_hi.try_into()?;
+    let dec_handle_hi: PedersenDecHandle = pod_dec_handle_hi.try_into()?;
+    let ct_hi = dec_handle_hi.to_elgamal_ctxt(comm_hi); // convert into ElGamalCT
+
+    let ct_dest: ElGamalCT = pod_ct_dest.try_into()?;
+
+    let ct_sub = ct_dest - (ct_lo + ct_hi * Scalar::from(TWO_32));
     Ok(ct_sub.into())
 }
 
-// The following two functions are used for `Deposit` and `Withdraw`, and they can also be replaced
-// with a generic function if we go that route
+// this function is needed for `Deposit`
 pub fn add_to_pod_ciphertext(ct: PodElGamalCT, amount: u64) -> Result<PodElGamalCT, ProofError> {
     let ct: ElGamalCT = ct.try_into()?;
     let ct_sum = ct.add_to_msg(amount);
     Ok(ct_sum.into())
 }
 
+// this function is needed for `Withdraw`
 pub fn sub_to_pod_ciphertext(ct: PodElGamalCT, amount: u64) -> Result<PodElGamalCT, ProofError> {
     let ct: ElGamalCT = ct.try_into()?;
     let ct_sub = ct.sub_to_msg(amount);
@@ -365,6 +345,7 @@ mod tests {
             elgamal::{ElGamal, ElGamalCT},
             pedersen::{Pedersen, PedersenOpen},
         },
+        crate::instruction::transfer::split_u64_into_u32,
         merlin::Transcript,
         rand::rngs::OsRng,
         std::convert::TryInto,
@@ -461,5 +442,63 @@ mod tests {
         );
 
         assert!(TryInto::<PodRangeProof64>::try_into(proof).is_err());
+    }
+
+    #[test]
+    fn test_transfer_arithmetic() {
+        // setup
+
+        // transfer amount
+        let transfer_amount: u64 = 55;
+        let (amount_lo, amount_hi) = split_u64_into_u32(transfer_amount);
+
+        // generate public keys
+        let (source_pk, _) = ElGamal::keygen();
+        let (dest_pk, _) = ElGamal::keygen();
+        let (auditor_pk, _) = ElGamal::keygen();
+
+        // commitments associated with TransferRangeProof
+        let (comm_lo, open_lo) = Pedersen::commit(amount_lo);
+        let (comm_hi, open_hi) = Pedersen::commit(amount_hi);
+
+        let comm_lo: PodPedersenComm = comm_lo.into();
+        let comm_hi: PodPedersenComm = comm_hi.into();
+
+        // decryption handles associated with TransferValidityProof
+        let handle_source_lo: PodPedersenDecHandle = source_pk.gen_decrypt_handle(&open_lo).into();
+        let handle_dest_lo: PodPedersenDecHandle = dest_pk.gen_decrypt_handle(&open_lo).into();
+        let _handle_auditor_lo: PodPedersenDecHandle =
+            auditor_pk.gen_decrypt_handle(&open_lo).into();
+
+        let handle_source_hi: PodPedersenDecHandle = source_pk.gen_decrypt_handle(&open_hi).into();
+        let handle_dest_hi: PodPedersenDecHandle = dest_pk.gen_decrypt_handle(&open_hi).into();
+        let _handle_auditor_hi: PodPedersenDecHandle =
+            auditor_pk.gen_decrypt_handle(&open_hi).into();
+
+        // source spendable and recipient pending
+        let source_spendable_ct: PodElGamalCT = source_pk.encrypt(77_u64).into();
+        let dest_pending_ct: PodElGamalCT = source_pk.encrypt(77_u64).into();
+
+        // program arithmetic
+
+        // subtracting from source
+        let _final_source_spendable_ct = sub_pod_ciphertexts_for_transfer(
+            comm_lo,
+            handle_source_lo,
+            comm_hi,
+            handle_source_hi,
+            source_spendable_ct,
+        )
+        .unwrap();
+
+        // adding to destination
+        let _final_dest_pending_ct = add_pod_ciphertexts_for_transfer(
+            comm_lo,
+            handle_dest_lo,
+            comm_hi,
+            handle_dest_hi,
+            dest_pending_ct,
+        )
+        .unwrap();
     }
 }

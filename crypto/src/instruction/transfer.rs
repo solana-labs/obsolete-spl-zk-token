@@ -503,7 +503,7 @@ pub struct TransferHandles {
 
 /// Split u64 number into two u32 numbers
 #[cfg(not(target_arch = "bpf"))]
-fn split_u64_into_u32(amt: u64) -> (u32, u32) {
+pub fn split_u64_into_u32(amt: u64) -> (u32, u32) {
     let lo = amt as u32;
     let hi = (amt >> 32) as u32;
 
