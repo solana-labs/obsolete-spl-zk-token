@@ -37,20 +37,20 @@ use {
 ///
 
 /// The instructions
-pub struct TransferWithRangeProof {
-    pub proof_component: TransferWithRangeProofData, // 928 bytes
+pub struct TransferRangeProof {
+    pub proof_component: TransferRangeProofData, // 928 bytes
 }
 
-pub struct TransferWithValidityProof {
-    pub proof_component: TransferWithValidityProofData, // 640 bytes
+pub struct TransferValidityProof {
+    pub proof_component: TransferValidityProofData, // 640 bytes
     pub other_component: OtherComponents,
 }
 
 /// Just a grouping struct for the data required for the two transfer instructions. It is
 /// convenient to generate the two components jointly as they share common components.
 pub struct TransferData {
-    pub range_proof_data: TransferWithRangeProofData,
-    pub validity_proof_data: TransferWithValidityProofData,
+    pub range_proof_data: TransferRangeProofData,
+    pub validity_proof_data: TransferValidityProofData,
 }
 
 impl TransferData {
@@ -135,13 +135,13 @@ impl TransferData {
         );
 
         // generate data components
-        let range_proof_data = TransferWithRangeProofData {
+        let range_proof_data = TransferRangeProofData {
             amount_comms,
             proof: transfer_proofs.range_proof,
             ephemeral_state,
         };
 
-        let validity_proof_data = TransferWithValidityProofData {
+        let validity_proof_data = TransferValidityProofData {
             decryption_handles_lo,
             decryption_handles_hi,
             transfer_public_keys,
@@ -159,7 +159,7 @@ impl TransferData {
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
-pub struct TransferWithRangeProofData {
+pub struct TransferRangeProofData {
     /// The transfer amount encoded as Pedersen commitments
     pub amount_comms: TransferComms, // 64 bytes
 
@@ -173,9 +173,9 @@ pub struct TransferWithRangeProofData {
     pub ephemeral_state: TransferEphemeralState, // 128 bytes
 }
 
-impl Verifiable for TransferWithRangeProofData {
+impl Verifiable for TransferRangeProofData {
     fn verify(&self) -> Result<(), ProofError> {
-        let mut transcript = Transcript::new(b"TransferWithRangeProof");
+        let mut transcript = Transcript::new(b"TransferRangeProof");
 
         // standard range proof verification
         let proof: RangeProof = self.proof.try_into()?;
@@ -195,7 +195,7 @@ impl Verifiable for TransferWithRangeProofData {
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
-pub struct TransferWithValidityProofData {
+pub struct TransferValidityProofData {
     /// The decryption handles that allow decryption of the lo-bits
     pub decryption_handles_lo: TransferHandles, // 96 bytes
 
@@ -228,7 +228,7 @@ pub struct TransferEphemeralState {
     pub t_x_blinding: PodScalar,                      // 32 bytes
 }
 
-impl Verifiable for TransferWithValidityProofData {
+impl Verifiable for TransferValidityProofData {
     fn verify(&self) -> Result<(), ProofError> {
         let new_spendable_ct = self.new_spendable_ct.try_into()?;
         let proof = self.proof.clone(); // cloning here for now TODO: figure out how we handle serialization
@@ -270,7 +270,7 @@ impl TransferProofs {
         new_spendable_ct: &ElGamalCT,
     ) -> (Self, TransferEphemeralState) {
         // TODO: should also commit to pubkeys and commitments later
-        let mut transcript_validity_proof = merlin::Transcript::new(b"TransferWithValidityProof");
+        let mut transcript_validity_proof = merlin::Transcript::new(b"TransferValidityProof");
 
         let H = PedersenBase::default().H;
         let D = new_spendable_ct.decrypt_handle.get_point();
@@ -320,7 +320,7 @@ impl TransferProofs {
         };
 
         // generate the range proof
-        let mut transcript_range_proof = Transcript::new(b"TransferWithRangeProof");
+        let mut transcript_range_proof = Transcript::new(b"TransferRangeProof");
         let (range_proof, x, z) = RangeProof::create_with(
             vec![new_spendable_balance, transfer_amt.0, transfer_amt.1],
             vec![64, 32, 32],
@@ -377,7 +377,7 @@ impl ValidityProof {
         transfer_public_keys: &TransferPubKeys,
         ephemeral_state: &TransferEphemeralState,
     ) -> Result<(), ProofError> {
-        let mut transcript = Transcript::new(b"TransferWithValidityProof");
+        let mut transcript = Transcript::new(b"TransferValidityProof");
 
         let source_pk: ElGamalPK = transfer_public_keys.source_pk.try_into()?;
         let dest_pk: ElGamalPK = transfer_public_keys.dest_pk.try_into()?;

@@ -6,7 +6,7 @@ mod withdraw;
 
 pub use {
     close_account::CloseAccountData,
-    transfer::{TransferWithRangeProofData, TransferWithValidityProofData},
+    transfer::{TransferRangeProofData, TransferValidityProofData},
     update_account_pk::UpdateAccountPkData,
     withdraw::WithdrawData,
 };
@@ -52,26 +52,26 @@ pub enum ProofInstruction {
     ///
     VerifyWithdraw,
 
-    /// Verify a `TransferWithRangeProofData` struct
+    /// Verify a `TransferRangeProofData` struct
     ///
     /// Accounts expected by this instruction:
     ///   None
     ///
     /// Data expected by this instruction:
-    ///   `TransferWithRangeProofData`
+    ///   `TransferRangeProofData`
     ///
     ///
-    VerifyTransferWithRangeProofData,
+    VerifyTransferRangeProofData,
 
-    /// Verify a `TransferWithValidityProofData` struct
+    /// Verify a `TransferValidityProofData` struct
     ///
     /// Accounts expected by this instruction:
     ///   None
     ///
     /// Data expected by this instruction:
-    ///   `TransferWithValidityProofData`
+    ///   `TransferValidityProofData`
     ///
-    VerifyTransferWithValidityProofData,
+    VerifyTransferValidityProofData,
 }
 
 impl ProofInstruction {
