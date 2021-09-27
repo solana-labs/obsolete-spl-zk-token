@@ -201,7 +201,7 @@ impl TryFrom<PodRangeProof64> for RangeProof {
     }
 }
 
-/// Serialization of range proofs for 128-bit numbers (for `TransferWithRangeProof` instruction)
+/// Serialization of range proofs for 128-bit numbers (for `TransferRangeProof` instruction)
 #[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct PodRangeProof128([u8; 736]);

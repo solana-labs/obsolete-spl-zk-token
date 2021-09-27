@@ -80,11 +80,11 @@ impl TranscriptProtocol for Transcript {
     }
 
     fn transfer_range_proof_sep(&mut self) {
-        self.append_message(b"dom_sep", b"TransferWithRangeProof");
+        self.append_message(b"dom_sep", b"TransferRangeProof");
     }
 
     fn transfer_validity_proof_sep(&mut self) {
-        self.append_message(b"dom_sep", b"TransferWithValidityProof");
+        self.append_message(b"dom_sep", b"TransferValidityProof");
     }
 
     fn append_scalar(&mut self, label: &'static [u8], scalar: &Scalar) {
