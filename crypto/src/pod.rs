@@ -494,8 +494,10 @@ mod tests {
         )
         .unwrap();
 
-        let final_source_open = source_open - (open_lo.clone() + open_hi.clone() * Scalar::from(TWO_32));
-        let expected_source_ct: PodElGamalCT = source_pk.encrypt_with(22_u64, &final_source_open).into();
+        let final_source_open =
+            source_open - (open_lo.clone() + open_hi.clone() * Scalar::from(TWO_32));
+        let expected_source_ct: PodElGamalCT =
+            source_pk.encrypt_with(22_u64, &final_source_open).into();
         assert_eq!(expected_source_ct, final_source_spendable_ct);
 
         // adding to destination
