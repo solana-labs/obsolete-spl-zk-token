@@ -5,7 +5,10 @@ mod update_account_pk;
 mod withdraw;
 
 pub use {
-    close_account::CloseAccountData, update_account_pk::UpdateAccountPkData, withdraw::WithdrawData,
+    close_account::CloseAccountData,
+    transfer::{TransferWithRangeProofData, TransferWithValidityProofData},
+    update_account_pk::UpdateAccountPkData,
+    withdraw::WithdrawData,
 };
 
 use {
@@ -48,6 +51,27 @@ pub enum ProofInstruction {
     ///   `WithdrawData`
     ///
     VerifyWithdraw,
+
+    /// Verify a `TransferWithRangeProofData` struct
+    ///
+    /// Accounts expected by this instruction:
+    ///   None
+    ///
+    /// Data expected by this instruction:
+    ///   `TransferWithRangeProofData`
+    ///
+    ///
+    VerifyTransferWithRangeProofData,
+
+    /// Verify a `TransferWithValidityProofData` struct
+    ///
+    /// Accounts expected by this instruction:
+    ///   None
+    ///
+    /// Data expected by this instruction:
+    ///   `TransferWithValidityProofData`
+    ///
+    VerifyTransferWithValidityProofData,
 }
 
 impl ProofInstruction {

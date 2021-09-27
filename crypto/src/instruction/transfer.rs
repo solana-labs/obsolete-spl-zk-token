@@ -8,6 +8,7 @@ use {
 };
 use {
     crate::{
+        instruction::Verifiable,
         encryption::elgamal::{ElGamalCT, ElGamalPK},
         encryption::pedersen::{PedersenComm, PedersenDecHandle},
         errors::ProofError,
@@ -156,6 +157,8 @@ impl TransferData {
     }
 }
 
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct TransferWithRangeProofData {
     /// The transfer amount encoded as Pedersen commitments
     pub amount_comms: TransferComms, // 64 bytes
@@ -164,18 +167,19 @@ pub struct TransferWithRangeProofData {
     ///   1. the source account has enough funds for the transfer (i.e. the final balance is a
     ///      64-bit positive number)
     ///   2. the transfer amount is a 64-bit positive number
-    pub proof: RangeProof, // 736 bytes
+    pub proof: PodRangeProof128, // 736 bytes
 
     /// Ephemeral state between the two transfer instruction data
     pub ephemeral_state: TransferEphemeralState, // 128 bytes
 }
 
-impl TransferWithRangeProofData {
-    pub fn verify(&self) -> Result<(), ProofError> {
+impl Verifiable for TransferWithRangeProofData {
+    fn verify(&self) -> Result<(), ProofError> {
         let mut transcript = Transcript::new(b"TransferWithRangeProof");
 
         // standard range proof verification
-        self.proof.verify_with(
+        let proof: RangeProof = self.proof.try_into()?;
+        proof.verify_with(
             vec![
                 &self.ephemeral_state.spendable_comm_verification.into(),
                 &self.amount_comms.lo.into(),
@@ -189,6 +193,8 @@ impl TransferWithRangeProofData {
     }
 }
 
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct TransferWithValidityProofData {
     /// The decryption handles that allow decryption of the lo-bits
     pub decryption_handles_lo: TransferHandles, // 96 bytes
@@ -222,8 +228,8 @@ pub struct TransferEphemeralState {
     pub t_x_blinding: PodScalar,                      // 32 bytes
 }
 
-impl TransferWithValidityProofData {
-    pub fn verify(&self) -> Result<(), ProofError> {
+impl Verifiable for TransferWithValidityProofData {
+    fn verify(&self) -> Result<(), ProofError> {
         let new_spendable_ct = self.new_spendable_ct.try_into()?;
         let proof = self.proof.clone(); // cloning here for now TODO: figure out how we handle serialization
 
@@ -243,7 +249,7 @@ pub struct OtherComponents;
 /// Just a grouping struct for the two proofs that are needed for a transfer instruction. The two
 /// proofs have to be generated together as they share joint data.
 pub struct TransferProofs {
-    pub range_proof: RangeProof,
+    pub range_proof: PodRangeProof128,
     pub validity_proof: ValidityProof,
 }
 
@@ -334,7 +340,7 @@ impl TransferProofs {
 
         (
             Self {
-                range_proof,
+                range_proof: range_proof.try_into().expect("valid range_proof"),
                 validity_proof,
             },
             ephemeral_state,
@@ -346,7 +352,8 @@ impl TransferProofs {
 ///
 /// These two components should be output by a RangeProof creation function.
 #[allow(non_snake_case)]
-#[derive(Clone)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct ValidityProof {
     // Proof component for the spendable ciphertext components: R
     pub R: PodCompressedRistretto, // 32 bytes
@@ -469,6 +476,8 @@ impl ValidityProof {
 }
 
 /// The ElGamal public keys needed for a transfer
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct TransferPubKeys {
     pub source_pk: PodElGamalPK,  // 32 bytes
     pub dest_pk: PodElGamalPK,    // 32 bytes
@@ -476,12 +485,16 @@ pub struct TransferPubKeys {
 }
 
 /// The transfer amount commitments needed for a transfer
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct TransferComms {
     pub lo: PodPedersenComm, // 32 bytes
     pub hi: PodPedersenComm, // 32 bytes
 }
 
 /// The decryption handles needed for a transfer
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct TransferHandles {
     pub source: PodPedersenDecHandle,  // 32 bytes
     pub dest: PodPedersenDecHandle,    // 32 bytes
