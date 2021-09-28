@@ -4738,6 +4738,7 @@ name = "spl-zk-token"
 version = "0.1.0"
 dependencies = [
  "assert_matches",
+ "bincode",
  "bytemuck",
  "getrandom 0.1.16",
  "num-derive",
@@ -4746,6 +4747,7 @@ dependencies = [
  "solana-program-test",
  "solana-sdk",
  "solana-validator",
+ "spl-memo",
  "spl-token",
  "spl-zk-token-crypto",
  "spl-zk-token-proof",
