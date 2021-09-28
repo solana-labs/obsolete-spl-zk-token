@@ -55,55 +55,6 @@ pub struct WithdrawInstructionData {
     pub decimals: u8,
 }
 
-#[derive(Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct SubmitCiphertextValidityProofInstructionData {
-    /// The receiver's ElGamal public key
-    pub receiver_pk: PodElGamalPK,
-
-    /// The receiver's pending balance, encrypted with `receiver_pk`
-    pub receiver_pending_balance: PodElGamalCT,
-
-    pub proof: TransDataCTValidity,
-}
-
-#[derive(Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct SubmitRangeProofInstructionData {
-    /// The receiver's ElGamal public key
-    pub receiver_pk: PodElGamalPK,
-
-    /// The receiver's pending balance, encrypted with `receiver_pk`
-    pub receiver_pending_balance: PodElGamalCT,
-
-    pub proof: TransDataRangeProof,
-}
-
-#[derive(Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct TransferInstructionData {
-    /// Receiver's encryption key
-    pub receiver_pk: PodElGamalPK,
-
-    /// Transfer amount split into two 32 values and encrypted so only the receiver can view it
-    pub receiver_transfer_split_amount: ElGamalSplitCT,
-}
-
-#[derive(Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct TransferWithAuditorInstructionData {
-    pub transfer_data: TransferInstructionData,
-
-    /// Transfer Auditor's encryption key
-    pub transfer_auditor_pk: PodElGamalPK,
-
-    /// Transfer amount split into two 32 values and encrypted so only the transfer auditor can view it
-    pub transfer_auditor_split_amount: ElGamalSplitCT,
-
-    /// TODO: Proof that `transfer_auditor_split_amount` is equal to `receiver_transfer_split_amount`
-    pub crypto_auditor_amount_equality_proof: (),
-}
-
 #[derive(Clone, Copy, Debug, FromPrimitive, ToPrimitive)]
 #[repr(u8)]
 pub enum ConfidentialTokenInstruction {
@@ -269,65 +220,47 @@ pub enum ConfidentialTokenInstruction {
     ///
     Withdraw,
 
-    /// Submits a confidential transfer ciphertext validity proof. The two proof submissions required before the
-    /// `Transfer` instruction will succeed are `SubmitCiphertextValidityProof` and `SubmitRangeProof`.
+    /// Submits a confidential transfer validity proof.
+    ///
+    /// The transfer will take affect once both proof submissions are provided,
+    /// `TransferValidityProof` and `TransferRangeProof`.
     ///
     ///   0. `[writable]` The source confidential token account
-    ///   1. `[]` The source's corresponding SPL Token account
-    ///   2. `[]` The destination confidential token account
-    ///   3. `[signer]` The single source account owner
-    /// or:
-    ///   3. `[]` The multisig  source account owner
-    ///   4.. `[signer]` Required M signer accounts for the SPL Token Multisig account
-    ///
-    /// Data expected by this instruction:
-    ///   `SubmitCiphertextValidityProofInstructionData`
-    ///
-    SubmitCiphertextValidityProof,
-
-    /// Submits a confidential transfer range proof. The two proof submissions required before the
-    /// `Transfer` instruction will succeed are `SubmitCiphertextValidityProof` and `SubmitRangeProof`.
-    ///
-    ///   0. `[writable]` The source confidential token account
-    ///   1. `[]` The source's corresponding SPL Token account
-    ///   2. `[]` The destination confidential token account
-    ///   3. `[signer]` The single source account owner
-    /// or:
-    ///   3. `[]` The multisig  source account owner
-    ///   4.. `[signer]` Required M signer accounts for the SPL Token Multisig account
-    ///
-    /// Data expected by this instruction:
-    ///   `SubmitRangeProofInstructionData
-    ///
-    SubmitRangeProof,
-
-    /// Transfers tokens confidentially from one account to another. The prerequisite transfer
-    /// proofs must have already been successfully submitted using `SubmitCiphertextValidityProof`
-    /// and `SubmitRangeProof` for this instruction to succeed.
-    ///
-    /// A transfer will fail if:
-    /// * Either the source or the destination is frozen
-    /// * The destination has disabled incoming transfers by invoking `DisableInboundTransfers`
-    /// * Prerequisite proofs have not been submitted
-    /// * The destination received a transfer from another source causing the previously
-    ///   submitted transfer proofs for this transfer to be invalidated
-    ///
-    ///   0. `[writable]` The source confidential token account
-    ///   1. `[]` The source's corresponding SPL Token account
-    ///   2. `[writable]` The destination confidential token account
+    ///   1. `[]` The source SPL Token account
+    ///   2. `[writeable]` The destination confidential token account
     ///   3. `[]` The destination token account
     ///   4. `[]` The TransferAuditor account, computed by `get_transfer_auditor_address()`
+    ///   5. `[]` Instructions sysvar
+    ///   6. `[signer]` The single source account owner
+    /// or:
+    ///   5. `[]` The multisig  source account owner
+    ///   6.. `[signer]` Required M signer accounts for the SPL Token Multisig account
+    //
+    /// Data expected by this instruction:
+    ///   None
     ///
-    /// The primary purpose of this instruction is to enable receiver and auditor visibility into a
-    /// successful transfer and its balance, which can be determined by inspecting the `Transfer`
-    /// instruction data and the status of the encompassing transaction (that is, access to
-    /// on-chain account data is not required).
+    TransferValidityProof,
+
+    /// Submits a confidential transfer range proof.
+    ///
+    /// The transfer will take affect once both proof submissions are provided,
+    /// `TransferValidityProof` and `TransferRangeProof`.
+    ///
+    ///   0. `[writable]` The source confidential token account
+    ///   1. `[]` The source SPL Token account
+    ///   2. `[writeable]` The destination confidential token account
+    ///   3. `[]` The destination token account
+    ///   4. `[]` The TransferAuditor account, computed by `get_transfer_auditor_address()`
+    ///   5. `[]` Instructions sysvar
+    ///   6. `[signer]` The single source account owner
+    /// or:
+    ///   5. `[]` The multisig  source account owner
+    ///   6.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     /// Data expected by this instruction:
-    ///   `TransferInstructionData` or `TransferWithAuditorInstructionData` depending on whether
-    ///   the transfer auditor feature is enabled for the SPL Token mint
+    ///   None
     ///
-    Transfer,
+    TransferRangeProof,
 
     /// Applies the pending balance to the available balance then clears the pending balance.
     ///
@@ -630,6 +563,55 @@ pub fn withdraw(
             },
         ),
     ]
+}
+
+/// Create the two `Transfer` instructions
+#[allow(clippy::too_many_arguments)]
+pub fn transfer(
+    source_zk_token_account: Pubkey,
+    source_token_account: Pubkey,
+    destination_zk_token_account: Pubkey,
+    destination_token_account: Pubkey,
+    mint: &Pubkey,
+    authority: Pubkey,
+    multisig_signers: &[&Pubkey],
+    transfer_data: TransferData,
+) -> (
+    /* TransferRangeProof = */ Vec<Instruction>,
+    /* TransferValidityProof = */ Vec<Instruction>,
+) {
+    let mut accounts = vec![
+        AccountMeta::new(source_zk_token_account, false),
+        AccountMeta::new_readonly(source_token_account, false),
+        AccountMeta::new(destination_zk_token_account, false),
+        AccountMeta::new_readonly(destination_token_account, false),
+        AccountMeta::new(get_transfer_auditor_address(mint), false),
+        AccountMeta::new_readonly(sysvar::instructions::id(), false),
+        AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
+    ];
+
+    for multisig_signer in multisig_signers.iter() {
+        accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
+    }
+
+    (
+        vec![
+            ProofInstruction::VerifyTransferRangeProofData.encode(&transfer_data.range_proof),
+            encode_instruction(
+                accounts.clone(),
+                ConfidentialTokenInstruction::TransferRangeProof,
+                &(),
+            ),
+        ],
+        vec![
+            ProofInstruction::VerifyTransferValidityProofData.encode(&transfer_data.validity_proof),
+            encode_instruction(
+                accounts,
+                ConfidentialTokenInstruction::TransferValidityProof,
+                &(),
+            ),
+        ],
+    )
 }
 
 /// Create a `ApplyPendingBalance` instruction

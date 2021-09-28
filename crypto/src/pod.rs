@@ -24,7 +24,7 @@ pub fn pod_from_bytes<T: Pod>(bytes: &[u8]) -> Option<&T> {
     bytemuck::try_from_bytes(bytes).ok()
 }
 
-#[derive(Clone, Copy, Pod, Zeroable)]
+#[derive(Clone, Copy, Pod, Zeroable, PartialEq)]
 #[repr(transparent)]
 pub struct PodScalar([u8; 32]);
 

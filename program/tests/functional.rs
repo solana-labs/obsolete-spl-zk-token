@@ -119,6 +119,30 @@ fn add_omnibus_token_account(program_test: &mut ProgramTest, mint: Pubkey, balan
     omnibus_token_address
 }
 
+fn add_zk_transfer_auditor_account(
+    program_test: &mut ProgramTest,
+    mint: Pubkey,
+    elgamal_pk: Option<ElGamalPK>,
+) -> Pubkey {
+    let zk_transfer_auditor_address = get_transfer_auditor_address(&mint);
+
+    let zk_transfer_auditor_state = spl_zk_token::state::TransferAuditor {
+        mint: mint.into(),
+        enabled: elgamal_pk.is_some().into(),
+        elgamal_pk: elgamal_pk.unwrap_or_default().into(),
+    };
+    let zk_transfer_auditor_account = Account::create(
+        ACCOUNT_RENT_EXEMPTION,
+        pod_bytes_of(&zk_transfer_auditor_state).to_vec(),
+        id(),
+        false,
+        Epoch::default(),
+    );
+
+    program_test.add_account(zk_transfer_auditor_address, zk_transfer_auditor_account);
+    zk_transfer_auditor_address
+}
+
 fn add_zk_token_account(
     program_test: &mut ProgramTest,
     mint: Pubkey,
@@ -467,7 +491,7 @@ async fn test_deposit() {
 
     assert_eq!(
         get_zk_token_balance(&mut banks_client, zk_token_account).await,
-        (ElGamalCT::default(), ElGamalCT::default())
+        (ElGamalCT::default(), ElGamalCT::default()) // TODO: FIX CHECK
     );
 
     let mut transaction = Transaction::new_with_payer(
@@ -484,7 +508,7 @@ async fn test_deposit() {
 
     assert_eq!(
         get_zk_token_balance(&mut banks_client, zk_token_account).await,
-        (ElGamalCT::default(), ElGamalCT::default())
+        (ElGamalCT::default(), ElGamalCT::default()) // TODO: FIX CHECK
     );
 }
 
@@ -559,9 +583,77 @@ async fn test_withdraw() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn test_transfer() {
-    todo!()
+    let owner = Keypair::new();
+    let (src_elgamal_pk, src_elgamal_sk) = ElGamal::keygen();
+    let (dst_elgamal_pk, _dst_elgamal_sk) = ElGamal::keygen();
+
+    let src_zk_available_balance = 123_u64;
+    let src_zk_available_balance_ct = src_elgamal_pk.encrypt(src_zk_available_balance);
+
+    let dst_zk_available_balance = 0_u64;
+    let dst_zk_available_balance_ct = dst_elgamal_pk.encrypt(dst_zk_available_balance);
+
+    let mut program_test = program_test();
+    let mint = add_token_mint_account(&mut program_test, None);
+
+    let auditor_pk = ElGamalPK::default();
+    let _zk_transfer_auditor_address =
+        add_zk_transfer_auditor_account(&mut program_test, mint, None);
+
+    let src_token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 0);
+    let src_zk_token_account = add_zk_token_account(
+        &mut program_test,
+        mint,
+        src_token_account,
+        src_elgamal_pk,
+        src_zk_available_balance_ct,
+    );
+    let dst_token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 0);
+    let dst_zk_token_account = add_zk_token_account(
+        &mut program_test,
+        mint,
+        dst_token_account,
+        dst_elgamal_pk,
+        dst_zk_available_balance_ct,
+    );
+    let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
+
+    let transfer_amount = 1;
+
+    let transfer_data = spl_zk_token::instruction::TransferData::new(
+        transfer_amount,
+        src_zk_available_balance,
+        src_zk_available_balance_ct,
+        src_elgamal_sk,
+        src_elgamal_pk,
+        dst_elgamal_pk,
+        auditor_pk,
+    );
+
+    let (transfer_range_proof, transfer_validity_proof) = spl_zk_token::instruction::transfer(
+        src_zk_token_account,
+        src_token_account,
+        dst_zk_token_account,
+        dst_token_account,
+        &mint,
+        owner.pubkey(),
+        &[],
+        transfer_data,
+    );
+
+    let mut transaction = Transaction::new_with_payer(&transfer_range_proof, Some(&payer.pubkey()));
+    transaction.sign(&[&payer, &owner], recent_blockhash);
+    banks_client.process_transaction(transaction).await.unwrap();
+
+    let mut transaction =
+        Transaction::new_with_payer(&transfer_validity_proof, Some(&payer.pubkey()));
+    transaction.sign(&[&payer, &owner], recent_blockhash);
+    banks_client.process_transaction(transaction).await.unwrap();
+
+    // TODO: Check resulting balances of src_zk_token_account and dst_zk_token_account once the
+    // syscalls exist
+    //
 }
 
 #[tokio::test]
