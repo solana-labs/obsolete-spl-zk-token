@@ -37,6 +37,16 @@ fn program_test() -> ProgramTest {
 const ACCOUNT_RENT_EXEMPTION: u64 = 1_000_000_000; // go with something big to be safe
 const DECIMALS: u8 = 0;
 
+fn assert_transaction_size(transaction: &Transaction) {
+    let serialized = bincode::serialize(&transaction).unwrap();
+    assert!(
+        serialized.len() < solana_sdk::packet::PACKET_DATA_SIZE,
+        "{} too big; max {}",
+        serialized.len(),
+        solana_sdk::packet::PACKET_DATA_SIZE
+    );
+}
+
 fn add_token_mint_account(
     program_test: &mut ProgramTest,
     freeze_authority: Option<Pubkey>,
@@ -235,6 +245,7 @@ async fn test_configure_mint() {
         Some(&payer.pubkey()),
     );
     transaction.sign(&[&payer], recent_blockhash);
+    assert_transaction_size(&transaction);
     banks_client
         .process_transaction(transaction)
         .await
@@ -253,6 +264,7 @@ async fn test_configure_mint() {
         Some(&payer.pubkey()),
     );
     transaction.sign(&[&payer, &freeze_authority], recent_blockhash);
+    assert_transaction_size(&transaction);
     banks_client.process_transaction(transaction).await.unwrap();
 
     // Omnibus account now exists
@@ -306,6 +318,7 @@ async fn test_create_account() {
         Some(&payer.pubkey()),
     );
     transaction.sign(&[&payer, &owner], recent_blockhash);
+    assert_transaction_size(&transaction);
     banks_client.process_transaction(transaction).await.unwrap();
 
     // Zk token account now exists
@@ -361,6 +374,7 @@ async fn test_close_account() {
         Some(&payer.pubkey()),
     );
     transaction.sign(&[&payer, &owner], recent_blockhash);
+    assert_transaction_size(&transaction);
     banks_client.process_transaction(transaction).await.unwrap();
 
     // zk_token_account is now gone
@@ -425,6 +439,7 @@ async fn test_update_account_pk() {
         Some(&payer.pubkey()),
     );
     transaction.sign(&[&payer, &owner], recent_blockhash);
+    assert_transaction_size(&transaction);
     banks_client.process_transaction(transaction).await.unwrap();
 
     let account = banks_client
@@ -478,6 +493,7 @@ async fn test_deposit() {
         Some(&payer.pubkey()),
     );
     transaction.sign(&[&payer, &owner], recent_blockhash);
+    assert_transaction_size(&transaction);
     banks_client.process_transaction(transaction).await.unwrap();
 
     assert_eq!(
@@ -504,6 +520,7 @@ async fn test_deposit() {
         Some(&payer.pubkey()),
     );
     transaction.sign(&[&payer, &owner], recent_blockhash);
+    assert_transaction_size(&transaction);
     banks_client.process_transaction(transaction).await.unwrap();
 
     assert_eq!(
@@ -565,6 +582,7 @@ async fn test_withdraw() {
         Some(&payer.pubkey()),
     );
     transaction.sign(&[&payer, &owner], recent_blockhash);
+    assert_transaction_size(&transaction);
     banks_client.process_transaction(transaction).await.unwrap();
 
     assert_eq!(get_token_balance(&mut banks_client, token_account).await, 1);
@@ -631,7 +649,7 @@ async fn test_transfer() {
         auditor_pk,
     );
 
-    let (transfer_range_proof, transfer_validity_proof) = spl_zk_token::instruction::transfer(
+    let (transfer_range_proof, mut transfer_validity_proof) = spl_zk_token::instruction::transfer(
         src_zk_token_account,
         src_token_account,
         dst_zk_token_account,
@@ -644,11 +662,19 @@ async fn test_transfer() {
 
     let mut transaction = Transaction::new_with_payer(&transfer_range_proof, Some(&payer.pubkey()));
     transaction.sign(&[&payer, &owner], recent_blockhash);
+
+    assert_transaction_size(&transaction);
     banks_client.process_transaction(transaction).await.unwrap();
 
+    transfer_validity_proof.push(spl_memo::build_memo(
+        b"A memo in the transfer validity proof transaction.....",
+        &[],
+    ));
     let mut transaction =
         Transaction::new_with_payer(&transfer_validity_proof, Some(&payer.pubkey()));
     transaction.sign(&[&payer, &owner], recent_blockhash);
+
+    assert_transaction_size(&transaction);
     banks_client.process_transaction(transaction).await.unwrap();
 
     // TODO: Check resulting balances of src_zk_token_account and dst_zk_token_account once the
