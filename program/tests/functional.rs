@@ -16,7 +16,7 @@ use {
         encryption::elgamal::{ElGamal, ElGamalCT, ElGamalPK},
         pod::*,
     },
-    spl_zk_token_program_sdk::zk_token_proof_program,
+    spl_zk_token_sdk::zk_token_proof_program,
     std::{borrow::Borrow, convert::TryInto},
 };
 
