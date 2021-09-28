@@ -16,6 +16,7 @@ use {
         encryption::elgamal::{ElGamal, ElGamalCT, ElGamalPK},
         pod::*,
     },
+    spl_zk_token_program_sdk::zk_token_proof_program,
     std::{borrow::Borrow, convert::TryInto},
 };
 
@@ -28,7 +29,7 @@ fn program_test() -> ProgramTest {
 
     pc.add_builtin_program(
         "spl_zk_token_crypto",
-        spl_zk_token_crypto::id(),
+        zk_token_proof_program::id(),
         spl_zk_token_proof::process_instruction,
     );
     pc

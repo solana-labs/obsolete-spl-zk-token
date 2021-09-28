@@ -4750,6 +4750,7 @@ dependencies = [
  "spl-memo",
  "spl-token",
  "spl-zk-token-crypto",
+ "spl-zk-token-program-sdk",
  "spl-zk-token-proof",
 ]
 
@@ -4767,12 +4768,9 @@ dependencies = [
  "getrandom 0.1.16",
  "itertools 0.8.2",
  "merlin",
- "num-derive",
- "num-traits",
  "rand 0.7.3",
  "serde",
  "sha3 0.8.2",
- "solana-program",
  "subtle",
  "thiserror",
  "time 0.1.44",
@@ -4780,18 +4778,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "spl-zk-token-program-sdk"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "num-derive",
+ "num-traits",
+ "solana-program",
+ "spl-zk-token-crypto",
+]
+
+[[package]]
 name = "spl-zk-token-proof"
 version = "0.1.0"
 dependencies = [
- "assert_matches",
  "bytemuck",
  "getrandom 0.1.16",
  "num-derive",
  "num-traits",
- "solana-program-test",
  "solana-sdk",
- "solana-validator",
- "spl-zk-token-crypto",
+ "spl-zk-token-program-sdk",
 ]
 
 [[package]]

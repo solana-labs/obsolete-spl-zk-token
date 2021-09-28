@@ -14,7 +14,7 @@ use {
     spl_zk_token_crypto::{encryption::elgamal::ElGamalPK, pod::*},
 };
 
-pub use spl_zk_token_crypto::instruction::*;
+pub use spl_zk_token_program_sdk::zk_token_proof_instruction::*;
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
