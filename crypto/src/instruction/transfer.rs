@@ -230,11 +230,8 @@ pub struct TransferEphemeralState {
 
 impl Verifiable for TransferValidityProofData {
     fn verify(&self) -> Result<(), ProofError> {
-        let new_spendable_ct = self.new_spendable_ct.try_into()?;
-        let proof = self.proof.clone(); // cloning here for now TODO: figure out how we handle serialization
-
-        proof.verify(
-            &new_spendable_ct,
+        self.proof.verify(
+            &self.new_spendable_ct.try_into()?,
             &self.decryption_handles_lo,
             &self.decryption_handles_hi,
             &self.transfer_public_keys,
