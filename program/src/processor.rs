@@ -700,122 +700,23 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
     Ok(())
 }
 
-// TODO: Rework `TransferProof`
-#[derive(Clone, Debug, PartialEq)]
-enum TransferProof {
-    CiphertextValidity, //(TransDataCTValidity),
-    Range,              //(TransDataRangeProof),
-}
-
-/// Processes a [SubmitCiphertextValidityProof] or [SubmitRangeProof] instruction.
-fn process_submit_transfer_proof(
-    accounts: &[AccountInfo],
-    receiver_pk: &PodElGamalPK,
-    receiver_pending_balance: &PodElGamalCT,
-    transfer_proof: TransferProof,
+fn process_transfer_common(
+    confidential_account: &mut ConfidentialAccount,
+    token_account: &spl_token::state::Account,
+    receiver_confidential_account: &mut ConfidentialAccount,
+    receiver_token_account: &spl_token::state::Account,
+    transfer_auditor: &TransferAuditor,
 ) -> ProgramResult {
-    let account_info_iter = &mut accounts.iter();
-
-    let confidential_account_info = next_account_info(account_info_iter)?;
-    let token_account_info = next_account_info(account_info_iter)?;
-    let owner_info = next_account_info(account_info_iter)?;
-
-    let (mut confidential_account, _token_account) = validate_confidential_account_is_signer(
-        confidential_account_info,
-        token_account_info,
-        owner_info,
-        account_info_iter.as_slice(),
-    )?;
-
-    let mut outbound_transfer = &mut confidential_account.outbound_transfer;
-    if outbound_transfer.receiver_pk != *receiver_pk
-        || outbound_transfer.receiver_pending_balance != *receiver_pending_balance
+    if !bool::from(&confidential_account.outbound_transfer.validity_proof)
+        || !bool::from(&confidential_account.outbound_transfer.range_proof)
     {
-        *outbound_transfer = OutboundTransfer::zeroed();
+        return Ok(());
     }
 
-    let (_sender_available_balance, sender_transfer_amount, receiver_transfer_amount) =
-        match transfer_proof {
-            TransferProof::CiphertextValidity => {
-                // TODO: Validate the proof and extract the transfer amounts
-                outbound_transfer.validity_proof = true.into();
-                (
-                    PodElGamalCT::zeroed(),
-                    PodElGamalCT::zeroed(),
-                    PodElGamalCT::zeroed(),
-                )
-            }
-            TransferProof::Range => {
-                // TODO: Validate the proof and extract the transfer amounts
-                outbound_transfer.range_proof = true.into();
-                (
-                    PodElGamalCT::zeroed(),
-                    PodElGamalCT::zeroed(),
-                    PodElGamalCT::zeroed(),
-                )
-            }
-        };
-
-    /* TODO: uncomment/rework
-    if sender_available_balance != confidential_account.available_balance {
-        msg!("Error: Available balance mismatch");
-        return Err(ProgramError::InvalidArgument);
-    }
-    */
-
-    outbound_transfer.sender_transfer_amount = sender_transfer_amount;
-    outbound_transfer.receiver_pk = *receiver_pk;
-    outbound_transfer.receiver_pending_balance = *receiver_pending_balance;
-    outbound_transfer.receiver_transfer_amount = receiver_transfer_amount;
-
-    Ok(())
-}
-
-/// Processes a [Transfer] instruction.
-fn process_transfer(
-    accounts: &[AccountInfo],
-    receiver_pk: &PodElGamalPK,
-    receiver_transfer_amount: PodElGamalCT,
-    transfer_auditor_pk: Option<PodElGamalPK>,
-) -> ProgramResult {
-    let account_info_iter = &mut accounts.iter();
-
-    let confidential_account_info = next_account_info(account_info_iter)?;
-    let token_account_info = next_account_info(account_info_iter)?;
-    let receiver_confidential_account_info = next_account_info(account_info_iter)?;
-    let receiver_token_account_info = next_account_info(account_info_iter)?;
-    let transfer_auditor_info = next_account_info(account_info_iter)?;
-
-    validate_account_owner(transfer_auditor_info, &id())?;
-
-    let transfer_auditor = TransferAuditor::from_account_info(transfer_auditor_info, &id())?;
-
-    if let Some(transfer_auditor_pk) = transfer_auditor_pk {
-        if bool::from(&transfer_auditor.enabled) {
-            if transfer_auditor.elgamal_pk != transfer_auditor_pk {
-                msg!("Error: Invalid transfer auditor pk");
-                return Err(ProgramError::InvalidArgument);
-            }
-        } else {
-            msg!("Error: Transfer auditor pk not required");
-            return Err(ProgramError::InvalidArgument);
-        }
-    } else if bool::from(&transfer_auditor.enabled) {
-        msg!("Error: Transfer auditor pk missing");
-        return Err(ProgramError::InvalidArgument);
-    }
-    let (mut confidential_account, token_account) =
-        validate_confidential_account(confidential_account_info, token_account_info)?;
-
-    let (receiver_confidential_account, receiver_token_account) = validate_confidential_account(
-        receiver_confidential_account_info,
-        receiver_token_account_info,
-    )?;
-
-    if token_account.mint != receiver_token_account.mint
-        || !transfer_auditor.mint.equals(&token_account.mint)
+    if confidential_account.mint != receiver_confidential_account.mint
+        || confidential_account.mint != transfer_auditor.mint
     {
-        msg!("Error: Mint mismatch");
+        msg!("Mint mismatch");
         return Err(ProgramError::InvalidArgument);
     }
 
@@ -829,37 +730,164 @@ fn process_transfer(
         return Err(ProgramError::InvalidArgument);
     }
 
-    let outbound_transfer = &confidential_account.outbound_transfer;
-    if !bool::from(&outbound_transfer.validity_proof) || !bool::from(&outbound_transfer.range_proof)
+    if confidential_account
+        .outbound_transfer
+        .transfer_public_keys
+        .source_pk
+        != confidential_account.elgamal_pk
+        || confidential_account
+            .outbound_transfer
+            .transfer_public_keys
+            .dest_pk
+            != receiver_confidential_account.elgamal_pk
+        || (bool::from(&transfer_auditor.enabled)
+            && confidential_account
+                .outbound_transfer
+                .transfer_public_keys
+                .auditor_pk
+                != transfer_auditor.elgamal_pk)
     {
-        msg!("Error: Transfer proof(s) missing");
-        return Err(ProgramError::InvalidAccountData);
+        msg!("Error: ElGamal public key mismatch");
+        return Err(ProgramError::InvalidArgument);
     }
 
-    if outbound_transfer.receiver_pk != *receiver_pk
-        || receiver_confidential_account.elgamal_pk != *receiver_pk
+    // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY PENDING SYSCALL CREATION
+    confidential_account.available_balance =
+        confidential_account.outbound_transfer.new_available_balance;
+    /*
+    confidential_account.available_balance = sub_pod_ciphertexts_for_transfer(
+        confidential_account.outbound_transfer.amount_comms.lo,
+        confidential_account.outbound_transfer.source_lo,
+        confidential_account.outbound_transfer.amount_comms.hi,
+        confidential_account.outbound_transfer.source_hi,
+        confidential_account.available_balance,
+    )
+    .map_err(|_| ProgramError::InvalidInstructionData)?;
+    */
+
+    if confidential_account.available_balance
+        != confidential_account.outbound_transfer.new_available_balance
     {
-        msg!("Error: Receiver public key mismatch");
-        return Err(ProgramError::InvalidArgument);
+        msg!("Available balance mismatch");
+        return Err(ProgramError::InvalidInstructionData);
     }
 
-    if outbound_transfer.receiver_transfer_amount != receiver_transfer_amount {
-        msg!("Error: Transfer amount mismatch");
-        return Err(ProgramError::InvalidArgument);
-    }
-
-    if outbound_transfer.receiver_pending_balance != receiver_confidential_account.pending_balance {
-        msg!("Error: Receiver pending balance mismatch");
-        return Err(ProgramError::InvalidArgument);
-    }
-
-    // TODO: implement and uncomment the PodElGamalCT addition
-    // confidential_account.available_balance -= outbound_transfer.sender_transfer_amount;
-    // receiver_confidential_account.pending_balance += outbound_transfer.receiver_transfer_amount;
+    /*
+    receiver_confidential_account.pending_balance = add_pod_ciphertexts_for_transfer(
+        confidential_account.outbound_transfer.amount_comms.lo,
+        confidential_account.outbound_transfer.dest_lo,
+        confidential_account.outbound_transfer.amount_comms.hi,
+        confidential_account.outbound_transfer.dest_hi,
+        receiver_confidential_account.pending_balance,
+    )
+    .map_err(|_| ProgramError::InvalidInstructionData)?;
+    */
 
     confidential_account.outbound_transfer = OutboundTransfer::zeroed();
-
     Ok(())
+}
+
+/// Processes a [TransferValidityProof] instruction.
+fn process_transfer_validity_proof(accounts: &[AccountInfo]) -> ProgramResult {
+    let account_info_iter = &mut accounts.iter();
+    let confidential_account_info = next_account_info(account_info_iter)?;
+    let token_account_info = next_account_info(account_info_iter)?;
+    let receiver_confidential_account_info = next_account_info(account_info_iter)?;
+    let receiver_token_account_info = next_account_info(account_info_iter)?;
+    let transfer_auditor_info = next_account_info(account_info_iter)?;
+    let instructions_sysvar_info = next_account_info(account_info_iter)?;
+    let owner_info = next_account_info(account_info_iter)?;
+
+    let (mut confidential_account, token_account) = validate_confidential_account_is_signer(
+        confidential_account_info,
+        token_account_info,
+        owner_info,
+        account_info_iter.as_slice(),
+    )?;
+
+    let (mut receiver_confidential_account, receiver_token_account) =
+        validate_confidential_account(
+            receiver_confidential_account_info,
+            receiver_token_account_info,
+        )?;
+
+    let transfer_auditor = TransferAuditor::from_account_info(transfer_auditor_info, &id())?;
+
+    let previous_instruction = get_previous_instruction(instructions_sysvar_info)?;
+    let data = decode_proof_instruction::<TransferValidityProofData>(
+        ProofInstruction::VerifyTransferValidityProofData,
+        &previous_instruction,
+    )?;
+
+    if confidential_account.outbound_transfer.ephemeral_state != data.ephemeral_state {
+        confidential_account.outbound_transfer = OutboundTransfer::zeroed();
+        confidential_account.outbound_transfer.ephemeral_state = data.ephemeral_state;
+    }
+
+    confidential_account.outbound_transfer.validity_proof = true.into();
+    confidential_account.outbound_transfer.transfer_public_keys = data.transfer_public_keys;
+    confidential_account.outbound_transfer.new_available_balance = data.new_spendable_ct;
+    confidential_account.outbound_transfer.source_lo = data.decryption_handles_lo.source;
+    confidential_account.outbound_transfer.source_hi = data.decryption_handles_hi.source;
+    confidential_account.outbound_transfer.dest_lo = data.decryption_handles_lo.dest;
+    confidential_account.outbound_transfer.dest_hi = data.decryption_handles_hi.dest;
+
+    process_transfer_common(
+        &mut confidential_account,
+        &token_account,
+        &mut receiver_confidential_account,
+        &receiver_token_account,
+        &transfer_auditor,
+    )
+}
+
+/// Processes a [TransferRangeProof] instruction.
+fn process_transfer_range_proof(accounts: &[AccountInfo]) -> ProgramResult {
+    let account_info_iter = &mut accounts.iter();
+    let confidential_account_info = next_account_info(account_info_iter)?;
+    let token_account_info = next_account_info(account_info_iter)?;
+    let receiver_confidential_account_info = next_account_info(account_info_iter)?;
+    let receiver_token_account_info = next_account_info(account_info_iter)?;
+    let transfer_auditor_info = next_account_info(account_info_iter)?;
+    let instructions_sysvar_info = next_account_info(account_info_iter)?;
+    let owner_info = next_account_info(account_info_iter)?;
+
+    let (mut confidential_account, token_account) = validate_confidential_account_is_signer(
+        confidential_account_info,
+        token_account_info,
+        owner_info,
+        account_info_iter.as_slice(),
+    )?;
+
+    let (mut receiver_confidential_account, receiver_token_account) =
+        validate_confidential_account(
+            receiver_confidential_account_info,
+            receiver_token_account_info,
+        )?;
+
+    let transfer_auditor = TransferAuditor::from_account_info(transfer_auditor_info, &id())?;
+
+    let previous_instruction = get_previous_instruction(instructions_sysvar_info)?;
+    let data = decode_proof_instruction::<TransferRangeProofData>(
+        ProofInstruction::VerifyTransferRangeProofData,
+        &previous_instruction,
+    )?;
+
+    if confidential_account.outbound_transfer.ephemeral_state != data.ephemeral_state {
+        confidential_account.outbound_transfer = OutboundTransfer::zeroed();
+        confidential_account.outbound_transfer.ephemeral_state = data.ephemeral_state;
+    }
+
+    confidential_account.outbound_transfer.range_proof = true.into();
+    confidential_account.outbound_transfer.amount_comms = data.amount_comms;
+
+    process_transfer_common(
+        &mut confidential_account,
+        &token_account,
+        &mut receiver_confidential_account,
+        &receiver_token_account,
+        &transfer_auditor,
+    )
 }
 
 /// Processes an [ApplyPendingBalance] instruction.
@@ -877,8 +905,14 @@ fn process_apply_pending_balance(accounts: &[AccountInfo]) -> ProgramResult {
         account_info_iter.as_slice(),
     )?;
 
-    // TODO: implement and uncomment the PodElGamalCT addition
-    // confidential_account.available_balance += confidential_account.pending_balance;
+    // TODO: UNCOMMENT AFTER SYSCALL CREATION
+    /*
+    confidential_account.available_balance = add_pod_ciphertexts(
+        confidential_account.available_balance,
+        confidential_account.pending_balance,
+    )
+    .map_err(|_| ProgramError::InvalidInstructionData)?;
+    */
     confidential_account.pending_balance = PodElGamalCT::zeroed();
 
     Ok(())
@@ -952,48 +986,13 @@ pub fn process_instruction(
             let data = decode_instruction_data::<WithdrawInstructionData>(input)?;
             process_withdraw(accounts, data.amount.into(), data.decimals)
         }
-        ConfidentialTokenInstruction::SubmitCiphertextValidityProof => {
-            msg!("SubmitCiphertextValidityProof");
-            let data =
-                decode_instruction_data::<SubmitCiphertextValidityProofInstructionData>(input)?;
-            process_submit_transfer_proof(
-                accounts,
-                &data.receiver_pk,
-                &data.receiver_pending_balance,
-                TransferProof::CiphertextValidity, // TODO
-            )
+        ConfidentialTokenInstruction::TransferRangeProof => {
+            msg!("TransferRangeProof");
+            process_transfer_range_proof(accounts)
         }
-        ConfidentialTokenInstruction::SubmitRangeProof => {
-            msg!("SubmitRangeProof");
-            let data = decode_instruction_data::<SubmitRangeProofInstructionData>(input)?;
-            process_submit_transfer_proof(
-                accounts,
-                &data.receiver_pk,
-                &data.receiver_pending_balance,
-                TransferProof::Range, // TODO
-            )
-        }
-        ConfidentialTokenInstruction::Transfer => {
-            msg!("Transfer");
-            let data = decode_instruction_data::<TransferInstructionData>(input)?;
-
-            // TODO: Ensure the proof in `transfer_audit` is valid
-
-            // TODO: use `combine_u32_ciphertexts()`...
-            /*
-            let receiver_transfer_amount = combine_u32_ciphertexts(
-                receiver_transfer_split_amount.0,
-                receiver_transfer_split_amount.1,
-            );
-            */
-            let receiver_transfer_amount = PodElGamalCT::zeroed();
-
-            process_transfer(
-                accounts,
-                &data.receiver_pk,
-                receiver_transfer_amount,
-                None, // TODO: Support `TransferWithAuditorInstructionData`
-            )
+        ConfidentialTokenInstruction::TransferValidityProof => {
+            msg!("TransferValidityProof");
+            process_transfer_validity_proof(accounts)
         }
         ConfidentialTokenInstruction::ApplyPendingBalance => {
             msg!("ApplyPendingBalance");

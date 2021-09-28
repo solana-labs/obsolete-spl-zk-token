@@ -1,7 +1,10 @@
 use {
     crate::pod::*,
     bytemuck::{Pod, Zeroable},
-    spl_zk_token_crypto::pod::*,
+    spl_zk_token_crypto::{
+        instruction::{TransferComms, TransferEphemeralState, TransferPubKeys},
+        pod::*,
+    },
 };
 
 /// Account used for auditing confidential transfers
@@ -29,17 +32,23 @@ pub struct OutboundTransfer {
     /// `true` once a range proof has been accepted for this transfer
     pub range_proof: PodBool,
 
-    /// Transfer amount encrypted by the sender's `ConfidentialAccount::elgamal_pk`
-    pub sender_transfer_amount: PodElGamalCT,
+    /// The public encryption keys associated with the transfer: source, dest, and auditor
+    pub transfer_public_keys: TransferPubKeys,
 
-    /// The receiver's ElGamal public key
-    pub receiver_pk: PodElGamalPK,
+    /// The transfer amount encoded as Pedersen commitments
+    pub amount_comms: TransferComms,
 
-    /// The receiver's pending balance encrypted with `receiver_pk`
-    pub receiver_pending_balance: PodElGamalCT,
+    /// The source and destination decryption handles
+    pub source_lo: PodPedersenDecHandle,
+    pub source_hi: PodPedersenDecHandle,
+    pub dest_lo: PodPedersenDecHandle,
+    pub dest_hi: PodPedersenDecHandle,
 
-    /// Transfer amount encrypted with `receiver_pk`
-    pub receiver_transfer_amount: PodElGamalCT,
+    /// The available balance in the source account after the transfer completes
+    pub new_available_balance: PodElGamalCT,
+
+    /// Ephemeral state between the two transfer instruction data
+    pub ephemeral_state: TransferEphemeralState,
 }
 impl PodAccountInfo<'_, '_> for OutboundTransfer {}
 

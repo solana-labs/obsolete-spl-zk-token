@@ -6,7 +6,10 @@ mod withdraw;
 
 pub use {
     close_account::CloseAccountData,
-    transfer::{TransferRangeProofData, TransferValidityProofData},
+    transfer::{
+        TransferComms, TransferData, TransferEphemeralState, TransferPubKeys,
+        TransferRangeProofData, TransferValidityProofData,
+    },
     update_account_pk::UpdateAccountPkData,
     withdraw::WithdrawData,
 };
@@ -59,7 +62,6 @@ pub enum ProofInstruction {
     ///
     /// Data expected by this instruction:
     ///   `TransferRangeProofData`
-    ///
     ///
     VerifyTransferRangeProofData,
 

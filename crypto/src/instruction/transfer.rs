@@ -26,31 +26,11 @@ use {
     std::convert::TryInto,
 };
 
-/// NOTE: I think the logical way to divide up the proof is as before:
-/// 1. rangeproof
-/// 2. ciphertext validity proof
-///
-/// We can have transfer instructions for each of these proof components.
-/// - Rangeproof is going to be the much heavier component in terms of size and verification cost.
-/// - Ciphertext validity proof should be relatively lightweight and small so there should be room
-///   to fit other things in the same instruction.
-///
-
-/// The instructions
-pub struct TransferRangeProof {
-    pub proof_component: TransferRangeProofData, // 928 bytes
-}
-
-pub struct TransferValidityProof {
-    pub proof_component: TransferValidityProofData, // 640 bytes
-    pub other_component: OtherComponents,
-}
-
 /// Just a grouping struct for the data required for the two transfer instructions. It is
 /// convenient to generate the two components jointly as they share common components.
 pub struct TransferData {
-    pub range_proof_data: TransferRangeProofData,
-    pub validity_proof_data: TransferValidityProofData,
+    pub range_proof: TransferRangeProofData,
+    pub validity_proof: TransferValidityProofData,
 }
 
 impl TransferData {
@@ -135,13 +115,13 @@ impl TransferData {
         );
 
         // generate data components
-        let range_proof_data = TransferRangeProofData {
+        let range_proof = TransferRangeProofData {
             amount_comms,
             proof: transfer_proofs.range_proof,
             ephemeral_state,
         };
 
-        let validity_proof_data = TransferValidityProofData {
+        let validity_proof = TransferValidityProofData {
             decryption_handles_lo,
             decryption_handles_hi,
             transfer_public_keys,
@@ -151,8 +131,8 @@ impl TransferData {
         };
 
         TransferData {
-            range_proof_data,
-            validity_proof_data,
+            range_proof,
+            validity_proof,
         }
     }
 }
@@ -219,7 +199,7 @@ pub struct TransferValidityProofData {
 ///
 /// Identical ephemeral data should be included in the two transfer instructions and this should be
 /// checked by the ZK Token program.
-#[derive(Clone, Copy, Pod, Zeroable)]
+#[derive(Clone, Copy, Pod, Zeroable, PartialEq)]
 #[repr(C)]
 pub struct TransferEphemeralState {
     pub spendable_comm_verification: PodPedersenComm, // 32 bytes
@@ -239,9 +219,6 @@ impl Verifiable for TransferValidityProofData {
         )
     }
 }
-
-/// Other components (like memo?) needed for transfer excluding the crypto components
-pub struct OtherComponents;
 
 /// Just a grouping struct for the two proofs that are needed for a transfer instruction. The two
 /// proofs have to be generated together as they share joint data.
@@ -556,9 +533,9 @@ mod test {
         );
 
         // verify range proof
-        assert!(transfer_data.range_proof_data.verify().is_ok());
+        assert!(transfer_data.range_proof.verify().is_ok());
 
         // verify ciphertext validity proof
-        assert!(transfer_data.validity_proof_data.verify().is_ok());
+        assert!(transfer_data.validity_proof.verify().is_ok());
     }
 }
