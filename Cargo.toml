@@ -3,4 +3,5 @@ members = [
   "crypto",
   "program",
   "proof-program",
+  "sdk",
 ]

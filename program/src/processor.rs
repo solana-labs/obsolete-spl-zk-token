@@ -18,6 +18,7 @@ use {
         sysvar::{self, Sysvar},
     },
     spl_zk_token_crypto::pod::*,
+    spl_zk_token_program_sdk::zk_token_proof_program,
     std::result::Result,
 };
 
@@ -43,7 +44,7 @@ fn decode_proof_instruction<T: Pod>(
     expected: ProofInstruction,
     instruction: &Instruction,
 ) -> Result<&T, ProgramError> {
-    if ProofInstruction::decode_type(&spl_zk_token_crypto::id(), &instruction.data)
+    if ProofInstruction::decode_type(&zk_token_proof_program::id(), &instruction.data)
         != Some(expected)
     {
         msg!("Unexpected proof instruction");
