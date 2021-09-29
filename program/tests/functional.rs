@@ -1,6 +1,3 @@
-// Mark this test as BPF-only due to current `ProgramTest` limitations when CPIing into the system program
-#![cfg(feature = "test-bpf")]
-
 use {
     bytemuck::Zeroable,
     solana_program::{program_pack::Pack, pubkey::Pubkey},
@@ -30,7 +27,7 @@ fn program_test() -> ProgramTest {
     pc.add_builtin_program(
         "spl_zk_token_crypto",
         zk_token_proof_program::id(),
-        spl_zk_token_proof::process_instruction,
+        spl_zk_token_proof_program::process_instruction,
     );
     pc
 }
@@ -38,6 +35,7 @@ fn program_test() -> ProgramTest {
 const ACCOUNT_RENT_EXEMPTION: u64 = 1_000_000_000; // go with something big to be safe
 const DECIMALS: u8 = 0;
 
+#[cfg(feature = "test-bpf")]
 fn assert_transaction_size(transaction: &Transaction) {
     let serialized = bincode::serialize(&transaction).unwrap();
     assert!(
@@ -47,6 +45,13 @@ fn assert_transaction_size(transaction: &Transaction) {
         solana_sdk::packet::PACKET_DATA_SIZE
     );
 }
+
+#[cfg(not(feature = "test-bpf"))]
+fn assert_transaction_size(_transaction: &Transaction) {
+    // TODO: Remove this implementation
+}
+
+
 
 fn add_token_mint_account(
     program_test: &mut ProgramTest,
@@ -222,6 +227,8 @@ async fn get_zk_token_balance(
     )
 }
 
+// Mark this test as BPF-only due to current `ProgramTest` limitations when CPIing into the system program
+#[cfg(feature = "test-bpf")]
 #[tokio::test]
 async fn test_configure_mint() {
     let owner = Keypair::new();
@@ -294,6 +301,8 @@ async fn test_update_transfer_auditor() {
     todo!()
 }
 
+// Mark this test as BPF-only due to current `ProgramTest` limitations when CPIing into the system program
+#[cfg(feature = "test-bpf")]
 #[tokio::test]
 async fn test_create_account() {
     let owner = Keypair::new();
