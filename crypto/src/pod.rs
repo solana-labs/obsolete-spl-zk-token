@@ -273,42 +273,43 @@ pub const TWO_32: u64 = 4294967296;
 
 // Just this function needs syscall support
 //
-// On input two scalars x0, x1 and two ciphertexts ct0, ct1, the function returns x0*ct0 + x1*ct1
+// On input two scalars x0, x1 and two ciphertexts ct0, ct1,
+// returns `Some(x0*ct0 + x1*ct1)` or `None` if the input was invalid
 pub fn add_pod_ciphertexts(
     scalar_0: Scalar,
     pod_ct_0: PodElGamalCT,
     scalar_1: Scalar,
     pod_ct_1: PodElGamalCT,
-) -> Result<PodElGamalCT, ProofError> {
-    let ct_0: ElGamalCT = pod_ct_0.try_into()?;
-    let ct_1: ElGamalCT = pod_ct_1.try_into()?;
+) -> Option<PodElGamalCT> {
+    let ct_0: ElGamalCT = pod_ct_0.try_into().ok()?;
+    let ct_1: ElGamalCT = pod_ct_1.try_into().ok()?;
 
     let ct_sum = ct_0 * scalar_0 + ct_1 * scalar_1;
-    Ok(ct_sum.into())
+    Some(PodElGamalCT::from(ct_sum))
 }
 
 // All methods here rely on `general_add_pod_ciphertexts`
 pub struct PodElGamalArithmetic;
 impl PodElGamalArithmetic {
-    pub fn add(pod_ct_0: PodElGamalCT, pod_ct_1: PodElGamalCT) -> Result<PodElGamalCT, ProofError> {
+    pub fn add(pod_ct_0: PodElGamalCT, pod_ct_1: PodElGamalCT) -> Option<PodElGamalCT> {
         add_pod_ciphertexts(Scalar::one(), pod_ct_0, Scalar::one(), pod_ct_1)
     }
 
     pub fn subtract(
         pod_ct_0: PodElGamalCT,
         pod_ct_1: PodElGamalCT,
-    ) -> Result<PodElGamalCT, ProofError> {
+    ) -> Option<PodElGamalCT> {
         add_pod_ciphertexts(Scalar::one(), pod_ct_0, -Scalar::one(), pod_ct_1)
     }
 
     pub fn combine_lo_hi(
         pod_ct_lo: PodElGamalCT,
         pod_ct_hi: PodElGamalCT,
-    ) -> Result<PodElGamalCT, ProofError> {
+    ) -> Option<PodElGamalCT> {
         add_pod_ciphertexts(Scalar::one(), pod_ct_lo, Scalar::from(TWO_32), pod_ct_hi)
     }
 
-    pub fn add_to(pod_ct: PodElGamalCT, amount: u64) -> Result<PodElGamalCT, ProofError> {
+    pub fn add_to(pod_ct: PodElGamalCT, amount: u64) -> Option<PodElGamalCT> {
         let mut buf = [0_u8; 64];
         buf.copy_from_slice(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes());
         add_pod_ciphertexts(
@@ -319,7 +320,7 @@ impl PodElGamalArithmetic {
         )
     }
 
-    pub fn subtract_to(pod_ct: PodElGamalCT, amount: u64) -> Result<PodElGamalCT, ProofError> {
+    pub fn subtract_to(pod_ct: PodElGamalCT, amount: u64) -> Option<PodElGamalCT> {
         let mut buf = [0; 64];
         buf.copy_from_slice(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes());
         add_pod_ciphertexts(

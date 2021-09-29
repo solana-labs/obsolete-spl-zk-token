@@ -617,7 +617,7 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
     {
         confidential_account.pending_balance =
             PodElGamalArithmetic::add_to(confidential_account.pending_balance, amount)
-                .map_err(|_| ProgramError::InvalidInstructionData)?;
+                .ok_or(ProgramError::InvalidInstructionData)?;
     }
     Ok(())
 }
@@ -662,7 +662,7 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
     {
         confidential_account.available_balance =
             PodElGamalArithmetic::subtract_to(confidential_account.available_balance, amount)
-                .map_err(|_| ProgramError::InvalidInstructionData)?;
+                .ok_or(ProgramError::InvalidInstructionData)?;
     }
 
     if confidential_account.available_balance != data.final_balance_ct {
@@ -938,7 +938,7 @@ fn process_apply_pending_balance(accounts: &[AccountInfo]) -> ProgramResult {
             confidential_account.available_balance,
             confidential_account.pending_balance,
         )
-        .map_err(|_| ProgramError::InvalidInstructionData)?;
+        .ok_or(ProgramError::InvalidInstructionData)?;
     }
 
     Ok(())
