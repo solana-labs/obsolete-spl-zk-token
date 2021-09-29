@@ -1,12 +1,13 @@
 //! Plain Old Data wrappers for types that need to be sent over the wire
 
+#[cfg(not(target_arch = "bpf"))]
+use crate::range_proof::RangeProof;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_COMPRESSED;
 use {
     crate::{
         encryption::elgamal::{ElGamalCT, ElGamalPK},
         encryption::pedersen::{PedersenComm, PedersenDecHandle},
         errors::ProofError,
-        range_proof::RangeProof,
     },
     bytemuck::{Pod, Zeroable},
     curve25519_dalek::{ristretto::CompressedRistretto, scalar::Scalar},
@@ -183,6 +184,7 @@ pub struct PodRangeProof64([u8; 672]);
 unsafe impl Zeroable for PodRangeProof64 {}
 unsafe impl Pod for PodRangeProof64 {}
 
+#[cfg(not(target_arch = "bpf"))]
 impl TryFrom<RangeProof> for PodRangeProof64 {
     type Error = ProofError;
 
@@ -204,6 +206,7 @@ impl TryFrom<RangeProof> for PodRangeProof64 {
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl TryFrom<PodRangeProof64> for RangeProof {
     type Error = ProofError;
 
@@ -222,6 +225,7 @@ pub struct PodRangeProof128([u8; 736]);
 unsafe impl Zeroable for PodRangeProof128 {}
 unsafe impl Pod for PodRangeProof128 {}
 
+#[cfg(not(target_arch = "bpf"))]
 impl TryFrom<RangeProof> for PodRangeProof128 {
     type Error = ProofError;
 
@@ -243,6 +247,7 @@ impl TryFrom<RangeProof> for PodRangeProof128 {
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl TryFrom<PodRangeProof128> for RangeProof {
     type Error = ProofError;
 

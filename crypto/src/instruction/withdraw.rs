@@ -1,19 +1,22 @@
+use {
+    crate::pod::*,
+    bytemuck::{Pod, Zeroable},
+};
 #[cfg(not(target_arch = "bpf"))]
 use {
-    crate::encryption::{
-        elgamal::{ElGamalPK, ElGamalSK},
-        pedersen::{PedersenBase, PedersenOpen},
-    },
-    rand::rngs::OsRng,
-};
-use {
     crate::{
-        encryption::elgamal::ElGamalCT, errors::ProofError, instruction::Verifiable, pod::*,
-        range_proof::RangeProof, transcript::TranscriptProtocol,
+        encryption::{
+            elgamal::{ElGamalCT, ElGamalPK, ElGamalSK},
+            pedersen::{PedersenBase, PedersenOpen},
+        },
+        errors::ProofError,
+        instruction::Verifiable,
+        range_proof::RangeProof,
+        transcript::TranscriptProtocol,
     },
-    bytemuck::{Pod, Zeroable},
     curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar, traits::MultiscalarMul},
     merlin::Transcript,
+    rand::rngs::OsRng,
     std::convert::TryInto,
 };
 
@@ -63,6 +66,7 @@ impl WithdrawData {
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl Verifiable for WithdrawData {
     fn verify(&self) -> Result<(), ProofError> {
         let final_balance_ct = self.final_balance_ct.try_into()?;
@@ -85,12 +89,12 @@ pub struct WithdrawProof {
 }
 
 #[allow(non_snake_case)]
+#[cfg(not(target_arch = "bpf"))]
 impl WithdrawProof {
     fn transcript_new() -> Transcript {
         Transcript::new(b"WithdrawProof")
     }
 
-    #[cfg(not(target_arch = "bpf"))]
     pub fn new(source_sk: &ElGamalSK, final_balance: u64, final_balance_ct: &ElGamalCT) -> Self {
         let mut transcript = Self::transcript_new();
 

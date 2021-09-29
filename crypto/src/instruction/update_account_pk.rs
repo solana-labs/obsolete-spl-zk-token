@@ -1,23 +1,25 @@
+use {
+    crate::pod::*,
+    bytemuck::{Pod, Zeroable},
+};
 #[cfg(not(target_arch = "bpf"))]
 use {
-    crate::encryption::elgamal::{ElGamalPK, ElGamalSK},
-    rand::rngs::OsRng,
-};
-use {
     crate::{
-        encryption::{elgamal::ElGamalCT, pedersen::PedersenBase},
+        encryption::{
+            elgamal::{ElGamalCT, ElGamalPK, ElGamalSK},
+            pedersen::PedersenBase,
+        },
         errors::ProofError,
         instruction::Verifiable,
-        pod::*,
         transcript::TranscriptProtocol,
     },
-    bytemuck::{Pod, Zeroable},
     curve25519_dalek::{
         ristretto::RistrettoPoint,
         scalar::Scalar,
         traits::{IsIdentity, MultiscalarMul},
     },
     merlin::Transcript,
+    rand::rngs::OsRng,
     std::convert::TryInto,
 };
 
@@ -72,6 +74,7 @@ impl UpdateAccountPkData {
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl Verifiable for UpdateAccountPkData {
     fn verify(&self) -> Result<(), ProofError> {
         let current_ct = self.current_ct.try_into()?;
@@ -94,12 +97,12 @@ pub struct UpdateAccountPkProof {
 }
 
 #[allow(non_snake_case)]
+#[cfg(not(target_arch = "bpf"))]
 impl UpdateAccountPkProof {
     fn transcript_new() -> Transcript {
         Transcript::new(b"UpdateAccountPkProof")
     }
 
-    #[cfg(not(target_arch = "bpf"))]
     fn new(
         current_balance: u64,
         current_sk: &ElGamalSK,

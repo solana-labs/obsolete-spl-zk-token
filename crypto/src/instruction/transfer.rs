@@ -1,28 +1,26 @@
+use {
+    crate::pod::*,
+    bytemuck::{Pod, Zeroable},
+};
 #[cfg(not(target_arch = "bpf"))]
 use {
-    crate::encryption::{
-        elgamal::ElGamalSK,
-        pedersen::{Pedersen, PedersenBase, PedersenOpen},
-    },
-    rand::rngs::OsRng,
-};
-use {
     crate::{
-        encryption::elgamal::{ElGamalCT, ElGamalPK},
-        encryption::pedersen::{PedersenComm, PedersenDecHandle},
+        encryption::{
+            elgamal::{ElGamalCT, ElGamalPK, ElGamalSK},
+            pedersen::{Pedersen, PedersenBase, PedersenComm, PedersenDecHandle, PedersenOpen},
+        },
         errors::ProofError,
         instruction::Verifiable,
-        pod::*,
         range_proof::RangeProof,
         transcript::TranscriptProtocol,
     },
-    bytemuck::{Pod, Zeroable},
     curve25519_dalek::{
         ristretto::{CompressedRistretto, RistrettoPoint},
         scalar::Scalar,
         traits::{IsIdentity, MultiscalarMul, VartimeMultiscalarMul},
     },
     merlin::Transcript,
+    rand::rngs::OsRng,
     std::convert::TryInto,
 };
 
@@ -33,8 +31,8 @@ pub struct TransferData {
     pub validity_proof: TransferValidityProofData,
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl TransferData {
-    #[cfg(not(target_arch = "bpf"))]
     pub fn new(
         transfer_amount: u64,
         spendable_balance: u64,
@@ -153,6 +151,7 @@ pub struct TransferRangeProofData {
     pub ephemeral_state: TransferEphemeralState, // 128 bytes
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl Verifiable for TransferRangeProofData {
     fn verify(&self) -> Result<(), ProofError> {
         let mut transcript = Transcript::new(b"TransferRangeProof");
@@ -208,6 +207,7 @@ pub struct TransferEphemeralState {
     pub t_x_blinding: PodScalar,                      // 32 bytes
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl Verifiable for TransferValidityProofData {
     fn verify(&self) -> Result<(), ProofError> {
         self.proof.verify(
@@ -228,10 +228,10 @@ pub struct TransferProofs {
 }
 
 #[allow(non_snake_case)]
+#[cfg(not(target_arch = "bpf"))]
 impl TransferProofs {
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::many_single_char_names)]
-    #[cfg(not(target_arch = "bpf"))]
     pub fn new(
         source_sk: &ElGamalSK,
         source_pk: &ElGamalPK,
@@ -342,6 +342,7 @@ pub struct ValidityProof {
 }
 
 #[allow(non_snake_case)]
+#[cfg(not(target_arch = "bpf"))]
 impl ValidityProof {
     pub fn verify(
         self,
@@ -485,12 +486,15 @@ pub fn split_u64_into_u32(amt: u64) -> (u32, u32) {
 }
 
 /// Constant for 2^32
+#[cfg(not(target_arch = "bpf"))]
 const TWO_32: u64 = 4294967296;
 
+#[cfg(not(target_arch = "bpf"))]
 pub fn combine_u32_comms(comm_lo: PedersenComm, comm_hi: PedersenComm) -> PedersenComm {
     comm_lo + comm_hi * Scalar::from(TWO_32)
 }
 
+#[cfg(not(target_arch = "bpf"))]
 pub fn combine_u32_handles(
     handle_lo: PedersenDecHandle,
     handle_hi: PedersenDecHandle,
@@ -498,6 +502,7 @@ pub fn combine_u32_handles(
     handle_lo + handle_hi * Scalar::from(TWO_32)
 }
 
+#[cfg(not(target_arch = "bpf"))]
 pub fn combine_u32_ciphertexts(ct_lo: ElGamalCT, ct_hi: ElGamalCT) -> ElGamalCT {
     ct_lo + ct_hi * Scalar::from(TWO_32)
 }

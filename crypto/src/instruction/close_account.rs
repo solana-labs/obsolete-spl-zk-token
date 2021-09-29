@@ -1,16 +1,21 @@
+use {
+    crate::pod::*,
+    bytemuck::{Pod, Zeroable},
+};
 #[cfg(not(target_arch = "bpf"))]
-use {crate::encryption::elgamal::ElGamalSK, rand::rngs::OsRng};
 use {
     crate::{
-        encryption::elgamal::ElGamalCT, errors::ProofError, instruction::Verifiable, pod::*,
+        encryption::elgamal::{ElGamalCT, ElGamalSK},
+        errors::ProofError,
+        rand::rngs::OsRng,
         transcript::TranscriptProtocol,
     },
-    bytemuck::{Pod, Zeroable},
     curve25519_dalek::{
         ristretto::RistrettoPoint,
         scalar::Scalar,
         traits::{IsIdentity, MultiscalarMul},
     },
+    instruction::Verifiable,
     merlin::Transcript,
     std::convert::TryInto,
 };
@@ -32,8 +37,8 @@ pub struct CloseAccountData {
     pub proof: CloseAccountProof, // 64 bytes
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl CloseAccountData {
-    #[cfg(not(target_arch = "bpf"))]
     pub fn new(source_sk: &ElGamalSK, balance: ElGamalCT) -> Self {
         let proof = CloseAccountProof::new(source_sk, &balance);
 
@@ -44,6 +49,7 @@ impl CloseAccountData {
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl Verifiable for CloseAccountData {
     fn verify(&self) -> Result<(), ProofError> {
         let balance = self.balance.try_into()?;
@@ -62,12 +68,12 @@ pub struct CloseAccountProof {
 }
 
 #[allow(non_snake_case)]
+#[cfg(not(target_arch = "bpf"))]
 impl CloseAccountProof {
     fn transcript_new() -> Transcript {
         Transcript::new(b"CloseAccountProof")
     }
 
-    #[cfg(not(target_arch = "bpf"))]
     pub fn new(source_sk: &ElGamalSK, balance: &ElGamalCT) -> Self {
         let mut transcript = Self::transcript_new();
 
