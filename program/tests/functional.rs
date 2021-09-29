@@ -657,8 +657,8 @@ async fn test_transfer() {
         transfer_amount,
         src_zk_available_balance,
         src_zk_available_balance_ct,
-        src_elgamal_sk,
         src_elgamal_pk,
+        &src_elgamal_sk,
         dst_elgamal_pk,
         auditor_pk,
     );
