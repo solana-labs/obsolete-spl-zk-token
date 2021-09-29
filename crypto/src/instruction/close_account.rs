@@ -7,7 +7,7 @@ use {
     crate::{
         encryption::elgamal::{ElGamalCT, ElGamalSK},
         errors::ProofError,
-        rand::rngs::OsRng,
+        instruction::Verifiable,
         transcript::TranscriptProtocol,
     },
     curve25519_dalek::{
@@ -15,8 +15,8 @@ use {
         scalar::Scalar,
         traits::{IsIdentity, MultiscalarMul},
     },
-    instruction::Verifiable,
     merlin::Transcript,
+    rand::rngs::OsRng,
     std::convert::TryInto,
 };
 
