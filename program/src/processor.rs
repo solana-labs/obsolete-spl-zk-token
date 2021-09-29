@@ -608,13 +608,17 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
         &accounts,
     )?;
 
-    // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY ONLY TO PACIFY CLIPPY
-    confidential_account.pending_balance = PodElGamalCT::zeroed();
-    /*
-    confidential_account.pending_balance =
-        add_to_pod_ciphertext(confidential_account.pending_balance, amount)
-            .map_err(|_| ProgramError::InvalidInstructionData)?;
-    */
+    #[cfg(feature = "test-bpf")]
+    {
+        // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY ONLY TO PACIFY CLIPPY
+        confidential_account.pending_balance = PodElGamalCT::zeroed();
+    }
+    #[cfg(not(feature = "test-bpf"))]
+    {
+        confidential_account.pending_balance =
+            PodElGamalArithmetic::add_to(confidential_account.pending_balance, amount)
+                .map_err(|_| ProgramError::InvalidInstructionData)?;
+    }
     Ok(())
 }
 
@@ -649,13 +653,17 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
         &previous_instruction,
     )?;
 
-    // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY ONLY TO PACIFY CLIPPY
-    confidential_account.available_balance = data.final_balance_ct;
-    /*
-    confidential_account.available_balance =
-        sub_to_pod_ciphertext(confidential_account.available_balance, amount)
-            .map_err(|_| ProgramError::InvalidInstructionData)?;
-    */
+    #[cfg(feature = "test-bpf")]
+    {
+        // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY ONLY TO PACIFY CLIPPY
+        confidential_account.available_balance = data.final_balance_ct;
+    }
+    #[cfg(not(feature = "test-bpf"))]
+    {
+        confidential_account.available_balance =
+            PodElGamalArithmetic::subtract_to(confidential_account.available_balance, amount)
+                .map_err(|_| ProgramError::InvalidInstructionData)?;
+    }
 
     if confidential_account.available_balance != data.final_balance_ct {
         msg!("Available balance mismatch");
@@ -752,19 +760,25 @@ fn process_transfer_common(
         return Err(ProgramError::InvalidArgument);
     }
 
-    // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY PENDING SYSCALL CREATION
-    confidential_account.available_balance =
-        confidential_account.outbound_transfer.new_available_balance;
-    /*
-    confidential_account.available_balance = sub_pod_ciphertexts_for_transfer(
-        confidential_account.outbound_transfer.amount_comms.lo,
-        confidential_account.outbound_transfer.source_lo,
-        confidential_account.outbound_transfer.amount_comms.hi,
-        confidential_account.outbound_transfer.source_hi,
-        confidential_account.available_balance,
-    )
-    .map_err(|_| ProgramError::InvalidInstructionData)?;
-    */
+    #[cfg(feature = "test-bpf")]
+    {
+        // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY PENDING SYSCALL CREATION
+        confidential_account.available_balance =
+            confidential_account.outbound_transfer.new_available_balance;
+    }
+    #[cfg(not(feature = "test-bpf"))]
+    {
+        /*
+        confidential_account.available_balance = sub_pod_ciphertexts_for_transfer(
+            confidential_account.outbound_transfer.amount_comms.lo,
+            confidential_account.outbound_transfer.source_lo,
+            confidential_account.outbound_transfer.amount_comms.hi,
+            confidential_account.outbound_transfer.source_hi,
+            confidential_account.available_balance,
+        )
+        .map_err(|_| ProgramError::InvalidInstructionData)?;
+        */
+    }
 
     if confidential_account.available_balance
         != confidential_account.outbound_transfer.new_available_balance
@@ -773,18 +787,25 @@ fn process_transfer_common(
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    /*
-    receiver_confidential_account.pending_balance = add_pod_ciphertexts_for_transfer(
-        confidential_account.outbound_transfer.amount_comms.lo,
-        confidential_account.outbound_transfer.dest_lo,
-        confidential_account.outbound_transfer.amount_comms.hi,
-        confidential_account.outbound_transfer.dest_hi,
-        receiver_confidential_account.pending_balance,
-    )
-    .map_err(|_| ProgramError::InvalidInstructionData)?;
-    */
+    #[cfg(feature = "test-bpf")]
+    {
+        // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY PENDING SYSCALL CREATION
+        confidential_account.outbound_transfer = OutboundTransfer::zeroed();
+    }
+    #[cfg(not(feature = "test-bpf"))]
+    {
+        /*
+        receiver_confidential_account.pending_balance = add_pod_ciphertexts_for_transfer(
+            confidential_account.outbound_transfer.amount_comms.lo,
+            confidential_account.outbound_transfer.dest_lo,
+            confidential_account.outbound_transfer.amount_comms.hi,
+            confidential_account.outbound_transfer.dest_hi,
+            receiver_confidential_account.pending_balance,
+        )
+        .map_err(|_| ProgramError::InvalidInstructionData)?;
+        */
+    }
 
-    confidential_account.outbound_transfer = OutboundTransfer::zeroed();
     Ok(())
 }
 
@@ -906,15 +927,19 @@ fn process_apply_pending_balance(accounts: &[AccountInfo]) -> ProgramResult {
         account_info_iter.as_slice(),
     )?;
 
-    // TODO: UNCOMMENT AFTER SYSCALL CREATION
-    /*
-    confidential_account.available_balance = add_pod_ciphertexts(
-        confidential_account.available_balance,
-        confidential_account.pending_balance,
-    )
-    .map_err(|_| ProgramError::InvalidInstructionData)?;
-    */
-    confidential_account.pending_balance = PodElGamalCT::zeroed();
+    #[cfg(feature = "test-bpf")]
+    {
+        // TODO: THIS IS WRONG
+        confidential_account.pending_balance = PodElGamalCT::zeroed();
+    }
+    #[cfg(not(feature = "test-bpf"))]
+    {
+        confidential_account.available_balance = PodElGamalArithmetic::add(
+            confidential_account.available_balance,
+            confidential_account.pending_balance,
+        )
+        .map_err(|_| ProgramError::InvalidInstructionData)?;
+    }
 
     Ok(())
 }

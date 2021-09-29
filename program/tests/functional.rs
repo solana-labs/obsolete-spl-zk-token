@@ -49,8 +49,6 @@ fn assert_transaction_size(_transaction: &Transaction) {
     */
 }
 
-
-
 fn add_token_mint_account(
     program_test: &mut ProgramTest,
     freeze_authority: Option<Pubkey>,
