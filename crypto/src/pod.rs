@@ -1,16 +1,17 @@
 //! Plain Old Data wrappers for types that need to be sent over the wire
 
+use bytemuck::{Pod, Zeroable};
 #[cfg(not(target_arch = "bpf"))]
-use crate::range_proof::RangeProof;
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_COMPRESSED;
 use {
     crate::{
         encryption::elgamal::{ElGamalCT, ElGamalPK},
         encryption::pedersen::{PedersenComm, PedersenDecHandle},
         errors::ProofError,
+        range_proof::RangeProof,
     },
-    bytemuck::{Pod, Zeroable},
-    curve25519_dalek::{ristretto::CompressedRistretto, scalar::Scalar},
+    curve25519_dalek::{
+        constants::RISTRETTO_BASEPOINT_COMPRESSED, ristretto::CompressedRistretto, scalar::Scalar,
+    },
     std::{
         convert::{TryFrom, TryInto},
         fmt,
@@ -31,12 +32,14 @@ pub fn pod_from_bytes<T: Pod>(bytes: &[u8]) -> Option<&T> {
 #[repr(transparent)]
 pub struct PodScalar([u8; 32]);
 
+#[cfg(not(target_arch = "bpf"))]
 impl From<Scalar> for PodScalar {
     fn from(scalar: Scalar) -> Self {
         Self(scalar.to_bytes())
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl From<PodScalar> for Scalar {
     fn from(pod: PodScalar) -> Self {
         Scalar::from_bits(pod.0)
@@ -47,12 +50,14 @@ impl From<PodScalar> for Scalar {
 #[repr(transparent)]
 pub struct PodCompressedRistretto([u8; 32]);
 
+#[cfg(not(target_arch = "bpf"))]
 impl From<CompressedRistretto> for PodCompressedRistretto {
     fn from(cr: CompressedRistretto) -> Self {
         Self(cr.to_bytes())
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl From<PodCompressedRistretto> for CompressedRistretto {
     fn from(pod: PodCompressedRistretto) -> Self {
         Self(pod.0)
@@ -62,12 +67,15 @@ impl From<PodCompressedRistretto> for CompressedRistretto {
 #[derive(Clone, Copy, Pod, Zeroable, PartialEq)]
 #[repr(transparent)]
 pub struct PodElGamalCT([u8; 64]);
+
+#[cfg(not(target_arch = "bpf"))]
 impl From<ElGamalCT> for PodElGamalCT {
     fn from(ct: ElGamalCT) -> Self {
         Self(ct.to_bytes())
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl TryFrom<PodElGamalCT> for ElGamalCT {
     type Error = ProofError;
 
@@ -85,6 +93,7 @@ impl From<(PodPedersenComm, PodPedersenDecHandle)> for PodElGamalCT {
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl fmt::Debug for PodElGamalCT {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.0)
@@ -94,12 +103,15 @@ impl fmt::Debug for PodElGamalCT {
 #[derive(Clone, Copy, Pod, Zeroable, PartialEq)]
 #[repr(transparent)]
 pub struct PodElGamalPK([u8; 32]);
+
+#[cfg(not(target_arch = "bpf"))]
 impl From<ElGamalPK> for PodElGamalPK {
     fn from(pk: ElGamalPK) -> Self {
         Self(pk.to_bytes())
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl TryFrom<PodElGamalPK> for ElGamalPK {
     type Error = ProofError;
 
@@ -108,6 +120,7 @@ impl TryFrom<PodElGamalPK> for ElGamalPK {
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl fmt::Debug for PodElGamalPK {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.0)
@@ -117,6 +130,8 @@ impl fmt::Debug for PodElGamalPK {
 #[derive(Clone, Copy, Pod, Zeroable, PartialEq)]
 #[repr(transparent)]
 pub struct PodPedersenComm([u8; 32]);
+
+#[cfg(not(target_arch = "bpf"))]
 impl From<PedersenComm> for PodPedersenComm {
     fn from(comm: PedersenComm) -> Self {
         Self(comm.to_bytes())
@@ -124,12 +139,14 @@ impl From<PedersenComm> for PodPedersenComm {
 }
 
 // For proof verification, interpret PodPedersenComm directly as CompressedRistretto
+#[cfg(not(target_arch = "bpf"))]
 impl From<PodPedersenComm> for CompressedRistretto {
     fn from(pod: PodPedersenComm) -> Self {
         Self(pod.0)
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl TryFrom<PodPedersenComm> for PedersenComm {
     type Error = ProofError;
 
@@ -138,6 +155,7 @@ impl TryFrom<PodPedersenComm> for PedersenComm {
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl fmt::Debug for PodPedersenComm {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.0)
@@ -147,6 +165,8 @@ impl fmt::Debug for PodPedersenComm {
 #[derive(Clone, Copy, Pod, Zeroable, PartialEq)]
 #[repr(transparent)]
 pub struct PodPedersenDecHandle([u8; 32]);
+
+#[cfg(not(target_arch = "bpf"))]
 impl From<PedersenDecHandle> for PodPedersenDecHandle {
     fn from(handle: PedersenDecHandle) -> Self {
         Self(handle.to_bytes())
@@ -154,12 +174,14 @@ impl From<PedersenDecHandle> for PodPedersenDecHandle {
 }
 
 // For proof verification, interpret PodPedersenDecHandle as CompressedRistretto
+#[cfg(not(target_arch = "bpf"))]
 impl From<PodPedersenDecHandle> for CompressedRistretto {
     fn from(pod: PodPedersenDecHandle) -> Self {
         Self(pod.0)
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl TryFrom<PodPedersenDecHandle> for PedersenDecHandle {
     type Error = ProofError;
 
@@ -168,6 +190,7 @@ impl TryFrom<PodPedersenDecHandle> for PedersenDecHandle {
     }
 }
 
+#[cfg(not(target_arch = "bpf"))]
 impl fmt::Debug for PodPedersenDecHandle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.0)
@@ -275,6 +298,7 @@ pub const TWO_32: u64 = 4294967296;
 //
 // On input two scalars x0, x1 and two ciphertexts ct0, ct1,
 // returns `Some(x0*ct0 + x1*ct1)` or `None` if the input was invalid
+#[cfg(not(target_arch = "bpf"))]
 pub fn add_pod_ciphertexts(
     scalar_0: Scalar,
     pod_ct_0: PodElGamalCT,
@@ -290,45 +314,66 @@ pub fn add_pod_ciphertexts(
 
 // All methods here rely on `general_add_pod_ciphertexts`
 pub struct PodElGamalArithmetic;
+
+#[allow(unused_variables)]
 impl PodElGamalArithmetic {
     pub fn add(pod_ct_0: PodElGamalCT, pod_ct_1: PodElGamalCT) -> Option<PodElGamalCT> {
-        add_pod_ciphertexts(Scalar::one(), pod_ct_0, Scalar::one(), pod_ct_1)
+        #[cfg(not(target_arch = "bpf"))]
+        {
+            add_pod_ciphertexts(Scalar::one(), pod_ct_0, Scalar::one(), pod_ct_1)
+        }
+        #[cfg(target_arch = "bpf")]
+        None
     }
 
-    pub fn subtract(
-        pod_ct_0: PodElGamalCT,
-        pod_ct_1: PodElGamalCT,
-    ) -> Option<PodElGamalCT> {
-        add_pod_ciphertexts(Scalar::one(), pod_ct_0, -Scalar::one(), pod_ct_1)
+    pub fn subtract(pod_ct_0: PodElGamalCT, pod_ct_1: PodElGamalCT) -> Option<PodElGamalCT> {
+        #[cfg(not(target_arch = "bpf"))]
+        {
+            add_pod_ciphertexts(Scalar::one(), pod_ct_0, -Scalar::one(), pod_ct_1)
+        }
+        #[cfg(target_arch = "bpf")]
+        None
     }
 
-    pub fn combine_lo_hi(
-        pod_ct_lo: PodElGamalCT,
-        pod_ct_hi: PodElGamalCT,
-    ) -> Option<PodElGamalCT> {
-        add_pod_ciphertexts(Scalar::one(), pod_ct_lo, Scalar::from(TWO_32), pod_ct_hi)
+    pub fn combine_lo_hi(pod_ct_lo: PodElGamalCT, pod_ct_hi: PodElGamalCT) -> Option<PodElGamalCT> {
+        #[cfg(not(target_arch = "bpf"))]
+        {
+            add_pod_ciphertexts(Scalar::one(), pod_ct_lo, Scalar::from(TWO_32), pod_ct_hi)
+        }
+        #[cfg(target_arch = "bpf")]
+        None
     }
 
     pub fn add_to(pod_ct: PodElGamalCT, amount: u64) -> Option<PodElGamalCT> {
-        let mut buf = [0_u8; 64];
-        buf.copy_from_slice(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes());
-        add_pod_ciphertexts(
-            Scalar::one(),
-            pod_ct,
-            Scalar::from(amount),
-            PodElGamalCT(buf),
-        )
+        #[cfg(not(target_arch = "bpf"))]
+        {
+            let mut buf = [0_u8; 64];
+            buf.copy_from_slice(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes());
+            add_pod_ciphertexts(
+                Scalar::one(),
+                pod_ct,
+                Scalar::from(amount),
+                PodElGamalCT(buf),
+            )
+        }
+        #[cfg(target_arch = "bpf")]
+        None
     }
 
     pub fn subtract_to(pod_ct: PodElGamalCT, amount: u64) -> Option<PodElGamalCT> {
-        let mut buf = [0; 64];
-        buf.copy_from_slice(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes());
-        add_pod_ciphertexts(
-            Scalar::one(),
-            pod_ct,
-            -Scalar::from(amount),
-            PodElGamalCT(buf),
-        )
+        #[cfg(not(target_arch = "bpf"))]
+        {
+            let mut buf = [0; 64];
+            buf.copy_from_slice(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes());
+            add_pod_ciphertexts(
+                Scalar::one(),
+                pod_ct,
+                -Scalar::from(amount),
+                PodElGamalCT(buf),
+            )
+        }
+        #[cfg(target_arch = "bpf")]
+        None
     }
 }
 

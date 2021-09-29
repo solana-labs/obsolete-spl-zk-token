@@ -1,5 +1,7 @@
 //! Program instructions
 
+#[cfg(not(target_arch = "bpf"))]
+use spl_zk_token_crypto::encryption::elgamal::ElGamalPK;
 use {
     crate::{pod::*, *},
     bytemuck::{Pod, Zeroable},
@@ -11,7 +13,7 @@ use {
         pubkey::Pubkey,
         sysvar,
     },
-    spl_zk_token_crypto::{encryption::elgamal::ElGamalPK, pod::*},
+    spl_zk_token_crypto::pod::*,
 };
 
 pub use spl_zk_token_sdk::zk_token_proof_instruction::*;
@@ -406,6 +408,7 @@ pub fn configure_mint_with_transfer_auditor(
 }
 
 /// Create a `CreateAccount` instruction
+#[cfg(not(target_arch = "bpf"))]
 pub fn create_account(
     funding_address: Pubkey,
     zk_token_account: Pubkey,
