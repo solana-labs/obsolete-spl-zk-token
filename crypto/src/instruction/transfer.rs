@@ -37,8 +37,8 @@ impl TransferData {
         transfer_amount: u64,
         spendable_balance: u64,
         spendable_ct: ElGamalCT,
-        source_sk: ElGamalSK,
         source_pk: ElGamalPK,
+        source_sk: &ElGamalSK,
         dest_pk: ElGamalPK,
         auditor_pk: ElGamalPK,
     ) -> Self {
@@ -101,7 +101,7 @@ impl TransferData {
 
         // range_proof and validity_proof should be generated together
         let (transfer_proofs, ephemeral_state) = TransferProofs::new(
-            &source_sk,
+            source_sk,
             &source_pk,
             &dest_pk,
             &auditor_pk,
@@ -531,8 +531,8 @@ mod test {
             transfer_amount,
             spendable_balance,
             spendable_ct,
-            source_sk,
             source_pk,
+            &source_sk,
             dest_pk,
             auditor_pk,
         );
