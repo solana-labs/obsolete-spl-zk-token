@@ -1,10 +1,7 @@
 //#![deny(missing_docs)]
 #![forbid(unsafe_code)]
 
-use {
-    bytemuck::{Zeroable},
-    solana_program::pubkey::Pubkey,
-};
+use {bytemuck::Zeroable, solana_program::pubkey::Pubkey};
 
 mod entrypoint;
 pub mod instruction;
