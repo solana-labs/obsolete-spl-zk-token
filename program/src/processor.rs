@@ -608,12 +608,12 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
         &accounts,
     )?;
 
-    #[cfg(feature = "test-bpf")]
+    #[cfg(target_arch = "bpf")]
     {
         // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY ONLY TO PACIFY CLIPPY
         confidential_account.pending_balance = PodElGamalCT::zeroed();
     }
-    #[cfg(not(feature = "test-bpf"))]
+    #[cfg(not(target_arch = "bpf"))]
     {
         confidential_account.pending_balance =
             PodElGamalArithmetic::add_to(confidential_account.pending_balance, amount)
@@ -653,12 +653,12 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
         &previous_instruction,
     )?;
 
-    #[cfg(feature = "test-bpf")]
+    #[cfg(target_arch = "bpf")]
     {
         // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY ONLY TO PACIFY CLIPPY
         confidential_account.available_balance = data.final_balance_ct;
     }
-    #[cfg(not(feature = "test-bpf"))]
+    #[cfg(not(target_arch = "bpf"))]
     {
         confidential_account.available_balance =
             PodElGamalArithmetic::subtract_to(confidential_account.available_balance, amount)
@@ -760,13 +760,13 @@ fn process_transfer_common(
         return Err(ProgramError::InvalidArgument);
     }
 
-    #[cfg(feature = "test-bpf")]
+    #[cfg(target_arch = "bpf")]
     {
         // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY PENDING SYSCALL CREATION
         confidential_account.available_balance =
             confidential_account.outbound_transfer.new_available_balance;
     }
-    #[cfg(not(feature = "test-bpf"))]
+    #[cfg(not(target_arch = "bpf"))]
     {
         /*
         confidential_account.available_balance = sub_pod_ciphertexts_for_transfer(
@@ -787,12 +787,12 @@ fn process_transfer_common(
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    #[cfg(feature = "test-bpf")]
+    #[cfg(target_arch = "bpf")]
     {
         // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY PENDING SYSCALL CREATION
         confidential_account.outbound_transfer = OutboundTransfer::zeroed();
     }
-    #[cfg(not(feature = "test-bpf"))]
+    #[cfg(not(target_arch = "bpf"))]
     {
         /*
         receiver_confidential_account.pending_balance = add_pod_ciphertexts_for_transfer(
@@ -927,12 +927,12 @@ fn process_apply_pending_balance(accounts: &[AccountInfo]) -> ProgramResult {
         account_info_iter.as_slice(),
     )?;
 
-    #[cfg(feature = "test-bpf")]
+    #[cfg(target_arch = "bpf")]
     {
         // TODO: THIS IS WRONG
         confidential_account.pending_balance = PodElGamalCT::zeroed();
     }
-    #[cfg(not(feature = "test-bpf"))]
+    #[cfg(not(target_arch = "bpf"))]
     {
         confidential_account.available_balance = PodElGamalArithmetic::add(
             confidential_account.available_balance,
