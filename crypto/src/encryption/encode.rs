@@ -206,7 +206,6 @@ mod tests {
     ///   - 8 sec for precomputation
     ///   - 3 sec for online computation
     #[test]
-    #[ignore]
     fn test_decode_correctness() {
         let amount: u32 = 65545;
 
