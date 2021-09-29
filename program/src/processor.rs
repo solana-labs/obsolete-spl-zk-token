@@ -661,7 +661,7 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
     #[cfg(not(target_arch = "bpf"))]
     {
         confidential_account.available_balance =
-            PodElGamalArithmetic::subtract_to(confidential_account.available_balance, amount)
+            PodElGamalArithmetic::subtract_from(confidential_account.available_balance, amount)
                 .ok_or(ProgramError::InvalidInstructionData)?;
     }
 
@@ -768,16 +768,29 @@ fn process_transfer_common(
     }
     #[cfg(not(target_arch = "bpf"))]
     {
-        /*
-        confidential_account.available_balance = sub_pod_ciphertexts_for_transfer(
+        // Combine commitments and handles
+        let source_lo_ct: PodElGamalCT = (
             confidential_account.outbound_transfer.amount_comms.lo,
             confidential_account.outbound_transfer.source_lo,
+        )
+            .into();
+
+        let source_hi_ct: PodElGamalCT = (
             confidential_account.outbound_transfer.amount_comms.hi,
             confidential_account.outbound_transfer.source_hi,
-            confidential_account.available_balance,
         )
-        .map_err(|_| ProgramError::InvalidInstructionData)?;
-        */
+            .into();
+
+        // Combine lo and hi ciphertexts
+        let combined_ct_for_source =
+            PodElGamalArithmetic::combine_lo_hi(source_lo_ct, source_hi_ct).unwrap();
+
+        // Subtract from source available balance
+        confidential_account.available_balance = PodElGamalArithmetic::subtract(
+            confidential_account.available_balance,
+            combined_ct_for_source,
+        )
+        .ok_or(ProgramError::InvalidInstructionData)?;
     }
 
     if confidential_account.available_balance
@@ -794,16 +807,29 @@ fn process_transfer_common(
     }
     #[cfg(not(target_arch = "bpf"))]
     {
-        /*
-        receiver_confidential_account.pending_balance = add_pod_ciphertexts_for_transfer(
+        // Repeat for destination account
+        let dest_lo_ct: PodElGamalCT = (
             confidential_account.outbound_transfer.amount_comms.lo,
             confidential_account.outbound_transfer.dest_lo,
+        )
+            .into();
+
+        let dest_hi_ct: PodElGamalCT = (
             confidential_account.outbound_transfer.amount_comms.hi,
             confidential_account.outbound_transfer.dest_hi,
-            receiver_confidential_account.pending_balance,
         )
-        .map_err(|_| ProgramError::InvalidInstructionData)?;
-        */
+            .into();
+
+        // Combine lo and hi ciphertexts
+        let combined_ct_for_dest =
+            PodElGamalArithmetic::combine_lo_hi(dest_lo_ct, dest_hi_ct).unwrap();
+
+        // Subtract from source available balance
+        receiver_confidential_account.pending_balance = PodElGamalArithmetic::add(
+            receiver_confidential_account.pending_balance,
+            combined_ct_for_dest,
+        )
+        .ok_or(ProgramError::InvalidInstructionData)?;
     }
 
     Ok(())

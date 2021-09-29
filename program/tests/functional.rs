@@ -13,7 +13,6 @@ use {
     spl_zk_token::{self, pod::*, *},
     spl_zk_token_crypto::{
         encryption::elgamal::{ElGamal, ElGamalCT, ElGamalPK},
-        encryption::pedersen::PedersenOpen,
         pod::*,
     },
     spl_zk_token_sdk::zk_token_proof_program,
