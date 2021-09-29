@@ -1,3 +1,5 @@
+#[cfg(feature = "test-bpf")]
+use std::{borrow::Borrow, convert::TryInto};
 use {
     bytemuck::Zeroable,
     solana_program::{program_pack::Pack, pubkey::Pubkey},
@@ -15,8 +17,6 @@ use {
     },
     spl_zk_token_sdk::zk_token_proof_program,
 };
-#[cfg(feature = "test-bpf")]
-use std::{borrow::Borrow, convert::TryInto};
 
 fn program_test() -> ProgramTest {
     let mut pc = ProgramTest::new(

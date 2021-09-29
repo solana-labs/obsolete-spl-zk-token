@@ -2,7 +2,7 @@
 #![forbid(unsafe_code)]
 
 use {
-    bytemuck::{Pod, Zeroable},
+    bytemuck::{Zeroable},
     solana_program::pubkey::Pubkey,
 };
 
@@ -11,34 +11,6 @@ pub mod instruction;
 pub mod pod;
 pub mod processor;
 pub mod state;
-
-// ==== crypto placeholders ====
-#[derive(Clone, Copy, Debug, Pod, Zeroable, PartialEq)]
-#[repr(C)]
-pub struct ElGamalSplitCT {
-    data_high: [u8; 32],
-    data_low: [u8; 32],
-}
-impl Default for ElGamalSplitCT {
-    fn default() -> Self {
-        Self {
-            data_high: [0; 32],
-            data_low: [0; 32],
-        }
-    }
-}
-
-#[derive(Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct TransDataCTValidity {
-    crypto_stuff: [u8; 512], // TODO
-}
-#[derive(Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct TransDataRangeProof {
-    crypto_stuff: [u8; 512], // TODO
-}
-// ==== fin crypto placeholders ====
 
 solana_program::declare_id!("ZkTokenXHhH6t1juaWF74WLcfv4XoNocjXA6sPWHNg1"); // TODO: grind a `ZkToken...` keypair
 
