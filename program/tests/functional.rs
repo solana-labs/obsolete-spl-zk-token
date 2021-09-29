@@ -13,6 +13,7 @@ use {
     spl_zk_token::{self, pod::*, *},
     spl_zk_token_crypto::{
         encryption::elgamal::{ElGamal, ElGamalCT, ElGamalPK},
+        encryption::pedersen::PedersenOpen,
         pod::*,
     },
     spl_zk_token_sdk::zk_token_proof_program,
@@ -517,9 +518,13 @@ async fn test_deposit() {
         1
     );
 
+    let pk = ElGamalPK::default();
+    let expected_pending_ct = pk.encrypt_with(1_u64, &PedersenOpen::default());
+
     assert_eq!(
         get_zk_token_balance(&mut banks_client, zk_token_account).await,
-        (ElGamalCT::default(), ElGamalCT::default()) // TODO: FIX CHECK
+        (expected_pending_ct, ElGamalCT::default())
+        // (ElGamalCT::default(), ElGamalCT::default()) // TODO: FIX CHECK
     );
 
     let mut transaction = Transaction::new_with_payer(
@@ -537,7 +542,8 @@ async fn test_deposit() {
 
     assert_eq!(
         get_zk_token_balance(&mut banks_client, zk_token_account).await,
-        (ElGamalCT::default(), ElGamalCT::default()) // TODO: FIX CHECK
+        (ElGamalCT::default(), expected_pending_ct)
+        // (ElGamalCT::default(), ElGamalCT::default()) // TODO: FIX CHECK
     );
 }
 
