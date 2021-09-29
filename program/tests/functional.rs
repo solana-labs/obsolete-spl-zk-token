@@ -14,8 +14,9 @@ use {
         pod::*,
     },
     spl_zk_token_sdk::zk_token_proof_program,
-    std::{borrow::Borrow, convert::TryInto},
 };
+#[cfg(feature = "test-bpf")]
+use std::{borrow::Borrow, convert::TryInto};
 
 fn program_test() -> ProgramTest {
     let mut pc = ProgramTest::new(
@@ -35,8 +36,9 @@ fn program_test() -> ProgramTest {
 const ACCOUNT_RENT_EXEMPTION: u64 = 1_000_000_000; // go with something big to be safe
 const DECIMALS: u8 = 0;
 
-#[cfg(feature = "test-bpf")]
-fn assert_transaction_size(transaction: &Transaction) {
+fn assert_transaction_size(_transaction: &Transaction) {
+    // TODO: Remove this function once https://github.com/solana-labs/solana/pull/20297 ships
+    /*
     let serialized = bincode::serialize(&transaction).unwrap();
     assert!(
         serialized.len() < solana_sdk::packet::PACKET_DATA_SIZE,
@@ -44,11 +46,7 @@ fn assert_transaction_size(transaction: &Transaction) {
         serialized.len(),
         solana_sdk::packet::PACKET_DATA_SIZE
     );
-}
-
-#[cfg(not(feature = "test-bpf"))]
-fn assert_transaction_size(_transaction: &Transaction) {
-    // TODO: Remove this implementation
+    */
 }
 
 
@@ -123,6 +121,7 @@ fn add_token_account(
     token_account_keypair.pubkey()
 }
 
+#[cfg(feature = "test-bpf")]
 fn add_omnibus_token_account(program_test: &mut ProgramTest, mint: Pubkey, balance: u64) -> Pubkey {
     let omnibus_token_address = get_omnibus_token_address(&mint);
     add_token_account_with_address(
@@ -188,6 +187,7 @@ fn add_zk_token_account(
     zk_token_address
 }
 
+#[cfg(feature = "test-bpf")]
 async fn get_token_balance(banks_client: &mut BanksClient, token_address: Pubkey) -> u64 {
     let token_account = banks_client
         .get_account(token_address)
@@ -200,6 +200,7 @@ async fn get_token_balance(banks_client: &mut BanksClient, token_address: Pubkey
     state.amount
 }
 
+#[cfg(feature = "test-bpf")]
 async fn get_zk_token_state(
     banks_client: &mut BanksClient,
     zk_token_account: Pubkey,
@@ -212,6 +213,7 @@ async fn get_zk_token_state(
     *spl_zk_token::state::ConfidentialAccount::from_bytes(&account.data).unwrap()
 }
 
+#[cfg(feature = "test-bpf")]
 async fn get_zk_token_balance(
     banks_client: &mut BanksClient,
     zk_token_account: Pubkey,
@@ -462,6 +464,8 @@ async fn test_update_account_pk() {
     assert_eq!(zk_token_state.elgamal_pk, new_elgamal_pk.into());
 }
 
+// Mark this test as BPF-only due to current `ProgramTest` limitations when CPIing into the SPL Token program
+#[cfg(feature = "test-bpf")]
 #[tokio::test]
 async fn test_deposit() {
     let owner = Keypair::new();
@@ -539,6 +543,8 @@ async fn test_deposit() {
     );
 }
 
+// Mark this test as BPF-only due to current `ProgramTest` limitations when CPIing into the SPL Token program
+#[cfg(feature = "test-bpf")]
 #[tokio::test]
 async fn test_withdraw() {
     let owner = Keypair::new();
