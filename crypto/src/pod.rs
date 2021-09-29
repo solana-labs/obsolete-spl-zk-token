@@ -347,29 +347,29 @@ impl PodElGamalArithmetic {
     pub fn add_to(pod_ct: PodElGamalCT, amount: u64) -> Option<PodElGamalCT> {
         #[cfg(not(target_arch = "bpf"))]
         {
-            let mut buf = [0_u8; 64];
-            buf.copy_from_slice(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes());
+            let mut amount_as_pod_ct = [0_u8; 64];
+            amount_as_pod_ct[..32].copy_from_slice(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes());
             add_pod_ciphertexts(
                 Scalar::one(),
                 pod_ct,
                 Scalar::from(amount),
-                PodElGamalCT(buf),
+                PodElGamalCT(amount_as_pod_ct),
             )
         }
         #[cfg(target_arch = "bpf")]
         None
     }
 
-    pub fn subtract_to(pod_ct: PodElGamalCT, amount: u64) -> Option<PodElGamalCT> {
+    pub fn subtract_from(pod_ct: PodElGamalCT, amount: u64) -> Option<PodElGamalCT> {
         #[cfg(not(target_arch = "bpf"))]
         {
-            let mut buf = [0; 64];
-            buf.copy_from_slice(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes());
+            let mut amount_as_pod_ct = [0_u8; 64];
+            amount_as_pod_ct[..32].copy_from_slice(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes());
             add_pod_ciphertexts(
                 Scalar::one(),
                 pod_ct,
                 -Scalar::from(amount),
-                PodElGamalCT(buf),
+                PodElGamalCT(amount_as_pod_ct),
             )
         }
         #[cfg(target_arch = "bpf")]
@@ -414,6 +414,32 @@ mod tests {
 
         let expected: PodElGamalCT = pk.encrypt_with(55_u64, &open).into();
         assert_eq!(expected, sum);
+    }
+
+    #[test]
+    fn test_add_to() {
+        let spendable_balance = PodElGamalCT::zeroed();
+
+        let added_ct = PodElGamalArithmetic::add_to(spendable_balance, 55).unwrap();
+
+        let (pk, _) = ElGamal::keygen();
+        let expected: PodElGamalCT = pk.encrypt_with(55_u64, &PedersenOpen::default()).into();
+
+        assert_eq!(expected, added_ct);
+    }
+
+    #[test]
+    fn test_subtract_from() {
+        let amount = 77_u64;
+        let (pk, _) = ElGamal::keygen();
+        let open = PedersenOpen::random(&mut OsRng);
+        let encrypted_amount: PodElGamalCT = pk.encrypt_with(amount, &open).into();
+
+        let subtracted_ct = PodElGamalArithmetic::subtract_from(encrypted_amount, 55).unwrap();
+
+        let expected: PodElGamalCT = pk.encrypt_with(22_u64, &open).into();
+
+        assert_eq!(expected, subtracted_ct);
     }
 
     #[test]
