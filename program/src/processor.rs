@@ -760,35 +760,22 @@ fn process_transfer_common(
         return Err(ProgramError::InvalidArgument);
     }
 
-    #[cfg(target_arch = "bpf")]
-    {
-        // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY PENDING SYSCALL CREATION
-        confidential_account.available_balance =
-            confidential_account.outbound_transfer.new_available_balance;
-    }
-    #[cfg(not(target_arch = "bpf"))]
+    // Subtract from source available balance
     {
         // Combine commitments and handles
-        let source_lo_ct: PodElGamalCT = (
+        let source_lo_ct = PodElGamalCT::from((
             confidential_account.outbound_transfer.amount_comms.lo,
             confidential_account.outbound_transfer.source_lo,
-        )
-            .into();
-
-        let source_hi_ct: PodElGamalCT = (
+        ));
+        let source_hi_ct = PodElGamalCT::from((
             confidential_account.outbound_transfer.amount_comms.hi,
             confidential_account.outbound_transfer.source_hi,
-        )
-            .into();
+        ));
 
-        // Combine lo and hi ciphertexts
-        let combined_ct_for_source =
-            PodElGamalArithmetic::combine_lo_hi(source_lo_ct, source_hi_ct).unwrap();
-
-        // Subtract from source available balance
-        confidential_account.available_balance = PodElGamalArithmetic::subtract(
+        confidential_account.available_balance = PodElGamalArithmetic::subtract_with_lo_hi(
             confidential_account.available_balance,
-            combined_ct_for_source,
+            source_lo_ct,
+            source_hi_ct,
         )
         .ok_or(ProgramError::InvalidInstructionData)?;
     }
@@ -800,34 +787,22 @@ fn process_transfer_common(
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    #[cfg(target_arch = "bpf")]
+    // Add to destination pending balance
     {
-        // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY PENDING SYSCALL CREATION
-        confidential_account.outbound_transfer = OutboundTransfer::zeroed();
-    }
-    #[cfg(not(target_arch = "bpf"))]
-    {
-        // Repeat for destination account
-        let dest_lo_ct: PodElGamalCT = (
+        let dest_lo_ct = PodElGamalCT::from((
             confidential_account.outbound_transfer.amount_comms.lo,
             confidential_account.outbound_transfer.dest_lo,
-        )
-            .into();
+        ));
 
-        let dest_hi_ct: PodElGamalCT = (
+        let dest_hi_ct = PodElGamalCT::from((
             confidential_account.outbound_transfer.amount_comms.hi,
             confidential_account.outbound_transfer.dest_hi,
-        )
-            .into();
+        ));
 
-        // Combine lo and hi ciphertexts
-        let combined_ct_for_dest =
-            PodElGamalArithmetic::combine_lo_hi(dest_lo_ct, dest_hi_ct).unwrap();
-
-        // Subtract from source available balance
-        receiver_confidential_account.pending_balance = PodElGamalArithmetic::add(
+        receiver_confidential_account.pending_balance = PodElGamalArithmetic::add_with_lo_hi(
             receiver_confidential_account.pending_balance,
-            combined_ct_for_dest,
+            dest_lo_ct,
+            dest_hi_ct,
         )
         .ok_or(ProgramError::InvalidInstructionData)?;
     }
