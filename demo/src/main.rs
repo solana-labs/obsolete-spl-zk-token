@@ -17,8 +17,11 @@ use {
         transaction::Transaction,
     },
     spl_zk_token::pod::*,
-    spl_zk_token_sdk::encryption::elgamal::*,
-    std::{convert::TryInto, process::exit, sync::Arc},
+    spl_zk_token_sdk::{
+        curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT as G,
+        encryption::{dlog::decode_u32_precomputation, elgamal::*},
+    },
+    std::{collections::HashMap, convert::TryInto, process::exit, sync::Arc},
 };
 
 struct Config {
@@ -108,10 +111,18 @@ fn send(
     Ok(())
 }
 
+fn dlog_precompute() -> HashMap<[u8; 32], u32> {
+    println!("==> Precomputing discrete log data for decryption (~300kb)");
+    decode_u32_precomputation(G)
+}
+
 fn process_demo(
     rpc_client: &RpcClient,
     payer: &dyn Signer,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // Pre-compute HashMap needed for decryption. The HashMap is independent of (works for) any key.
+    let decryption_data = dlog_precompute();
+
     let token_mint = Keypair::new();
 
     let token_account_a = Keypair::new();
@@ -278,6 +289,14 @@ fn process_demo(
         get_zk_token_balance(rpc_client, &zk_token_account_a)?;
     assert_eq!(pending_balance_ct_a, ElGamalCiphertext::default());
 
+    // NOTE: account balance ciphertexts can still be decrypted as long as the balance is < 2^32
+    assert_eq!(
+        current_balance_ct_a
+            .decrypt_u32_online(&elgamal_sk_a, &decryption_data)
+            .unwrap(),
+        0, // TODO: replace with `current_balance_a`
+    );
+
     let (mut transfer_range_proof, transfer_validity_proof) = spl_zk_token::instruction::transfer(
         zk_token_account_a,
         token_account_a.pubkey(),
@@ -341,11 +360,31 @@ fn process_demo(
         &[payer],
     )?;
 
+    current_balance_a -= current_balance_a;
+    current_balance_b += current_balance_a;
+
+    let (_pending_balance_ct_a, current_balance_ct_a) =
+        get_zk_token_balance(rpc_client, &zk_token_account_a)?;
+
+    let (_pending_balance_ct_b, current_balance_ct_b) =
+        get_zk_token_balance(rpc_client, &zk_token_account_b)?;
+
+    assert_eq!(
+        current_balance_ct_a
+            .decrypt_u32_online(&elgamal_sk_a, &decryption_data)
+            .unwrap(),
+        0, // TODO: replace with `current_balance_a`
+    );
+
+    assert_eq!(
+        current_balance_ct_b
+            .decrypt_u32_online(&elgamal_sk_b, &decryption_data)
+            .unwrap(),
+        0, // TODO: replace with `current_balance_b`
+    );
+
     // TODO: Read transfer transaction off-chain, and confirm the transfer amount decodes to
     // `current_balance_a` via `elgamal_sk_a` and `elgamal_sk_b`
-
-    current_balance_b += current_balance_a;
-    current_balance_a -= current_balance_a;
 
     let (_pending_balance_ct_b, current_balance_ct_b) =
         get_zk_token_balance(rpc_client, &zk_token_account_b)?;
@@ -394,6 +433,26 @@ fn process_demo(
     );
     assert_eq!(current_balance_a, 0);
     assert_eq!(current_balance_b, 0);
+
+    let (_pending_balance_ct_a, current_balance_ct_a) =
+        get_zk_token_balance(rpc_client, &zk_token_account_a)?;
+
+    let (_pending_balance_ct_b, current_balance_ct_b) =
+        get_zk_token_balance(rpc_client, &zk_token_account_b)?;
+
+    assert_eq!(
+        current_balance_ct_a
+            .decrypt_u32_online(&elgamal_sk_a, &decryption_data)
+            .unwrap(),
+        0, // TODO: replace with `current_balance_a`
+    );
+
+    assert_eq!(
+        current_balance_ct_b
+            .decrypt_u32_online(&elgamal_sk_b, &decryption_data)
+            .unwrap(),
+        0, // TODO: replace with `current_balance_b`
+    );
 
     Ok(())
 }
