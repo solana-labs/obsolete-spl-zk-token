@@ -611,7 +611,7 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
     )?;
 
     confidential_account.pending_balance =
-        ops::add_to(confidential_account.pending_balance, amount)
+        ops::add_to(&confidential_account.pending_balance, amount)
             .ok_or(ProgramError::InvalidInstructionData)?;
 
     Ok(())
@@ -649,7 +649,7 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
     )?;
 
     confidential_account.available_balance =
-        ops::subtract_from(confidential_account.available_balance, amount)
+        ops::subtract_from(&confidential_account.available_balance, amount)
             .ok_or(ProgramError::InvalidInstructionData)?;
 
     if confidential_account.available_balance != data.final_balance_ct {
@@ -760,9 +760,9 @@ fn process_transfer_common(
         ));
 
         confidential_account.available_balance = ops::subtract_with_lo_hi(
-            confidential_account.available_balance,
-            source_lo_ct,
-            source_hi_ct,
+            &confidential_account.available_balance,
+            &source_lo_ct,
+            &source_hi_ct,
         )
         .ok_or(ProgramError::InvalidInstructionData)?;
     }
@@ -787,9 +787,9 @@ fn process_transfer_common(
         ));
 
         receiver_confidential_account.pending_balance = ops::add_with_lo_hi(
-            receiver_confidential_account.pending_balance,
-            dest_lo_ct,
-            dest_hi_ct,
+            &receiver_confidential_account.pending_balance,
+            &dest_lo_ct,
+            &dest_hi_ct,
         )
         .ok_or(ProgramError::InvalidInstructionData)?;
     }
@@ -916,10 +916,11 @@ fn process_apply_pending_balance(accounts: &[AccountInfo]) -> ProgramResult {
     )?;
 
     confidential_account.available_balance = ops::add(
-        confidential_account.available_balance,
-        confidential_account.pending_balance,
+        &confidential_account.available_balance,
+        &confidential_account.pending_balance,
     )
     .ok_or(ProgramError::InvalidInstructionData)?;
+    confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
 
     Ok(())
 }
