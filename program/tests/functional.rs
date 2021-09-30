@@ -1,5 +1,3 @@
-#[cfg(feature = "test-bpf")]
-use std::{borrow::Borrow, convert::TryInto};
 use {
     bytemuck::Zeroable,
     solana_program::{program_pack::Pack, pubkey::Pubkey},
@@ -16,6 +14,11 @@ use {
         pod::*,
     },
     spl_zk_token_sdk::zk_token_proof_program,
+};
+#[cfg(feature = "test-bpf")]
+use {
+    spl_zk_token_crypto::encryption::pedersen::PedersenOpen,
+    std::{borrow::Borrow, convert::TryInto},
 };
 
 fn program_test() -> ProgramTest {
@@ -523,7 +526,6 @@ async fn test_deposit() {
     assert_eq!(
         get_zk_token_balance(&mut banks_client, zk_token_account).await,
         (expected_pending_ct, ElGamalCT::default())
-        // (ElGamalCT::default(), ElGamalCT::default()) // TODO: FIX CHECK
     );
 
     let mut transaction = Transaction::new_with_payer(
@@ -542,7 +544,6 @@ async fn test_deposit() {
     assert_eq!(
         get_zk_token_balance(&mut banks_client, zk_token_account).await,
         (ElGamalCT::default(), expected_pending_ct)
-        // (ElGamalCT::default(), ElGamalCT::default()) // TODO: FIX CHECK
     );
 }
 
