@@ -208,7 +208,7 @@ fn create_pda_account<'a>(
 /// Processes an [ConfigureMint] instruction.
 fn process_configure_mint(
     accounts: &[AccountInfo],
-    transfer_auditor_pk: Option<&pod::ElGamalPK>,
+    transfer_auditor_pk: Option<&pod::ElGamalPubkey>,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let funder_info = next_account_info(account_info_iter)?;
@@ -326,7 +326,7 @@ fn process_configure_mint(
 /// Processes an [UpdateTransferAuditor] instruction.
 fn process_update_transfer_auditor(
     accounts: &[AccountInfo],
-    new_transfer_auditor_pk: Option<&pod::ElGamalPK>,
+    new_transfer_auditor_pk: Option<&pod::ElGamalPubkey>,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let transfer_auditor_info = next_account_info(account_info_iter)?;
@@ -432,7 +432,7 @@ fn process_create_account(
 
     /*
         An ElGamal ciphertext is of the form
-          ElGamalCT {
+          ElGamalCiphertext {
             msg_comm: r * H + x * G
             decrypt_handle: r * P
           }
@@ -450,16 +450,16 @@ fn process_create_account(
         for the `CreateAccount` instruction, it is already known that x is always 0. So r can just be
         set Scalar::zero().
 
-        This means that the ElGamalCT should simply be
-          ElGamalCT {
+        This means that the ElGamalCiphertext should simply be
+          ElGamalCiphertext {
             msg_comm: 0 * H + 0 * G = 0
             decrypt_handle: 0 * P = 0
           }
 
         This should just be encoded as [0; 64]
     */
-    confidential_account.pending_balance = pod::ElGamalCT::zeroed();
-    confidential_account.available_balance = pod::ElGamalCT::zeroed();
+    confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
+    confidential_account.available_balance = pod::ElGamalCiphertext::zeroed();
 
     Ok(())
 }
@@ -486,7 +486,7 @@ fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
         &previous_instruction,
     )?;
 
-    if confidential_account.pending_balance != pod::ElGamalCT::zeroed() {
+    if confidential_account.pending_balance != pod::ElGamalCiphertext::zeroed() {
         msg!("Pending balance is not zero");
         return Err(ProgramError::InvalidAccountData);
     }
@@ -535,7 +535,7 @@ fn process_update_account_pk(accounts: &[AccountInfo]) -> ProgramResult {
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    if confidential_account.pending_balance != pod::ElGamalCT::zeroed() {
+    if confidential_account.pending_balance != pod::ElGamalCiphertext::zeroed() {
         msg!("Pending balance is not zero");
         return Err(ProgramError::InvalidAccountData);
     }
@@ -750,11 +750,11 @@ fn process_transfer_common(
     // Subtract from source available balance
     {
         // Combine commitments and handles
-        let source_lo_ct = pod::ElGamalCT::from((
+        let source_lo_ct = pod::ElGamalCiphertext::from((
             confidential_account.outbound_transfer.amount_comms.lo,
             confidential_account.outbound_transfer.source_lo,
         ));
-        let source_hi_ct = pod::ElGamalCT::from((
+        let source_hi_ct = pod::ElGamalCiphertext::from((
             confidential_account.outbound_transfer.amount_comms.hi,
             confidential_account.outbound_transfer.source_hi,
         ));
@@ -776,12 +776,12 @@ fn process_transfer_common(
 
     // Add to destination pending balance
     {
-        let dest_lo_ct = pod::ElGamalCT::from((
+        let dest_lo_ct = pod::ElGamalCiphertext::from((
             confidential_account.outbound_transfer.amount_comms.lo,
             confidential_account.outbound_transfer.dest_lo,
         ));
 
-        let dest_hi_ct = pod::ElGamalCT::from((
+        let dest_hi_ct = pod::ElGamalCiphertext::from((
             confidential_account.outbound_transfer.amount_comms.hi,
             confidential_account.outbound_transfer.dest_hi,
         ));

@@ -9,7 +9,7 @@ use {
         transaction::Transaction,
     },
     spl_zk_token::{self, pod::*, *},
-    spl_zk_token_sdk::encryption::elgamal::{ElGamal, ElGamalCT, ElGamalPK},
+    spl_zk_token_sdk::encryption::elgamal::{ElGamal, ElGamalCiphertext, ElGamalPubkey},
     spl_zk_token_sdk::zk_token_proof_program,
 };
 #[cfg(feature = "test-bpf")]
@@ -135,7 +135,7 @@ fn add_omnibus_token_account(program_test: &mut ProgramTest, mint: Pubkey, balan
 fn add_zk_transfer_auditor_account(
     program_test: &mut ProgramTest,
     mint: Pubkey,
-    elgamal_pk: Option<ElGamalPK>,
+    elgamal_pk: Option<ElGamalPubkey>,
 ) -> Pubkey {
     let zk_transfer_auditor_address = get_transfer_auditor_address(&mint);
 
@@ -160,8 +160,8 @@ fn add_zk_token_account(
     program_test: &mut ProgramTest,
     mint: Pubkey,
     token_account: Pubkey,
-    elgamal_pk: ElGamalPK,
-    available_balance: ElGamalCT,
+    elgamal_pk: ElGamalPubkey,
+    available_balance: ElGamalCiphertext,
 ) -> Pubkey {
     let zk_token_address = get_confidential_token_address(&mint, &token_account);
 
@@ -216,8 +216,8 @@ async fn get_zk_token_balance(
     banks_client: &mut BanksClient,
     zk_token_account: Pubkey,
 ) -> (
-    /* pending_balance: */ ElGamalCT,
-    /* available_balance: */ ElGamalCT,
+    /* pending_balance: */ ElGamalCiphertext,
+    /* available_balance: */ ElGamalCiphertext,
 ) {
     let zk_token_state = get_zk_token_state(banks_client, zk_token_account).await;
 
@@ -478,7 +478,7 @@ async fn test_deposit() {
         mint,
         token_account,
         elgamal_pk,
-        ElGamalCT::default(), /* 0 balance */
+        ElGamalCiphertext::default(), /* 0 balance */
     );
     let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
 
@@ -517,12 +517,12 @@ async fn test_deposit() {
         1
     );
 
-    let pk = ElGamalPK::default();
+    let pk = ElGamalPubkey::default();
     let expected_pending_ct = pk.encrypt_with(1_u64, &PedersenOpen::default());
 
     assert_eq!(
         get_zk_token_balance(&mut banks_client, zk_token_account).await,
-        (expected_pending_ct, ElGamalCT::default())
+        (expected_pending_ct, ElGamalCiphertext::default())
     );
 
     let mut transaction = Transaction::new_with_payer(
@@ -540,7 +540,7 @@ async fn test_deposit() {
 
     assert_eq!(
         get_zk_token_balance(&mut banks_client, zk_token_account).await,
-        (ElGamalCT::default(), expected_pending_ct)
+        (ElGamalCiphertext::default(), expected_pending_ct)
     );
 }
 
@@ -611,7 +611,7 @@ async fn test_withdraw() {
     assert_eq!(
         get_zk_token_balance(&mut banks_client, zk_token_account).await,
         (
-            ElGamalCT::default(),
+            ElGamalCiphertext::default(),
             zk_new_available_balance_ct.try_into().unwrap()
         )
     );
@@ -632,7 +632,7 @@ async fn test_transfer() {
     let mut program_test = program_test();
     let mint = add_token_mint_account(&mut program_test, None);
 
-    let auditor_pk = ElGamalPK::default();
+    let auditor_pk = ElGamalPubkey::default();
     let _zk_transfer_auditor_address =
         add_zk_transfer_auditor_account(&mut program_test, mint, None);
 

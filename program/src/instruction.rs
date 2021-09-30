@@ -2,7 +2,7 @@
 //!
 
 #[cfg(not(target_arch = "bpf"))]
-use spl_zk_token_sdk::encryption::elgamal::ElGamalPK;
+use spl_zk_token_sdk::encryption::elgamal::ElGamalPubkey;
 use {
     crate::{pod::*, *},
     bytemuck::{Pod, Zeroable},
@@ -23,21 +23,21 @@ pub use spl_zk_token_sdk::zk_token_proof_instruction::*;
 #[repr(transparent)]
 pub struct ConfigureMintInstructionData {
     /// The `transfer_auditor` public key.
-    pub transfer_auditor_pk: pod::ElGamalPK,
+    pub transfer_auditor_pk: pod::ElGamalPubkey,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct UpdateTransferAuditorInstructionData {
     /// The new `transfer_auditor` public key.
-    pub new_transfer_auditor_pk: pod::ElGamalPK,
+    pub new_transfer_auditor_pk: pod::ElGamalPubkey,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct CreateAccountInstructionData {
     /// The public key associated with the account
-    pub elgamal_pk: pod::ElGamalPK,
+    pub elgamal_pk: pod::ElGamalPubkey,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -359,7 +359,7 @@ pub(crate) fn encode_instruction<T: Pod>(
 fn _configure_mint(
     funding_address: Pubkey,
     token_mint_address: Pubkey,
-    transfer_auditor_pk_and_freeze_authority: Option<(pod::ElGamalPK, Pubkey)>,
+    transfer_auditor_pk_and_freeze_authority: Option<(pod::ElGamalPubkey, Pubkey)>,
 ) -> Instruction {
     let omnibus_token_address = get_omnibus_token_address(&token_mint_address);
     let transfer_auditor_address = get_transfer_auditor_address(&token_mint_address);
@@ -398,7 +398,7 @@ pub fn configure_mint(funding_address: Pubkey, token_mint_address: Pubkey) -> In
 pub fn configure_mint_with_transfer_auditor(
     funding_address: Pubkey,
     token_mint_address: Pubkey,
-    transfer_auditor_pk: pod::ElGamalPK,
+    transfer_auditor_pk: pod::ElGamalPubkey,
     freeze_authority: Pubkey,
 ) -> Instruction {
     _configure_mint(
@@ -413,7 +413,7 @@ pub fn configure_mint_with_transfer_auditor(
 pub fn create_account(
     funding_address: Pubkey,
     zk_token_account: Pubkey,
-    elgamal_pk: ElGamalPK,
+    elgamal_pk: ElGamalPubkey,
     token_account: Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
