@@ -5,7 +5,6 @@ use {
         account_info::AccountInfo, instruction::Instruction, program_error::ProgramError,
         pubkey::Pubkey,
     },
-    spl_zk_token_crypto::pod::pod_from_bytes,
     std::{
         cell::RefMut,
         marker::PhantomData,
@@ -75,6 +74,16 @@ pub fn pod_from_instruction_data<'a, T: Pod>(
     } else {
         pod_from_bytes(&instruction.data).ok_or(ProgramError::InvalidArgument)
     }
+}
+
+/// Convert a `Pod` into a slice (zero copy)
+pub fn pod_bytes_of<T: Pod>(t: &T) -> &[u8] {
+    bytemuck::bytes_of(t)
+}
+
+/// Convert a slice into a `Pod` (zero copy)
+pub fn pod_from_bytes<T: Pod>(bytes: &[u8]) -> Option<&T> {
+    bytemuck::try_from_bytes(bytes).ok()
 }
 
 /// Maybe convert a slice into a `Pod` (zero copy)

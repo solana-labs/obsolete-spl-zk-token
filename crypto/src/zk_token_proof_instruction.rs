@@ -1,12 +1,11 @@
 ///! Instructions provided by the ZkToken Proof program
-pub use spl_zk_token_crypto::instruction::*;
+pub use crate::instruction::*;
 
 use {
-    bytemuck::Pod,
+    bytemuck::{bytes_of,Pod},
     num_derive::{FromPrimitive, ToPrimitive},
     num_traits::{FromPrimitive, ToPrimitive},
     solana_program::{instruction::Instruction, pubkey::Pubkey},
-    spl_zk_token_crypto::pod::*,
 };
 
 #[derive(Clone, Copy, Debug, FromPrimitive, ToPrimitive, PartialEq)]
@@ -66,7 +65,7 @@ pub enum ProofInstruction {
 impl ProofInstruction {
     pub fn encode<T: Pod>(&self, proof: &T) -> Instruction {
         let mut data = vec![ToPrimitive::to_u8(self).unwrap()];
-        data.extend_from_slice(pod_bytes_of(proof));
+        data.extend_from_slice(bytes_of(proof));
         Instruction {
             program_id: crate::zk_token_proof_program::id(),
             accounts: vec![],
@@ -86,7 +85,7 @@ impl ProofInstruction {
         if input.is_empty() {
             None
         } else {
-            pod_from_bytes(&input[1..])
+            bytemuck::try_from_bytes(&input[1..]).ok()
         }
     }
 }

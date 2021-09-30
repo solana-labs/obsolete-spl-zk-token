@@ -6,12 +6,14 @@ pub(crate) mod macros;
 pub mod encryption;
 
 #[cfg(not(target_arch = "bpf"))]
-pub mod errors;
+mod errors;
 
 #[cfg(not(target_arch = "bpf"))]
-pub mod range_proof;
+mod range_proof;
 #[cfg(not(target_arch = "bpf"))]
-pub mod transcript;
+mod transcript;
 
-pub mod instruction;
+mod instruction;
+pub mod zk_token_proof_instruction;
+pub mod zk_token_proof_program;
 pub mod pod;

@@ -2,7 +2,7 @@ use {
     crate::pod::*,
     bytemuck::{Pod, Zeroable},
     spl_zk_token_crypto::pod::*,
-    spl_zk_token_sdk::zk_token_proof_instruction::{
+    spl_zk_token_crypto::zk_token_proof_instruction::{
         TransferComms, TransferEphemeralState, TransferPubKeys,
     },
 };

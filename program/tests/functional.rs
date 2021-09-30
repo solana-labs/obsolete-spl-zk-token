@@ -11,9 +11,8 @@ use {
     spl_zk_token::{self, pod::*, *},
     spl_zk_token_crypto::{
         encryption::elgamal::{ElGamal, ElGamalCT, ElGamalPK},
-        pod::*,
     },
-    spl_zk_token_sdk::zk_token_proof_program,
+    spl_zk_token_crypto::zk_token_proof_program,
 };
 #[cfg(feature = "test-bpf")]
 use {
@@ -149,7 +148,7 @@ fn add_zk_transfer_auditor_account(
     };
     let zk_transfer_auditor_account = Account::create(
         ACCOUNT_RENT_EXEMPTION,
-        pod_bytes_of(&zk_transfer_auditor_state).to_vec(),
+        bytemuck::bytes_of(&zk_transfer_auditor_state).to_vec(),
         id(),
         false,
         Epoch::default(),
@@ -178,7 +177,7 @@ fn add_zk_token_account(
     };
     let zk_token_account = Account::create(
         ACCOUNT_RENT_EXEMPTION,
-        pod_bytes_of(&zk_token_account_state).to_vec(),
+        bytemuck::bytes_of(&zk_token_account_state).to_vec(),
         id(),
         false,
         Epoch::default(),

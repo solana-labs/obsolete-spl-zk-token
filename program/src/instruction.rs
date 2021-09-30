@@ -1,4 +1,5 @@
 //! Program instructions
+//!
 
 #[cfg(not(target_arch = "bpf"))]
 use spl_zk_token_crypto::encryption::elgamal::ElGamalPK;
@@ -16,7 +17,7 @@ use {
     spl_zk_token_crypto::pod::*,
 };
 
-pub use spl_zk_token_sdk::zk_token_proof_instruction::*;
+pub use spl_zk_token_crypto::zk_token_proof_instruction::*;
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
@@ -347,7 +348,7 @@ pub(crate) fn encode_instruction<T: Pod>(
     instruction_data: &T,
 ) -> Instruction {
     let mut data = vec![ToPrimitive::to_u8(&instruction_type).unwrap()];
-    data.extend_from_slice(pod_bytes_of(instruction_data));
+    data.extend_from_slice(bytemuck::bytes_of(instruction_data));
     Instruction {
         program_id: id(),
         accounts,

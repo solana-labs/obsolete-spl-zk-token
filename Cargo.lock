@@ -4728,7 +4728,6 @@ dependencies = [
  "spl-token",
  "spl-zk-token-crypto",
  "spl-zk-token-proof-program",
- "spl-zk-token-sdk",
 ]
 
 [[package]]
@@ -4743,9 +4742,12 @@ dependencies = [
  "curve25519-dalek 3.2.0",
  "getrandom 0.1.16",
  "merlin",
+ "num-derive",
+ "num-traits",
  "rand 0.7.3",
  "serde",
  "sha3",
+ "solana-program",
  "subtle",
  "thiserror",
  "time 0.1.44",
@@ -4761,17 +4763,6 @@ dependencies = [
  "num-derive",
  "num-traits",
  "solana-sdk",
- "spl-zk-token-sdk",
-]
-
-[[package]]
-name = "spl-zk-token-sdk"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "num-derive",
- "num-traits",
- "solana-program",
  "spl-zk-token-crypto",
 ]
 
