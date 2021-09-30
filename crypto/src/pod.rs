@@ -88,7 +88,7 @@ impl From<(PodPedersenComm, PodPedersenDecHandle)> for PodElGamalCT {
     fn from((pod_comm, pod_decrypt_handle): (PodPedersenComm, PodPedersenDecHandle)) -> Self {
         let mut buf = [0_u8; 64];
         buf[..32].copy_from_slice(&pod_comm.0);
-        buf[32..64].copy_from_slice(&pod_decrypt_handle.0);
+        buf[32..].copy_from_slice(&pod_decrypt_handle.0);
         PodElGamalCT(buf)
     }
 }
@@ -292,87 +292,112 @@ impl TryFrom<PodRangeProof128> for RangeProof {
 //  https://discord.com/channels/428295358100013066/774014770402689065/880529250246082611
 //
 
-pub const TWO_32: u64 = 4294967296;
-
-// Just this function needs syscall support
-//
-// On input two scalars x0, x1 and two ciphertexts ct0, ct1,
-// returns `Some(x0*ct0 + x1*ct1)` or `None` if the input was invalid
-#[cfg(not(target_arch = "bpf"))]
-pub fn add_pod_ciphertexts(
-    scalar_0: Scalar,
-    pod_ct_0: PodElGamalCT,
-    scalar_1: Scalar,
-    pod_ct_1: PodElGamalCT,
-) -> Option<PodElGamalCT> {
-    let ct_0: ElGamalCT = pod_ct_0.try_into().ok()?;
-    let ct_1: ElGamalCT = pod_ct_1.try_into().ok()?;
-
-    let ct_sum = ct_0 * scalar_0 + ct_1 * scalar_1;
-    Some(PodElGamalCT::from(ct_sum))
-}
-
 // All methods here rely on `general_add_pod_ciphertexts`
 pub struct PodElGamalArithmetic;
 
+#[cfg(not(target_arch = "bpf"))]
+impl PodElGamalArithmetic {
+    const TWO_32: u64 = 4294967296;
+
+    // On input two scalars x0, x1 and two ciphertexts ct0, ct1,
+    // returns `Some(x0*ct0 + x1*ct1)` or `None` if the input was invalid
+    fn add_pod_ciphertexts(
+        scalar_0: Scalar,
+        pod_ct_0: PodElGamalCT,
+        scalar_1: Scalar,
+        pod_ct_1: PodElGamalCT,
+    ) -> Option<PodElGamalCT> {
+        let ct_0: ElGamalCT = pod_ct_0.try_into().ok()?;
+        let ct_1: ElGamalCT = pod_ct_1.try_into().ok()?;
+
+        let ct_sum = ct_0 * scalar_0 + ct_1 * scalar_1;
+        Some(PodElGamalCT::from(ct_sum))
+    }
+
+    fn combine_lo_hi(pod_ct_lo: PodElGamalCT, pod_ct_hi: PodElGamalCT) -> Option<PodElGamalCT> {
+        Self::add_pod_ciphertexts(Scalar::one(), pod_ct_lo, Scalar::from(Self::TWO_32), pod_ct_hi)
+    }
+
+    pub fn add(pod_ct_0: PodElGamalCT, pod_ct_1: PodElGamalCT) -> Option<PodElGamalCT> {
+        Self::add_pod_ciphertexts(Scalar::one(), pod_ct_0, Scalar::one(), pod_ct_1)
+    }
+
+    pub fn add_with_lo_hi(
+        pod_ct_0: PodElGamalCT,
+        pod_ct_1_lo: PodElGamalCT,
+        pod_ct_1_hi: PodElGamalCT,
+    ) -> Option<PodElGamalCT> {
+        let pod_ct_1 = Self::combine_lo_hi(pod_ct_1_lo, pod_ct_1_hi)?;
+        Self::add_pod_ciphertexts(Scalar::one(), pod_ct_0, Scalar::one(), pod_ct_1)
+    }
+
+    pub fn subtract(pod_ct_0: PodElGamalCT, pod_ct_1: PodElGamalCT) -> Option<PodElGamalCT> {
+        Self::add_pod_ciphertexts(Scalar::one(), pod_ct_0, -Scalar::one(), pod_ct_1)
+    }
+
+    pub fn subtract_with_lo_hi(
+        pod_ct_0: PodElGamalCT,
+        pod_ct_1_lo: PodElGamalCT,
+        pod_ct_1_hi: PodElGamalCT,
+    ) -> Option<PodElGamalCT> {
+        let pod_ct_1 = Self::combine_lo_hi(pod_ct_1_lo, pod_ct_1_hi)?;
+        Self::add_pod_ciphertexts(Scalar::one(), pod_ct_0, -Scalar::one(), pod_ct_1)
+    }
+
+    pub fn add_to(pod_ct: PodElGamalCT, amount: u64) -> Option<PodElGamalCT> {
+        let mut amount_as_pod_ct = [0_u8; 64];
+        amount_as_pod_ct[..32].copy_from_slice(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes());
+        Self::add_pod_ciphertexts(
+            Scalar::one(),
+            pod_ct,
+            Scalar::from(amount),
+            PodElGamalCT(amount_as_pod_ct),
+        )
+    }
+
+    pub fn subtract_from(pod_ct: PodElGamalCT, amount: u64) -> Option<PodElGamalCT> {
+        let mut amount_as_pod_ct = [0_u8; 64];
+        amount_as_pod_ct[..32].copy_from_slice(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes());
+        Self::add_pod_ciphertexts(
+            Scalar::one(),
+            pod_ct,
+            -Scalar::from(amount),
+            PodElGamalCT(amount_as_pod_ct),
+        )
+    }
+}
+#[cfg(target_arch = "bpf")]
 #[allow(unused_variables)]
 impl PodElGamalArithmetic {
     pub fn add(pod_ct_0: PodElGamalCT, pod_ct_1: PodElGamalCT) -> Option<PodElGamalCT> {
-        #[cfg(not(target_arch = "bpf"))]
-        {
-            add_pod_ciphertexts(Scalar::one(), pod_ct_0, Scalar::one(), pod_ct_1)
-        }
-        #[cfg(target_arch = "bpf")]
+        None
+    }
+
+    pub fn add_with_lo_hi(
+        pod_ct_0: PodElGamalCT,
+        pod_ct_1_lo: PodElGamalCT,
+        pod_ct_1_hi: PodElGamalCT,
+    ) -> Option<PodElGamalCT> {
         None
     }
 
     pub fn subtract(pod_ct_0: PodElGamalCT, pod_ct_1: PodElGamalCT) -> Option<PodElGamalCT> {
-        #[cfg(not(target_arch = "bpf"))]
-        {
-            add_pod_ciphertexts(Scalar::one(), pod_ct_0, -Scalar::one(), pod_ct_1)
-        }
-        #[cfg(target_arch = "bpf")]
         None
     }
 
-    pub fn combine_lo_hi(pod_ct_lo: PodElGamalCT, pod_ct_hi: PodElGamalCT) -> Option<PodElGamalCT> {
-        #[cfg(not(target_arch = "bpf"))]
-        {
-            add_pod_ciphertexts(Scalar::one(), pod_ct_lo, Scalar::from(TWO_32), pod_ct_hi)
-        }
-        #[cfg(target_arch = "bpf")]
+    pub fn subtract_with_lo_hi(
+        pod_ct_0: PodElGamalCT,
+        pod_ct_1_lo: PodElGamalCT,
+        pod_ct_1_hi: PodElGamalCT,
+    ) -> Option<PodElGamalCT> {
         None
     }
 
     pub fn add_to(pod_ct: PodElGamalCT, amount: u64) -> Option<PodElGamalCT> {
-        #[cfg(not(target_arch = "bpf"))]
-        {
-            let mut amount_as_pod_ct = [0_u8; 64];
-            amount_as_pod_ct[..32].copy_from_slice(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes());
-            add_pod_ciphertexts(
-                Scalar::one(),
-                pod_ct,
-                Scalar::from(amount),
-                PodElGamalCT(amount_as_pod_ct),
-            )
-        }
-        #[cfg(target_arch = "bpf")]
         None
     }
 
     pub fn subtract_from(pod_ct: PodElGamalCT, amount: u64) -> Option<PodElGamalCT> {
-        #[cfg(not(target_arch = "bpf"))]
-        {
-            let mut amount_as_pod_ct = [0_u8; 64];
-            amount_as_pod_ct[..32].copy_from_slice(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes());
-            add_pod_ciphertexts(
-                Scalar::one(),
-                pod_ct,
-                -Scalar::from(amount),
-                PodElGamalCT(amount_as_pod_ct),
-            )
-        }
-        #[cfg(target_arch = "bpf")]
         None
     }
 }
@@ -564,7 +589,7 @@ mod tests {
 
         // test
         let final_source_open =
-            source_open - (open_lo.clone() + open_hi.clone() * Scalar::from(TWO_32));
+            source_open - (open_lo.clone() + open_hi.clone() * Scalar::from(PodElGamalArithmetic::TWO_32));
         let expected_source: PodElGamalCT =
             source_pk.encrypt_with(22_u64, &final_source_open).into();
         assert_eq!(expected_source, final_source_spendable);
@@ -582,7 +607,7 @@ mod tests {
         let final_dest_pending =
             PodElGamalArithmetic::add(dest_pending_ct, dest_combined_ct).unwrap();
 
-        let final_dest_open = dest_open + (open_lo + open_hi * Scalar::from(TWO_32));
+        let final_dest_open = dest_open + (open_lo + open_hi * Scalar::from(PodElGamalArithmetic::TWO_32));
         let expected_dest_ct: PodElGamalCT = dest_pk.encrypt_with(132_u64, &final_dest_open).into();
         assert_eq!(expected_dest_ct, final_dest_pending);
     }
