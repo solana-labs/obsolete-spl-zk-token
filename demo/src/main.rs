@@ -274,7 +274,7 @@ fn process_demo(
     let (_pending_balance_ct_a, current_balance_ct_a) =
         get_zk_token_balance(rpc_client, &zk_token_account_a)?;
 
-    let (transfer_range_proof, transfer_validity_proof) = spl_zk_token::instruction::transfer(
+    let (mut transfer_range_proof, transfer_validity_proof) = spl_zk_token::instruction::transfer(
         zk_token_account_a,
         token_account_a.pubkey(),
         zk_token_account_b,
@@ -293,6 +293,18 @@ fn process_demo(
         ),
     );
 
+    transfer_range_proof.extend(transfer_validity_proof);
+    send(
+        rpc_client,
+        &format!(
+            "Transferring {} from {} to {}",
+            current_balance_a, zk_token_account_a, zk_token_account_b
+        ),
+        &transfer_range_proof,
+        &[payer],
+    )?;
+
+    /*
     send(
         rpc_client,
         &format!(
@@ -311,6 +323,7 @@ fn process_demo(
         &transfer_validity_proof,
         &[payer],
     )?;
+    */
 
     send(
         rpc_client,
