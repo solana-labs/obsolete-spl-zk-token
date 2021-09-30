@@ -1,9 +1,9 @@
 use {
     crate::pod::*,
     bytemuck::{Pod, Zeroable},
-    spl_zk_token_sdk::pod::*,
-    spl_zk_token_sdk::zk_token_proof_instruction::{
-        TransferComms, TransferEphemeralState, TransferPubKeys,
+    spl_zk_token_sdk::{
+        zk_token_elgamal::pod,
+        zk_token_proof_instruction::{TransferComms, TransferEphemeralState, TransferPubKeys},
     },
 };
 
@@ -19,7 +19,7 @@ pub struct TransferAuditor {
     pub enabled: PodBool,
 
     /// ElGamal public key for the transfer auditor.
-    pub elgamal_pk: PodElGamalPK,
+    pub elgamal_pk: pod::ElGamalPK,
 }
 impl PodAccountInfo<'_, '_> for TransferAuditor {}
 
@@ -39,13 +39,13 @@ pub struct OutboundTransfer {
     pub amount_comms: TransferComms,
 
     /// The source and destination decryption handles
-    pub source_lo: PodPedersenDecHandle,
-    pub source_hi: PodPedersenDecHandle,
-    pub dest_lo: PodPedersenDecHandle,
-    pub dest_hi: PodPedersenDecHandle,
+    pub source_lo: pod::PedersenDecHandle,
+    pub source_hi: pod::PedersenDecHandle,
+    pub dest_lo: pod::PedersenDecHandle,
+    pub dest_hi: pod::PedersenDecHandle,
 
     /// The available balance in the source account after the transfer completes
-    pub new_available_balance: PodElGamalCT,
+    pub new_available_balance: pod::ElGamalCT,
 
     /// Ephemeral state between the two transfer instruction data
     pub ephemeral_state: TransferEphemeralState,
@@ -65,13 +65,13 @@ pub struct ConfidentialAccount {
     pub token_account: PodPubkey,
 
     /// The public key associated with ElGamal encryption
-    pub elgamal_pk: PodElGamalPK,
+    pub elgamal_pk: pod::ElGamalPK,
 
     /// The pending balance (encrypted by `elgamal_pk`)
-    pub pending_balance: PodElGamalCT,
+    pub pending_balance: pod::ElGamalCT,
 
     /// The available balance (encrypted by `elgamal_pk`)
-    pub available_balance: PodElGamalCT,
+    pub available_balance: pod::ElGamalCT,
 
     /// Prohibit incoming transfers if `false`
     pub accept_incoming_transfers: PodBool,
