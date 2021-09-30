@@ -14,16 +14,15 @@ bytemuck = { version = "1.7.2", features = ["derive"] }
 [target.'cfg(not(target_arch = "bpf"))'.dependencies]
 arrayref = "0.3.6"
 bincode = "1"
-byteorder = { version = "1", default-features = false }
-clear_on_drop = { version = "0.2", default-features = false }
-curve25519-dalek = { version = "2", default-features = false, features = ["u64_backend", "alloc", "serde"] }
-digest = { version = "0.8", default-features = false }
+byteorder = "1"
+clear_on_drop = "0.2"
+curve25519-dalek = { version = "3.2.0", features = ["serde"]}
 getrandom = { version = "0.1", features = ["dummy"] }
-merlin = { version = "2", default-features = false }
+merlin = "2"
 rand = "0.7"
 serde = { version = "1.0", features = ["derive"] }
-sha3 = { version = "0.8", default-features = false }
-subtle = { version = "2", default-features = false }
+sha3 = "0.9"
+subtle = "2"
 thiserror = "1"
 zeroize = { version = "1.2.0", default-features = false, features = ["zeroize_derive"] }
 
