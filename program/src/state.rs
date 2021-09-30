@@ -19,7 +19,7 @@ pub struct TransferAuditor {
     pub enabled: PodBool,
 
     /// ElGamal public key for the transfer auditor.
-    pub elgamal_pk: pod::ElGamalPK,
+    pub elgamal_pk: pod::ElGamalPubkey,
 }
 impl PodAccountInfo<'_, '_> for TransferAuditor {}
 
@@ -45,7 +45,7 @@ pub struct OutboundTransfer {
     pub dest_hi: pod::PedersenDecHandle,
 
     /// The available balance in the source account after the transfer completes
-    pub new_available_balance: pod::ElGamalCT,
+    pub new_available_balance: pod::ElGamalCiphertext,
 
     /// Ephemeral state between the two transfer instruction data
     pub ephemeral_state: TransferEphemeralState,
@@ -65,13 +65,13 @@ pub struct ConfidentialAccount {
     pub token_account: PodPubkey,
 
     /// The public key associated with ElGamal encryption
-    pub elgamal_pk: pod::ElGamalPK,
+    pub elgamal_pk: pod::ElGamalPubkey,
 
     /// The pending balance (encrypted by `elgamal_pk`)
-    pub pending_balance: pod::ElGamalCT,
+    pub pending_balance: pod::ElGamalCiphertext,
 
     /// The available balance (encrypted by `elgamal_pk`)
-    pub available_balance: pod::ElGamalCT,
+    pub available_balance: pod::ElGamalCiphertext,
 
     /// Prohibit incoming transfers if `false`
     pub accept_incoming_transfers: PodBool,

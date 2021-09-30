@@ -40,7 +40,7 @@ struct Config {
 fn get_zk_token_transfer_auditor(
     rpc_client: &RpcClient,
     token_mint: &Pubkey,
-) -> client_error::Result<ElGamalPK> {
+) -> client_error::Result<ElGamalPubkey> {
     let zk_transfer_auditor = spl_zk_token::get_transfer_auditor_address(token_mint);
     let account = rpc_client.get_account(&zk_transfer_auditor)?;
 
@@ -81,8 +81,8 @@ fn get_zk_token_balance(
     rpc_client: &RpcClient,
     zk_token_account: &Pubkey,
 ) -> client_error::Result<(
-    /* pending_balance: */ ElGamalCT,
-    /* available_balance: */ ElGamalCT,
+    /* pending_balance: */ ElGamalCiphertext,
+    /* available_balance: */ ElGamalCiphertext,
 )> {
     get_zk_token_state(rpc_client, zk_token_account).map(|zk_token_state| {
         (
