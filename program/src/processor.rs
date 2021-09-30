@@ -17,8 +17,10 @@ use {
         system_instruction,
         sysvar::{self, Sysvar},
     },
-    spl_zk_token_sdk::pod::*,
-    spl_zk_token_sdk::zk_token_proof_program,
+    spl_zk_token_sdk::{
+        zk_token_elgamal::{ops, pod},
+        zk_token_proof_program,
+    },
     std::result::Result,
 };
 
@@ -206,7 +208,7 @@ fn create_pda_account<'a>(
 /// Processes an [ConfigureMint] instruction.
 fn process_configure_mint(
     accounts: &[AccountInfo],
-    transfer_auditor_pk: Option<&PodElGamalPK>,
+    transfer_auditor_pk: Option<&pod::ElGamalPK>,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let funder_info = next_account_info(account_info_iter)?;
@@ -324,7 +326,7 @@ fn process_configure_mint(
 /// Processes an [UpdateTransferAuditor] instruction.
 fn process_update_transfer_auditor(
     accounts: &[AccountInfo],
-    new_transfer_auditor_pk: Option<&PodElGamalPK>,
+    new_transfer_auditor_pk: Option<&pod::ElGamalPK>,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let transfer_auditor_info = next_account_info(account_info_iter)?;
@@ -456,8 +458,8 @@ fn process_create_account(
 
         This should just be encoded as [0; 64]
     */
-    confidential_account.pending_balance = PodElGamalCT::zeroed();
-    confidential_account.available_balance = PodElGamalCT::zeroed();
+    confidential_account.pending_balance = pod::ElGamalCT::zeroed();
+    confidential_account.available_balance = pod::ElGamalCT::zeroed();
 
     Ok(())
 }
@@ -484,7 +486,7 @@ fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
         &previous_instruction,
     )?;
 
-    if confidential_account.pending_balance != PodElGamalCT::zeroed() {
+    if confidential_account.pending_balance != pod::ElGamalCT::zeroed() {
         msg!("Pending balance is not zero");
         return Err(ProgramError::InvalidAccountData);
     }
@@ -533,7 +535,7 @@ fn process_update_account_pk(accounts: &[AccountInfo]) -> ProgramResult {
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    if confidential_account.pending_balance != PodElGamalCT::zeroed() {
+    if confidential_account.pending_balance != pod::ElGamalCT::zeroed() {
         msg!("Pending balance is not zero");
         return Err(ProgramError::InvalidAccountData);
     }
@@ -609,7 +611,7 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
     )?;
 
     confidential_account.pending_balance =
-        PodElGamalArithmetic::add_to(confidential_account.pending_balance, amount)
+        ops::add_to(confidential_account.pending_balance, amount)
             .ok_or(ProgramError::InvalidInstructionData)?;
 
     Ok(())
@@ -647,7 +649,7 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
     )?;
 
     confidential_account.available_balance =
-        PodElGamalArithmetic::subtract_from(confidential_account.available_balance, amount)
+        ops::subtract_from(confidential_account.available_balance, amount)
             .ok_or(ProgramError::InvalidInstructionData)?;
 
     if confidential_account.available_balance != data.final_balance_ct {
@@ -748,16 +750,16 @@ fn process_transfer_common(
     // Subtract from source available balance
     {
         // Combine commitments and handles
-        let source_lo_ct = PodElGamalCT::from((
+        let source_lo_ct = pod::ElGamalCT::from((
             confidential_account.outbound_transfer.amount_comms.lo,
             confidential_account.outbound_transfer.source_lo,
         ));
-        let source_hi_ct = PodElGamalCT::from((
+        let source_hi_ct = pod::ElGamalCT::from((
             confidential_account.outbound_transfer.amount_comms.hi,
             confidential_account.outbound_transfer.source_hi,
         ));
 
-        confidential_account.available_balance = PodElGamalArithmetic::subtract_with_lo_hi(
+        confidential_account.available_balance = ops::subtract_with_lo_hi(
             confidential_account.available_balance,
             source_lo_ct,
             source_hi_ct,
@@ -774,17 +776,17 @@ fn process_transfer_common(
 
     // Add to destination pending balance
     {
-        let dest_lo_ct = PodElGamalCT::from((
+        let dest_lo_ct = pod::ElGamalCT::from((
             confidential_account.outbound_transfer.amount_comms.lo,
             confidential_account.outbound_transfer.dest_lo,
         ));
 
-        let dest_hi_ct = PodElGamalCT::from((
+        let dest_hi_ct = pod::ElGamalCT::from((
             confidential_account.outbound_transfer.amount_comms.hi,
             confidential_account.outbound_transfer.dest_hi,
         ));
 
-        receiver_confidential_account.pending_balance = PodElGamalArithmetic::add_with_lo_hi(
+        receiver_confidential_account.pending_balance = ops::add_with_lo_hi(
             receiver_confidential_account.pending_balance,
             dest_lo_ct,
             dest_hi_ct,
@@ -913,7 +915,7 @@ fn process_apply_pending_balance(accounts: &[AccountInfo]) -> ProgramResult {
         account_info_iter.as_slice(),
     )?;
 
-    confidential_account.available_balance = PodElGamalArithmetic::add(
+    confidential_account.available_balance = ops::add(
         confidential_account.available_balance,
         confidential_account.pending_balance,
     )

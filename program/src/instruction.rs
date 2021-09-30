@@ -14,7 +14,7 @@ use {
         pubkey::Pubkey,
         sysvar,
     },
-    spl_zk_token_sdk::pod::*,
+    spl_zk_token_sdk::zk_token_elgamal::pod,
 };
 
 pub use spl_zk_token_sdk::zk_token_proof_instruction::*;
@@ -23,21 +23,21 @@ pub use spl_zk_token_sdk::zk_token_proof_instruction::*;
 #[repr(transparent)]
 pub struct ConfigureMintInstructionData {
     /// The `transfer_auditor` public key.
-    pub transfer_auditor_pk: PodElGamalPK,
+    pub transfer_auditor_pk: pod::ElGamalPK,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct UpdateTransferAuditorInstructionData {
     /// The new `transfer_auditor` public key.
-    pub new_transfer_auditor_pk: PodElGamalPK,
+    pub new_transfer_auditor_pk: pod::ElGamalPK,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct CreateAccountInstructionData {
     /// The public key associated with the account
-    pub elgamal_pk: PodElGamalPK,
+    pub elgamal_pk: pod::ElGamalPK,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -359,7 +359,7 @@ pub(crate) fn encode_instruction<T: Pod>(
 fn _configure_mint(
     funding_address: Pubkey,
     token_mint_address: Pubkey,
-    transfer_auditor_pk_and_freeze_authority: Option<(PodElGamalPK, Pubkey)>,
+    transfer_auditor_pk_and_freeze_authority: Option<(pod::ElGamalPK, Pubkey)>,
 ) -> Instruction {
     let omnibus_token_address = get_omnibus_token_address(&token_mint_address);
     let transfer_auditor_address = get_transfer_auditor_address(&token_mint_address);
@@ -398,7 +398,7 @@ pub fn configure_mint(funding_address: Pubkey, token_mint_address: Pubkey) -> In
 pub fn configure_mint_with_transfer_auditor(
     funding_address: Pubkey,
     token_mint_address: Pubkey,
-    transfer_auditor_pk: PodElGamalPK,
+    transfer_auditor_pk: pod::ElGamalPK,
     freeze_authority: Pubkey,
 ) -> Instruction {
     _configure_mint(
