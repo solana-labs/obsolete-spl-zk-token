@@ -10,16 +10,16 @@ publish = false
 
 [dependencies]
 clap = "2.33.3"
-solana-clap-utils = "=1.7.11"
-solana-cli-config = "=1.7.11"
-solana-client = "=1.7.11"
-solana-logger = "=1.7.11"
-solana-remote-wallet = "=1.7.11"
-solana-sdk = "=1.7.11"
+solana-clap-utils = "=1.7.13"
+solana-cli-config = "=1.7.13"
+solana-client = "=1.7.13"
+solana-logger = "=1.7.13"
+solana-remote-wallet = "=1.7.13"
+solana-sdk = "=1.7.13"
 tokio = { version = "1", features = ["full"] }
 spl-token = { version = "3.2.0", features = ["no-entrypoint"] }
 spl-zk-token = { path = "../program", features = ["no-entrypoint"]}
 spl-zk-token-crypto = { path = "../crypto"}
 
 [dev-dependencies]
-solana-validator = "=1.7.11"
+solana-validator = "=1.7.13"
