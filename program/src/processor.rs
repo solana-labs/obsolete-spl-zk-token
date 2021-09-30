@@ -608,17 +608,10 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
         &accounts,
     )?;
 
-    #[cfg(target_arch = "bpf")]
-    {
-        // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY ONLY TO PACIFY CLIPPY
-        confidential_account.pending_balance = PodElGamalCT::zeroed();
-    }
-    #[cfg(not(target_arch = "bpf"))]
-    {
-        confidential_account.pending_balance =
-            PodElGamalArithmetic::add_to(confidential_account.pending_balance, amount)
-                .ok_or(ProgramError::InvalidInstructionData)?;
-    }
+    confidential_account.pending_balance =
+        PodElGamalArithmetic::add_to(confidential_account.pending_balance, amount)
+            .ok_or(ProgramError::InvalidInstructionData)?;
+
     Ok(())
 }
 
@@ -653,17 +646,9 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
         &previous_instruction,
     )?;
 
-    #[cfg(target_arch = "bpf")]
-    {
-        // TODO: THIS IS WRONG. IT EXISTS TEMPORARILY ONLY TO PACIFY CLIPPY
-        confidential_account.available_balance = data.final_balance_ct;
-    }
-    #[cfg(not(target_arch = "bpf"))]
-    {
-        confidential_account.available_balance =
-            PodElGamalArithmetic::subtract_from(confidential_account.available_balance, amount)
-                .ok_or(ProgramError::InvalidInstructionData)?;
-    }
+    confidential_account.available_balance =
+        PodElGamalArithmetic::subtract_from(confidential_account.available_balance, amount)
+            .ok_or(ProgramError::InvalidInstructionData)?;
 
     if confidential_account.available_balance != data.final_balance_ct {
         msg!("Available balance mismatch");
@@ -928,19 +913,11 @@ fn process_apply_pending_balance(accounts: &[AccountInfo]) -> ProgramResult {
         account_info_iter.as_slice(),
     )?;
 
-    #[cfg(target_arch = "bpf")]
-    {
-        // TODO: THIS IS WRONG
-        confidential_account.pending_balance = PodElGamalCT::zeroed();
-    }
-    #[cfg(not(target_arch = "bpf"))]
-    {
-        confidential_account.available_balance = PodElGamalArithmetic::add(
-            confidential_account.available_balance,
-            confidential_account.pending_balance,
-        )
-        .ok_or(ProgramError::InvalidInstructionData)?;
-    }
+    confidential_account.available_balance = PodElGamalArithmetic::add(
+        confidential_account.available_balance,
+        confidential_account.pending_balance,
+    )
+    .ok_or(ProgramError::InvalidInstructionData)?;
 
     Ok(())
 }
