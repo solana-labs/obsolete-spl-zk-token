@@ -4761,12 +4761,24 @@ dependencies = [
  "solana-validator",
  "spl-memo",
  "spl-token",
- "spl-zk-token-crypto",
  "spl-zk-token-proof-program",
+ "spl-zk-token-sdk",
 ]
 
 [[package]]
-name = "spl-zk-token-crypto"
+name = "spl-zk-token-proof-program"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "getrandom 0.1.16",
+ "num-derive",
+ "num-traits",
+ "solana-sdk",
+ "spl-zk-token-sdk",
+]
+
+[[package]]
+name = "spl-zk-token-sdk"
 version = "0.1.0"
 dependencies = [
  "arrayref",
@@ -4787,18 +4799,6 @@ dependencies = [
  "thiserror",
  "time 0.1.44",
  "zeroize",
-]
-
-[[package]]
-name = "spl-zk-token-proof-program"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "getrandom 0.1.16",
- "num-derive",
- "num-traits",
- "solana-sdk",
- "spl-zk-token-crypto",
 ]
 
 [[package]]
@@ -6011,7 +6011,7 @@ dependencies = [
  "solana-validator",
  "spl-token",
  "spl-zk-token",
- "spl-zk-token-crypto",
+ "spl-zk-token-sdk",
  "tokio",
 ]
 

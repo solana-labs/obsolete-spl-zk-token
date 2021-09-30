@@ -9,14 +9,12 @@ use {
         transaction::Transaction,
     },
     spl_zk_token::{self, pod::*, *},
-    spl_zk_token_crypto::{
-        encryption::elgamal::{ElGamal, ElGamalCT, ElGamalPK},
-    },
-    spl_zk_token_crypto::zk_token_proof_program,
+    spl_zk_token_sdk::encryption::elgamal::{ElGamal, ElGamalCT, ElGamalPK},
+    spl_zk_token_sdk::zk_token_proof_program,
 };
 #[cfg(feature = "test-bpf")]
 use {
-    spl_zk_token_crypto::encryption::pedersen::PedersenOpen,
+    spl_zk_token_sdk::encryption::pedersen::PedersenOpen,
     std::{borrow::Borrow, convert::TryInto},
 };
 
@@ -28,7 +26,7 @@ fn program_test() -> ProgramTest {
     );
 
     pc.add_builtin_program(
-        "spl_zk_token_crypto",
+        "spl_zk_token_sdk",
         zk_token_proof_program::id(),
         spl_zk_token_proof_program::process_instruction,
     );

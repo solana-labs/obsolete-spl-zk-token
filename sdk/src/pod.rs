@@ -269,20 +269,6 @@ impl TryFrom<PodRangeProof128> for RangeProof {
     }
 }
 
-// Arithmetic functions on PodElGamalCT's.
-//
-// The conversion PodElGamalCT --> ElGamalCT require the use of
-//      CompressedRistretto::decompress(&self) -> Option<RistrettoPoint>
-//
-// which is about 310k BPF instructions. Hence, we need syscalls for the following functions for
-// the ZK Token program to add/subtract balances without needing to do type conversion as BPF
-// instructions.
-//
-// This is regarding the discussion:
-//  https://discord.com/channels/428295358100013066/774014770402689065/880529250246082611
-//
-
-// All methods here rely on `general_add_pod_ciphertexts`
 pub struct PodElGamalArithmetic;
 
 #[cfg(not(target_arch = "bpf"))]

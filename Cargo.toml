@@ -1,6 +1,6 @@
 [workspace]
 members = [
-  "crypto",
+  "sdk",
   "program",
   "proof-program",
   "demo",

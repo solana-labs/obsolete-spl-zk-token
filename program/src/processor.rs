@@ -17,8 +17,8 @@ use {
         system_instruction,
         sysvar::{self, Sysvar},
     },
-    spl_zk_token_crypto::pod::*,
-    spl_zk_token_crypto::zk_token_proof_program,
+    spl_zk_token_sdk::pod::*,
+    spl_zk_token_sdk::zk_token_proof_program,
     std::result::Result,
 };
 

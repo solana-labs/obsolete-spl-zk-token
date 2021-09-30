@@ -26,7 +26,7 @@ use {
         transaction::Transaction,
     },
     spl_zk_token::pod::*,
-    spl_zk_token_crypto::encryption::elgamal::*,
+    spl_zk_token_sdk::encryption::elgamal::*,
     std::{convert::TryInto, process::exit, sync::Arc},
 };
 

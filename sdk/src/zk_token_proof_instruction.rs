@@ -2,7 +2,7 @@
 pub use crate::instruction::*;
 
 use {
-    bytemuck::{bytes_of,Pod},
+    bytemuck::{bytes_of, Pod},
     num_derive::{FromPrimitive, ToPrimitive},
     num_traits::{FromPrimitive, ToPrimitive},
     solana_program::{instruction::Instruction, pubkey::Pubkey},
