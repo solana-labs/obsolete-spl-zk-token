@@ -1,6 +1,10 @@
-use curve25519_dalek::ristretto::RistrettoPoint;
-use digest::{ExtendableOutput, Input, XofReader};
-use sha3::{Sha3XofReader, Shake256};
+use {
+    curve25519_dalek::{
+        digest::{ExtendableOutput, Update, XofReader},
+        ristretto::RistrettoPoint,
+    },
+    sha3::{Sha3XofReader, Shake256},
+};
 
 /// Generators for Pedersen vector commitments.
 ///
@@ -14,11 +18,11 @@ impl GeneratorsChain {
     /// Creates a chain of generators, determined by the hash of `label`.
     fn new(label: &[u8]) -> Self {
         let mut shake = Shake256::default();
-        shake.input(b"GeneratorsChain");
-        shake.input(label);
+        shake.update(b"GeneratorsChain");
+        shake.update(label);
 
         GeneratorsChain {
-            reader: shake.xof_result(),
+            reader: shake.finalize_xof(),
         }
     }
 
