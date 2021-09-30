@@ -315,7 +315,12 @@ impl PodElGamalArithmetic {
     }
 
     fn combine_lo_hi(pod_ct_lo: PodElGamalCT, pod_ct_hi: PodElGamalCT) -> Option<PodElGamalCT> {
-        Self::add_pod_ciphertexts(Scalar::one(), pod_ct_lo, Scalar::from(Self::TWO_32), pod_ct_hi)
+        Self::add_pod_ciphertexts(
+            Scalar::one(),
+            pod_ct_lo,
+            Scalar::from(Self::TWO_32),
+            pod_ct_hi,
+        )
     }
 
     pub fn add(pod_ct_0: PodElGamalCT, pod_ct_1: PodElGamalCT) -> Option<PodElGamalCT> {
@@ -588,8 +593,8 @@ mod tests {
             PodElGamalArithmetic::subtract(source_spendable_ct, source_combined_ct).unwrap();
 
         // test
-        let final_source_open =
-            source_open - (open_lo.clone() + open_hi.clone() * Scalar::from(PodElGamalArithmetic::TWO_32));
+        let final_source_open = source_open
+            - (open_lo.clone() + open_hi.clone() * Scalar::from(PodElGamalArithmetic::TWO_32));
         let expected_source: PodElGamalCT =
             source_pk.encrypt_with(22_u64, &final_source_open).into();
         assert_eq!(expected_source, final_source_spendable);
@@ -607,7 +612,8 @@ mod tests {
         let final_dest_pending =
             PodElGamalArithmetic::add(dest_pending_ct, dest_combined_ct).unwrap();
 
-        let final_dest_open = dest_open + (open_lo + open_hi * Scalar::from(PodElGamalArithmetic::TWO_32));
+        let final_dest_open =
+            dest_open + (open_lo + open_hi * Scalar::from(PodElGamalArithmetic::TWO_32));
         let expected_dest_ct: PodElGamalCT = dest_pk.encrypt_with(132_u64, &final_dest_open).into();
         assert_eq!(expected_dest_ct, final_dest_pending);
     }
