@@ -17,11 +17,8 @@ use {
         transaction::Transaction,
     },
     spl_zk_token::pod::*,
-    spl_zk_token_sdk::{
-        curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT as G,
-        encryption::{dlog::decode_u32_precomputation, elgamal::*},
-    },
-    std::{collections::HashMap, convert::TryInto, process::exit, sync::Arc},
+    spl_zk_token_sdk::encryption::{dlog::decode_u32_precomputation_for_G, elgamal::*},
+    std::{convert::TryInto, process::exit, sync::Arc},
 };
 
 struct Config {
@@ -111,17 +108,12 @@ fn send(
     Ok(())
 }
 
-fn dlog_precompute() -> HashMap<[u8; 32], u32> {
-    println!("==> Precomputing discrete log data for decryption (~300kb)");
-    decode_u32_precomputation(G)
-}
-
 fn process_demo(
     rpc_client: &RpcClient,
     payer: &dyn Signer,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Pre-compute HashMap needed for decryption. The HashMap is independent of (works for) any key.
-    let decryption_data = dlog_precompute();
+    println!("==> Precomputing discrete log data for decryption (~300kb)");
+    let decryption_data = decode_u32_precomputation_for_G(); // TODO: Move to build time
 
     let token_mint = Keypair::new();
 
