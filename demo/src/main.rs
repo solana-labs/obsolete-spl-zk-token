@@ -17,7 +17,7 @@ use {
         transaction::Transaction,
     },
     spl_zk_token::pod::*,
-    spl_zk_token_sdk::encryption::{dlog::decode_u32_precomputation_for_G, elgamal::*},
+    spl_zk_token_sdk::encryption::{discrete_log, elgamal::*},
     std::{convert::TryInto, process::exit, sync::Arc},
 };
 
@@ -113,7 +113,7 @@ fn process_demo(
     payer: &dyn Signer,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("==> Precomputing discrete log data for decryption (~300kb)");
-    let decryption_data = decode_u32_precomputation_for_G(); // TODO: Move to build time
+    let decryption_data = discrete_log::decode_u32_precomputation_for_G(); // TODO: Move to build time
 
     let token_mint = Keypair::new();
 
@@ -290,13 +290,13 @@ fn process_demo(
     );
 
     let transfer_data = spl_zk_token::instruction::TransferData::new(
-            mint_amount,
-            current_balance_a,
-            current_balance_ct_a,
-            elgamal_pk_a,
-            &elgamal_sk_a,
-            elgamal_pk_b,
-            auditor_elgamal_pk,
+        mint_amount,
+        current_balance_a,
+        current_balance_ct_a,
+        elgamal_pk_a,
+        &elgamal_sk_a,
+        elgamal_pk_b,
+        auditor_elgamal_pk,
     );
 
     let (mut transfer_range_proof, transfer_validity_proof) = spl_zk_token::instruction::transfer(
