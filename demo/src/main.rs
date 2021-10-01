@@ -261,7 +261,6 @@ fn process_demo(
         &[payer],
     )?;
 
-
     assert_eq!(
         rpc_client
             .get_token_account_balance(&token_account_a.pubkey())?
