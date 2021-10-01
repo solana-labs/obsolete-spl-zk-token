@@ -169,8 +169,8 @@ fn process_demo(
             rpc_client,
             &format!(
                 "Creating token account with {} tokens: {}",
+                mint_amount,
                 token_account.pubkey(),
-                mint_amount
             ),
             &[
                 system_instruction::create_account(
@@ -203,7 +203,7 @@ fn process_demo(
         );
         send(
             rpc_client,
-            &format!("Creating confidential token account: {}", zk_token_account),
+            &format!("Creating confidential token account {}", zk_token_account),
             &spl_zk_token::instruction::create_account(
                 payer.pubkey(),
                 zk_token_account,
