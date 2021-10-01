@@ -1,12 +1,3 @@
-/*
-  Prereqs:
-    $ cd zk-token/program
-    $ cargo build-bpf
-    $ cd ../../solana
-    $ validator/solana-test-validator \
-        --bpf-program ZkTokenXHhH6t1juaWF74WLcfv4XoNocjXA6sPWHNg1 \
-                      ../zk-token/target/deploy/spl_zk_token.so
-*/
 use {
     clap::{crate_description, crate_name, crate_version, App, Arg},
     solana_clap_utils::{
@@ -258,6 +249,19 @@ fn process_demo(
 
     current_balance_a += mint_amount;
 
+    send(
+        rpc_client,
+        &format!("Applying pending balance for {}", zk_token_account_a),
+        &spl_zk_token::instruction::apply_pending_balance(
+            zk_token_account_a,
+            token_account_a.pubkey(),
+            payer.pubkey(),
+            &[],
+        ),
+        &[payer],
+    )?;
+
+
     assert_eq!(
         rpc_client
             .get_token_account_balance(&token_account_a.pubkey())?
@@ -271,8 +275,9 @@ fn process_demo(
         "100",
     );
 
-    let (_pending_balance_ct_a, current_balance_ct_a) =
+    let (pending_balance_ct_a, current_balance_ct_a) =
         get_zk_token_balance(rpc_client, &zk_token_account_a)?;
+    assert_eq!(pending_balance_ct_a, ElGamalCiphertext::default());
 
     let (mut transfer_range_proof, transfer_validity_proof) = spl_zk_token::instruction::transfer(
         zk_token_account_a,
@@ -297,7 +302,7 @@ fn process_demo(
     send(
         rpc_client,
         &format!(
-            "Transferring {} from {} to {}",
+            "Transferring {} confidentially from {} to {}",
             current_balance_a, zk_token_account_a, zk_token_account_b
         ),
         &transfer_range_proof,
@@ -497,6 +502,7 @@ mod test {
     use {super::*, solana_validator::test_validator::*};
 
     #[test]
+    #[ignore]
     fn test_demo() {
         let (test_validator, payer) = TestValidatorGenesis::default()
             .add_program("spl_zk_token", spl_zk_token::id())

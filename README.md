@@ -1,5 +1,5 @@
 
-## Confidential Token Program
+# Confidential Token Program
 This program is a companion to the SPL Token program that enables confidential
 (**not** anonymous) transfers of SPL Tokens.
 
@@ -7,6 +7,52 @@ Any SPL Token can take enable confidential transfers. However SPL Tokens with a
 freeze authority can optionally enable a feature that allows a global auditor to
 also view all confidential transfer balances, and the freeze authority extends
 to confidential token accounts.
+
+
+
+## Development Environment
+
+### Setup
+A specific fork of the Solana monorepo is required for development:
+```
+$ git clone git@github.com:mvines/solana.git -b ctoken
+```
+
+Then clone this repository as a subdirectory of the Solana monorepo:
+```
+$ cd solana/
+$ git clone git@github.com:solana-labs/spl-zk-token.git zk-token
+```
+
+Finally run the embed script to configure your zk-token and monorepo projects.
+This will modify some `Cargo.toml` files in both projects:
+
+```
+$ cd solana/zk-token/
+$ ./scripts/embed.sh
+```
+
+### Transfer Demo
+
+To run the simple confidential transfer demo, first build the BPF program:
+```
+$ cd solana/zk-token/program/
+$ cargo build-bpf
+```
+
+Then start the `solana-test-validator`:
+```
+$ cd solana/
+$ ./validator/solana-test-validator --reset \
+    --bpf-program ZkTokenXHhH6t1juaWF74WLcfv4XoNocjXA6sPWHNg1 \
+    zk-token/target/deploy/spl_zk_token.so
+```
+
+Finally in another shell, run:
+```
+$ cd solana/zk-token/demo/
+$ cargo run -- -ul
+```
 
 ## Use cases
 
@@ -79,7 +125,7 @@ holds the SPL Token account, and therefore is already confidential token aware.
 ### Freezing of confidential funds
 Freezing the primary SPL Token account also causes the companion confidential token account to be frozen.
 
-### Making a confidential transfer
+### Making a confidential transfer [TODO: This section is out of date]
 Multiple transactions are required to perform a confidential transfer due to the
 current max the transaction size of 1232 bytes.
 

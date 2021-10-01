@@ -10,7 +10,6 @@ use {
     },
     spl_zk_token::{self, pod::*, *},
     spl_zk_token_sdk::encryption::elgamal::{ElGamal, ElGamalCiphertext, ElGamalPubkey},
-    spl_zk_token_sdk::zk_token_proof_program,
 };
 #[cfg(feature = "test-bpf")]
 use {
@@ -19,6 +18,16 @@ use {
 };
 
 fn program_test() -> ProgramTest {
+    ProgramTest::new(
+        "spl_zk_token",
+        id(),
+        processor!(processor::process_instruction),
+    )
+}
+
+/*
+fn program_test() -> ProgramTest {
+    use spl_zk_token_sdk::zk_token_proof_program;
     let mut pc = ProgramTest::new(
         "spl_zk_token",
         id(),
@@ -30,8 +39,10 @@ fn program_test() -> ProgramTest {
         zk_token_proof_program::id(),
         spl_zk_token_proof_program::process_instruction,
     );
+
     pc
 }
+*/
 
 const ACCOUNT_RENT_EXEMPTION: u64 = 1_000_000_000; // go with something big to be safe
 const DECIMALS: u8 = 0;
@@ -677,12 +688,15 @@ async fn test_transfer() {
         transfer_data,
     );
 
+    /*
     let mut transaction = Transaction::new_with_payer(&transfer_range_proof, Some(&payer.pubkey()));
     transaction.sign(&[&payer, &owner], recent_blockhash);
 
     assert_transaction_size(&transaction);
     banks_client.process_transaction(transaction).await.unwrap();
+    */
 
+    transfer_validity_proof.extend(transfer_range_proof);
     transfer_validity_proof.push(spl_memo::build_memo(
         b"A memo in the transfer validity proof transaction.....",
         &[],
