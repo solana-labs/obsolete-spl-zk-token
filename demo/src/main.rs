@@ -299,6 +299,9 @@ fn process_demo(
         auditor_elgamal_pk,
     );
 
+    // TODO: Extract transfer amount from `transfer_data` and demonstrate decrypting using
+    // `elgamal_sk_a` and `elgamal_sk_b`
+
     let (mut transfer_range_proof, transfer_validity_proof) = spl_zk_token::instruction::transfer(
         zk_token_account_a,
         token_account_a.pubkey(),
