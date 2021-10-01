@@ -285,8 +285,18 @@ fn process_demo(
     assert_eq!(
         current_balance_ct_a
             .decrypt_u32_online(&elgamal_sk_a, &decryption_data)
-            .unwrap(),
-        0, // TODO: replace with `current_balance_a`
+            .unwrap() as u64,
+        current_balance_a
+    );
+
+    let transfer_data = spl_zk_token::instruction::TransferData::new(
+            mint_amount,
+            current_balance_a,
+            current_balance_ct_a,
+            elgamal_pk_a,
+            &elgamal_sk_a,
+            elgamal_pk_b,
+            auditor_elgamal_pk,
     );
 
     let (mut transfer_range_proof, transfer_validity_proof) = spl_zk_token::instruction::transfer(
@@ -297,15 +307,7 @@ fn process_demo(
         &token_mint.pubkey(),
         payer.pubkey(),
         &[],
-        spl_zk_token::instruction::TransferData::new(
-            mint_amount,
-            current_balance_a,
-            current_balance_ct_a,
-            elgamal_pk_a,
-            &elgamal_sk_a,
-            elgamal_pk_b,
-            auditor_elgamal_pk,
-        ),
+        transfer_data,
     );
 
     transfer_range_proof.extend(transfer_validity_proof);
@@ -352,8 +354,8 @@ fn process_demo(
         &[payer],
     )?;
 
-    current_balance_a -= current_balance_a;
     current_balance_b += current_balance_a;
+    current_balance_a -= current_balance_a;
 
     let (_pending_balance_ct_a, current_balance_ct_a) =
         get_zk_token_balance(rpc_client, &zk_token_account_a)?;
@@ -364,19 +366,16 @@ fn process_demo(
     assert_eq!(
         current_balance_ct_a
             .decrypt_u32_online(&elgamal_sk_a, &decryption_data)
-            .unwrap(),
-        0, // TODO: replace with `current_balance_a`
+            .unwrap() as u64,
+        current_balance_a
     );
 
     assert_eq!(
         current_balance_ct_b
             .decrypt_u32_online(&elgamal_sk_b, &decryption_data)
-            .unwrap(),
-        0, // TODO: replace with `current_balance_b`
+            .unwrap() as u64,
+        current_balance_b
     );
-
-    // TODO: Read transfer transaction off-chain, and confirm the transfer amount decodes to
-    // `current_balance_a` via `elgamal_sk_a` and `elgamal_sk_b`
 
     let (_pending_balance_ct_b, current_balance_ct_b) =
         get_zk_token_balance(rpc_client, &zk_token_account_b)?;
@@ -435,15 +434,15 @@ fn process_demo(
     assert_eq!(
         current_balance_ct_a
             .decrypt_u32_online(&elgamal_sk_a, &decryption_data)
-            .unwrap(),
-        0, // TODO: replace with `current_balance_a`
+            .unwrap() as u64,
+        current_balance_a
     );
 
     assert_eq!(
         current_balance_ct_b
             .decrypt_u32_online(&elgamal_sk_b, &decryption_data)
-            .unwrap(),
-        0, // TODO: replace with `current_balance_b`
+            .unwrap() as u64,
+        current_balance_b
     );
 
     Ok(())
