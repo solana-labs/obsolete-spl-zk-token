@@ -299,7 +299,7 @@ fn process_demo(
             auditor_elgamal_pk,
     );
 
-    // TODO: Extract transfer amount from `transfer_data` and demonstrate decrypting using
+    // Extract transfer amount from `transfer_data` and demonstrate decrypting using
     // `elgamal_sk_a` and `elgamal_sk_b`
     let source_ciphertext = transfer_data.source_ciphertext();
     assert_eq!(
