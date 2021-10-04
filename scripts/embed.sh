@@ -13,7 +13,6 @@ fi
 
 export DIRTY_OK=1
 mv Cargo.toml Cargo.toml.org
-git add Cargo.toml.org
 touch Cargo.toml
 ./scripts/patch.crates-io.sh ..
 

@@ -1,10 +1,7 @@
 use {
     crate::pod::*,
     bytemuck::{Pod, Zeroable},
-    spl_zk_token_sdk::{
-        zk_token_elgamal::pod,
-        zk_token_proof_instruction::{TransferComms, TransferEphemeralState, TransferPubKeys},
-    },
+    spl_zk_token_sdk::zk_token_elgamal::pod,
 };
 
 /// Account used for auditing confidential transfers
@@ -22,35 +19,6 @@ pub struct TransferAuditor {
     pub elgamal_pk: pod::ElGamalPubkey,
 }
 impl PodAccountInfo<'_, '_> for TransferAuditor {}
-
-#[derive(Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct OutboundTransfer {
-    /// `true` once a validity proof has been accepted for this transfer
-    pub validity_proof: PodBool,
-
-    /// `true` once a range proof has been accepted for this transfer
-    pub range_proof: PodBool,
-
-    /// The public encryption keys associated with the transfer: source, dest, and auditor
-    pub transfer_public_keys: TransferPubKeys,
-
-    /// The transfer amount encoded as Pedersen commitments
-    pub amount_comms: TransferComms,
-
-    /// The source and destination decryption handles
-    pub source_lo: pod::PedersenDecHandle,
-    pub source_hi: pod::PedersenDecHandle,
-    pub dest_lo: pod::PedersenDecHandle,
-    pub dest_hi: pod::PedersenDecHandle,
-
-    /// The available balance in the source account after the transfer completes
-    pub new_available_balance: pod::ElGamalCiphertext,
-
-    /// Ephemeral state between the two transfer instruction data
-    pub ephemeral_state: TransferEphemeralState,
-}
-impl PodAccountInfo<'_, '_> for OutboundTransfer {}
 
 /// State for a confidential token account
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -75,10 +43,6 @@ pub struct ConfidentialAccount {
 
     /// Prohibit incoming transfers if `false`
     pub accept_incoming_transfers: PodBool,
-
-    /// Contains the details of an outbound transfer if `Some`.
-    /// Resets to `None` upon transfer completion or rejection of the outbound transfer.
-    pub outbound_transfer: OutboundTransfer,
 }
 impl PodAccountInfo<'_, '_> for ConfidentialAccount {}
 

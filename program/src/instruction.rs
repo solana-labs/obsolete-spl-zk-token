@@ -150,6 +150,8 @@ pub enum ConfidentialTokenInstruction {
     /// Data expected by this instruction:
     ///   None
     ///
+    /// The preceding instruction must be ProofInstruction::VerifyCloseAccount.
+    ///
     CloseAccount,
 
     /// Update the confidential token account's ElGamal public key.
@@ -172,6 +174,8 @@ pub enum ConfidentialTokenInstruction {
     ///
     /// Data expected by this instruction:
     ///   None
+    ///
+    /// The preceding instruction must be ProofInstruction::VerifyUpdateAccountPk.
     ///
     UpdateAccountPk,
 
@@ -221,33 +225,11 @@ pub enum ConfidentialTokenInstruction {
     /// Data expected by this instruction:
     ///   `WithdrawInstructionData`
     ///
+    /// The preceding instruction must be ProofInstruction::VerifyWithdraw.
+    ///
     Withdraw,
 
-    /// Submits a confidential transfer validity proof.
-    ///
-    /// The transfer will take affect once both proof submissions are provided,
-    /// `TransferValidityProof` and `TransferRangeProof`.
-    ///
-    ///   0. `[writable]` The source confidential token account
-    ///   1. `[]` The source SPL Token account
-    ///   2. `[writeable]` The destination confidential token account
-    ///   3. `[]` The destination token account
-    ///   4. `[]` The TransferAuditor account, computed by `get_transfer_auditor_address()`
-    ///   5. `[]` Instructions sysvar
-    ///   6. `[signer]` The single source account owner
-    /// or:
-    ///   5. `[]` The multisig  source account owner
-    ///   6.. `[signer]` Required M signer accounts for the SPL Token Multisig account
-    //
-    /// Data expected by this instruction:
-    ///   None
-    ///
-    TransferValidityProof,
-
-    /// Submits a confidential transfer range proof.
-    ///
-    /// The transfer will take affect once both proof submissions are provided,
-    /// `TransferValidityProof` and `TransferRangeProof`.
+    /// Transfer tokens confidentially.
     ///
     ///   0. `[writable]` The source confidential token account
     ///   1. `[]` The source SPL Token account
@@ -263,7 +245,9 @@ pub enum ConfidentialTokenInstruction {
     /// Data expected by this instruction:
     ///   None
     ///
-    TransferRangeProof,
+    /// The preceding instruction must be ProofInstruction::VerifyTransfer.
+    ///
+    Transfer,
 
     /// Applies the pending balance to the available balance then clears the pending balance.
     ///
@@ -569,7 +553,7 @@ pub fn withdraw(
     ]
 }
 
-/// Create the two `Transfer` instructions
+/// Create a `Transfer` instruction
 #[allow(clippy::too_many_arguments)]
 pub fn transfer(
     source_zk_token_account: Pubkey,
@@ -580,10 +564,7 @@ pub fn transfer(
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
     transfer_data: TransferData,
-) -> (
-    /* TransferRangeProof = */ Vec<Instruction>,
-    /* TransferValidityProof = */ Vec<Instruction>,
-) {
+) -> Vec<Instruction> {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
         AccountMeta::new_readonly(source_token_account, false),
@@ -598,24 +579,10 @@ pub fn transfer(
         accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
     }
 
-    (
-        vec![
-            ProofInstruction::VerifyTransferRangeProofData.encode(&transfer_data.range_proof),
-            encode_instruction(
-                accounts.clone(),
-                ConfidentialTokenInstruction::TransferRangeProof,
-                &(),
-            ),
-        ],
-        vec![
-            ProofInstruction::VerifyTransferValidityProofData.encode(&transfer_data.validity_proof),
-            encode_instruction(
-                accounts,
-                ConfidentialTokenInstruction::TransferValidityProof,
-                &(),
-            ),
-        ],
-    )
+    vec![
+        ProofInstruction::VerifyTransfer.encode(&transfer_data),
+        encode_instruction(accounts, ConfidentialTokenInstruction::Transfer, &()),
+    ]
 }
 
 /// Create a `ApplyPendingBalance` instruction
