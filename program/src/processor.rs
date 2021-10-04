@@ -547,7 +547,6 @@ fn process_update_account_pk(accounts: &[AccountInfo]) -> ProgramResult {
 
     confidential_account.elgamal_pk = data.new_pk;
     confidential_account.available_balance = data.new_ct;
-    confidential_account.outbound_transfer = OutboundTransfer::zeroed();
 
     Ok(())
 }
@@ -695,19 +694,31 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
 
     Ok(())
 }
+/// Processes a [Transfer] instruction.
+fn process_transfer(accounts: &[AccountInfo]) -> ProgramResult {
+    let account_info_iter = &mut accounts.iter();
+    let confidential_account_info = next_account_info(account_info_iter)?;
+    let token_account_info = next_account_info(account_info_iter)?;
+    let receiver_confidential_account_info = next_account_info(account_info_iter)?;
+    let receiver_token_account_info = next_account_info(account_info_iter)?;
+    let transfer_auditor_info = next_account_info(account_info_iter)?;
+    let instructions_sysvar_info = next_account_info(account_info_iter)?;
+    let owner_info = next_account_info(account_info_iter)?;
 
-fn process_transfer_common(
-    confidential_account: &mut ConfidentialAccount,
-    token_account: &spl_token::state::Account,
-    receiver_confidential_account: &mut ConfidentialAccount,
-    receiver_token_account: &spl_token::state::Account,
-    transfer_auditor: &TransferAuditor,
-) -> ProgramResult {
-    if !bool::from(&confidential_account.outbound_transfer.validity_proof)
-        || !bool::from(&confidential_account.outbound_transfer.range_proof)
-    {
-        return Ok(());
-    }
+    let (mut confidential_account, token_account) = validate_confidential_account_is_signer(
+        confidential_account_info,
+        token_account_info,
+        owner_info,
+        account_info_iter.as_slice(),
+    )?;
+
+    let (mut receiver_confidential_account, receiver_token_account) =
+        validate_confidential_account(
+            receiver_confidential_account_info,
+            receiver_token_account_info,
+        )?;
+
+    let transfer_auditor = TransferAuditor::from_account_info(transfer_auditor_info, &id())?;
 
     if confidential_account.mint != receiver_confidential_account.mint
         || confidential_account.mint != transfer_auditor.mint
@@ -726,22 +737,17 @@ fn process_transfer_common(
         return Err(ProgramError::InvalidArgument);
     }
 
-    if confidential_account
-        .outbound_transfer
-        .transfer_public_keys
-        .source_pk
-        != confidential_account.elgamal_pk
-        || confidential_account
-            .outbound_transfer
-            .transfer_public_keys
-            .dest_pk
+    let previous_instruction = get_previous_instruction(instructions_sysvar_info)?;
+    let data = decode_proof_instruction::<TransferData>(
+        ProofInstruction::VerifyTransfer,
+        &previous_instruction,
+    )?;
+
+    if data.validity_proof.transfer_public_keys.source_pk != confidential_account.elgamal_pk
+        || data.validity_proof.transfer_public_keys.dest_pk
             != receiver_confidential_account.elgamal_pk
         || (bool::from(&transfer_auditor.enabled)
-            && confidential_account
-                .outbound_transfer
-                .transfer_public_keys
-                .auditor_pk
-                != transfer_auditor.elgamal_pk)
+            && data.validity_proof.transfer_public_keys.auditor_pk != transfer_auditor.elgamal_pk)
     {
         msg!("Error: ElGamal public key mismatch");
         return Err(ProgramError::InvalidArgument);
@@ -751,12 +757,12 @@ fn process_transfer_common(
     {
         // Combine commitments and handles
         let source_lo_ct = pod::ElGamalCiphertext::from((
-            confidential_account.outbound_transfer.amount_comms.lo,
-            confidential_account.outbound_transfer.source_lo,
+            data.range_proof.amount_comms.lo,
+            data.validity_proof.decryption_handles_lo.source,
         ));
         let source_hi_ct = pod::ElGamalCiphertext::from((
-            confidential_account.outbound_transfer.amount_comms.hi,
-            confidential_account.outbound_transfer.source_hi,
+            data.range_proof.amount_comms.hi,
+            data.validity_proof.decryption_handles_hi.source,
         ));
 
         confidential_account.available_balance = ops::subtract_with_lo_hi(
@@ -767,23 +773,16 @@ fn process_transfer_common(
         .ok_or(ProgramError::InvalidInstructionData)?;
     }
 
-    if confidential_account.available_balance
-        != confidential_account.outbound_transfer.new_available_balance
-    {
-        msg!("Available balance mismatch");
-        return Err(ProgramError::InvalidInstructionData);
-    }
-
     // Add to destination pending balance
     {
         let dest_lo_ct = pod::ElGamalCiphertext::from((
-            confidential_account.outbound_transfer.amount_comms.lo,
-            confidential_account.outbound_transfer.dest_lo,
+            data.range_proof.amount_comms.lo,
+            data.validity_proof.decryption_handles_lo.dest,
         ));
 
         let dest_hi_ct = pod::ElGamalCiphertext::from((
-            confidential_account.outbound_transfer.amount_comms.hi,
-            confidential_account.outbound_transfer.dest_hi,
+            data.range_proof.amount_comms.hi,
+            data.validity_proof.decryption_handles_hi.dest,
         ));
 
         receiver_confidential_account.pending_balance = ops::add_with_lo_hi(
@@ -795,109 +794,6 @@ fn process_transfer_common(
     }
 
     Ok(())
-}
-
-/// Processes a [TransferValidityProof] instruction.
-fn process_transfer_validity_proof(accounts: &[AccountInfo]) -> ProgramResult {
-    let account_info_iter = &mut accounts.iter();
-    let confidential_account_info = next_account_info(account_info_iter)?;
-    let token_account_info = next_account_info(account_info_iter)?;
-    let receiver_confidential_account_info = next_account_info(account_info_iter)?;
-    let receiver_token_account_info = next_account_info(account_info_iter)?;
-    let transfer_auditor_info = next_account_info(account_info_iter)?;
-    let instructions_sysvar_info = next_account_info(account_info_iter)?;
-    let owner_info = next_account_info(account_info_iter)?;
-
-    let (mut confidential_account, token_account) = validate_confidential_account_is_signer(
-        confidential_account_info,
-        token_account_info,
-        owner_info,
-        account_info_iter.as_slice(),
-    )?;
-
-    let (mut receiver_confidential_account, receiver_token_account) =
-        validate_confidential_account(
-            receiver_confidential_account_info,
-            receiver_token_account_info,
-        )?;
-
-    let transfer_auditor = TransferAuditor::from_account_info(transfer_auditor_info, &id())?;
-
-    let previous_instruction = get_previous_instruction(instructions_sysvar_info)?;
-    let data = decode_proof_instruction::<TransferValidityProofData>(
-        ProofInstruction::VerifyTransferValidityProofData,
-        &previous_instruction,
-    )?;
-
-    if confidential_account.outbound_transfer.ephemeral_state != data.ephemeral_state {
-        confidential_account.outbound_transfer = OutboundTransfer::zeroed();
-        confidential_account.outbound_transfer.ephemeral_state = data.ephemeral_state;
-    }
-
-    confidential_account.outbound_transfer.validity_proof = true.into();
-    confidential_account.outbound_transfer.transfer_public_keys = data.transfer_public_keys;
-    confidential_account.outbound_transfer.new_available_balance = data.new_spendable_ct;
-    confidential_account.outbound_transfer.source_lo = data.decryption_handles_lo.source;
-    confidential_account.outbound_transfer.source_hi = data.decryption_handles_hi.source;
-    confidential_account.outbound_transfer.dest_lo = data.decryption_handles_lo.dest;
-    confidential_account.outbound_transfer.dest_hi = data.decryption_handles_hi.dest;
-
-    process_transfer_common(
-        &mut confidential_account,
-        &token_account,
-        &mut receiver_confidential_account,
-        &receiver_token_account,
-        &transfer_auditor,
-    )
-}
-
-/// Processes a [TransferRangeProof] instruction.
-fn process_transfer_range_proof(accounts: &[AccountInfo]) -> ProgramResult {
-    let account_info_iter = &mut accounts.iter();
-    let confidential_account_info = next_account_info(account_info_iter)?;
-    let token_account_info = next_account_info(account_info_iter)?;
-    let receiver_confidential_account_info = next_account_info(account_info_iter)?;
-    let receiver_token_account_info = next_account_info(account_info_iter)?;
-    let transfer_auditor_info = next_account_info(account_info_iter)?;
-    let instructions_sysvar_info = next_account_info(account_info_iter)?;
-    let owner_info = next_account_info(account_info_iter)?;
-
-    let (mut confidential_account, token_account) = validate_confidential_account_is_signer(
-        confidential_account_info,
-        token_account_info,
-        owner_info,
-        account_info_iter.as_slice(),
-    )?;
-
-    let (mut receiver_confidential_account, receiver_token_account) =
-        validate_confidential_account(
-            receiver_confidential_account_info,
-            receiver_token_account_info,
-        )?;
-
-    let transfer_auditor = TransferAuditor::from_account_info(transfer_auditor_info, &id())?;
-
-    let previous_instruction = get_previous_instruction(instructions_sysvar_info)?;
-    let data = decode_proof_instruction::<TransferRangeProofData>(
-        ProofInstruction::VerifyTransferRangeProofData,
-        &previous_instruction,
-    )?;
-
-    if confidential_account.outbound_transfer.ephemeral_state != data.ephemeral_state {
-        confidential_account.outbound_transfer = OutboundTransfer::zeroed();
-        confidential_account.outbound_transfer.ephemeral_state = data.ephemeral_state;
-    }
-
-    confidential_account.outbound_transfer.range_proof = true.into();
-    confidential_account.outbound_transfer.amount_comms = data.amount_comms;
-
-    process_transfer_common(
-        &mut confidential_account,
-        &token_account,
-        &mut receiver_confidential_account,
-        &receiver_token_account,
-        &transfer_auditor,
-    )
 }
 
 /// Processes an [ApplyPendingBalance] instruction.
@@ -993,13 +889,9 @@ pub fn process_instruction(
             let data = decode_instruction_data::<WithdrawInstructionData>(input)?;
             process_withdraw(accounts, data.amount.into(), data.decimals)
         }
-        ConfidentialTokenInstruction::TransferRangeProof => {
-            msg!("TransferRangeProof");
-            process_transfer_range_proof(accounts)
-        }
-        ConfidentialTokenInstruction::TransferValidityProof => {
-            msg!("TransferValidityProof");
-            process_transfer_validity_proof(accounts)
+        ConfidentialTokenInstruction::Transfer => {
+            msg!("Transfer");
+            process_transfer(accounts)
         }
         ConfidentialTokenInstruction::ApplyPendingBalance => {
             msg!("ApplyPendingBalance");

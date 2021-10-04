@@ -677,7 +677,7 @@ async fn test_transfer() {
         auditor_pk,
     );
 
-    let (transfer_range_proof, mut transfer_validity_proof) = spl_zk_token::instruction::transfer(
+    let mut instructions = spl_zk_token::instruction::transfer(
         src_zk_token_account,
         src_token_account,
         dst_zk_token_account,
@@ -688,21 +688,11 @@ async fn test_transfer() {
         transfer_data,
     );
 
-    /*
-    let mut transaction = Transaction::new_with_payer(&transfer_range_proof, Some(&payer.pubkey()));
-    transaction.sign(&[&payer, &owner], recent_blockhash);
-
-    assert_transaction_size(&transaction);
-    banks_client.process_transaction(transaction).await.unwrap();
-    */
-
-    transfer_validity_proof.extend(transfer_range_proof);
-    transfer_validity_proof.push(spl_memo::build_memo(
-        b"A memo in the transfer validity proof transaction.....",
+    instructions.push(spl_memo::build_memo(
+        b"A memo in the transfer transaction.....",
         &[],
     ));
-    let mut transaction =
-        Transaction::new_with_payer(&transfer_validity_proof, Some(&payer.pubkey()));
+    let mut transaction = Transaction::new_with_payer(&instructions, Some(&payer.pubkey()));
     transaction.sign(&[&payer, &owner], recent_blockhash);
 
     assert_transaction_size(&transaction);

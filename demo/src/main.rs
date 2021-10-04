@@ -319,48 +319,24 @@ fn process_demo(
         mint_amount,
     );
 
-    let (mut transfer_range_proof, transfer_validity_proof) = spl_zk_token::instruction::transfer(
-        zk_token_account_a,
-        token_account_a.pubkey(),
-        zk_token_account_b,
-        token_account_b.pubkey(),
-        &token_mint.pubkey(),
-        payer.pubkey(),
-        &[],
-        transfer_data,
-    );
-
-    transfer_range_proof.extend(transfer_validity_proof);
     send(
         rpc_client,
         &format!(
             "Transferring {} confidentially from {} to {}",
             current_balance_a, zk_token_account_a, zk_token_account_b
         ),
-        &transfer_range_proof,
-        &[payer],
-    )?;
-
-    /*
-    send(
-        rpc_client,
-        &format!(
-            "Transferring (Range Proof) {} from {} to {}",
-            current_balance_a, zk_token_account_a, zk_token_account_b
+        &spl_zk_token::instruction::transfer(
+            zk_token_account_a,
+            token_account_a.pubkey(),
+            zk_token_account_b,
+            token_account_b.pubkey(),
+            &token_mint.pubkey(),
+            payer.pubkey(),
+            &[],
+            transfer_data,
         ),
-        &transfer_range_proof,
         &[payer],
     )?;
-    send(
-        rpc_client,
-        &format!(
-            "Transferring (Validity Proof) {} from {} to {}",
-            current_balance_a, zk_token_account_a, zk_token_account_b
-        ),
-        &transfer_validity_proof,
-        &[payer],
-    )?;
-    */
 
     send(
         rpc_client,
