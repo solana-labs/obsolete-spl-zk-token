@@ -303,7 +303,8 @@ fn process_demo(
     // `elgamal_sk_a` and `elgamal_sk_b`
     let source_ciphertext = transfer_data.source_ciphertext();
     assert_eq!(
-        source_ciphertext.unwrap()
+        source_ciphertext
+            .unwrap()
             .decrypt_u32_online(&elgamal_sk_a, &decryption_data)
             .unwrap() as u64,
         mint_amount,
@@ -311,7 +312,8 @@ fn process_demo(
 
     let dest_ciphertext = transfer_data.dest_ciphertext();
     assert_eq!(
-        dest_ciphertext.unwrap()
+        dest_ciphertext
+            .unwrap()
             .decrypt_u32_online(&elgamal_sk_b, &decryption_data)
             .unwrap() as u64,
         mint_amount,
