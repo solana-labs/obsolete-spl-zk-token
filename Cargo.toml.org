@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "sdk",
+  "program",
+  "proof-program",
+  "demo",
+]
