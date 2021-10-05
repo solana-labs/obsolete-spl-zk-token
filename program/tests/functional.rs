@@ -542,6 +542,7 @@ async fn test_deposit() {
             token_account,
             owner.pubkey(),
             &[],
+            None,
         ),
         Some(&payer.pubkey()),
     );
@@ -698,9 +699,23 @@ async fn test_transfer() {
     assert_transaction_size(&transaction);
     banks_client.process_transaction(transaction).await.unwrap();
 
-    // TODO: Check resulting balances of src_zk_token_account and dst_zk_token_account once the
-    // syscalls exist
-    //
+    // TODO: Check balances of src_zk_token_account and dst_zk_token_accounts
+
+    let mut transaction = Transaction::new_with_payer(
+        &spl_zk_token::instruction::apply_pending_balance(
+            dst_zk_token_account,
+            dst_token_account,
+            owner.pubkey(),
+            &[],
+            Some(1),
+        ),
+        Some(&payer.pubkey()),
+    );
+    transaction.sign(&[&payer, &owner], recent_blockhash);
+    assert_transaction_size(&transaction);
+    banks_client.process_transaction(transaction).await.unwrap();
+
+    // TODO: Check balance of dst_zk_token_account
 }
 
 #[tokio::test]

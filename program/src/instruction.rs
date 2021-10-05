@@ -58,6 +58,14 @@ pub struct WithdrawInstructionData {
     pub decimals: u8,
 }
 
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub struct ApplyPendingBalanceData {
+    /// Counts the number of incoming transfers since the last successful `ApplyPendingBalance`
+    /// instruction
+    pub expected_incoming_transfer_count: PodU64,
+}
+
 #[derive(Clone, Copy, Debug, FromPrimitive, ToPrimitive)]
 #[repr(u8)]
 pub enum ConfidentialTokenInstruction {
@@ -261,7 +269,8 @@ pub enum ConfidentialTokenInstruction {
     ///   3.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     /// Data expected by this instruction:
-    ///   None
+    ///   `ApplyPendingBalanceData` (optional) if the client wishes to assert the number of
+    ///   processed incoming transfers
     ///
     ApplyPendingBalance,
 
@@ -591,6 +600,7 @@ pub fn apply_pending_balance(
     token_account: Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
+    expected_incoming_transfer_count: Option<u64>,
 ) -> Vec<Instruction> {
     let mut accounts = vec![
         AccountMeta::new(zk_token_account, false),
@@ -602,9 +612,19 @@ pub fn apply_pending_balance(
         accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
     }
 
-    vec![encode_instruction(
-        accounts,
-        ConfidentialTokenInstruction::ApplyPendingBalance,
-        &(),
-    )]
+    if let Some(expected_incoming_transfer_count) = expected_incoming_transfer_count {
+        vec![encode_instruction(
+            accounts,
+            ConfidentialTokenInstruction::ApplyPendingBalance,
+            &ApplyPendingBalanceData {
+                expected_incoming_transfer_count: expected_incoming_transfer_count.into(),
+            },
+        )]
+    } else {
+        vec![encode_instruction(
+            accounts,
+            ConfidentialTokenInstruction::ApplyPendingBalance,
+            &(),
+        )]
+    }
 }
