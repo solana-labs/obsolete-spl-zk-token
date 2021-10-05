@@ -17,6 +17,7 @@ touch Cargo.toml
 ./scripts/patch.crates-io.sh ..
 
 cat Cargo.toml >> ../Cargo.toml
+cat Cargo.toml >> ../programs/bpf/Cargo.toml
 cat >> Cargo.toml <<EOF
 [workspace]
 members = [
