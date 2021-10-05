@@ -13,7 +13,7 @@ use {
 };
 #[cfg(feature = "test-bpf")]
 use {
-    spl_zk_token_sdk::encryption::pedersen::PedersenOpen,
+    spl_zk_token_sdk::encryption::pedersen::PedersenOpening,
     std::{borrow::Borrow, convert::TryInto},
 };
 
@@ -529,7 +529,7 @@ async fn test_deposit() {
     );
 
     let pk = ElGamalPubkey::default();
-    let expected_pending_ct = pk.encrypt_with(1_u64, &PedersenOpen::default());
+    let expected_pending_ct = pk.encrypt_with(1_u64, &PedersenOpening::default());
 
     assert_eq!(
         get_zk_token_balance(&mut banks_client, zk_token_account).await,
