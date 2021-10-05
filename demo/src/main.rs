@@ -260,6 +260,7 @@ fn process_demo(
             token_account_a.pubkey(),
             payer.pubkey(),
             &[],
+            None,
         ),
         &[payer],
     )?;
@@ -346,6 +347,7 @@ fn process_demo(
             token_account_b.pubkey(),
             payer.pubkey(),
             &[],
+            Some(1),
         ),
         &[payer],
     )?;

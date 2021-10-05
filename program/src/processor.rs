@@ -793,11 +793,17 @@ fn process_transfer(accounts: &[AccountInfo]) -> ProgramResult {
         .ok_or(ProgramError::InvalidInstructionData)?;
     }
 
+    receiver_confidential_account.incoming_transfer_count =
+        (u64::from(receiver_confidential_account.incoming_transfer_count) + 1).into();
+
     Ok(())
 }
 
 /// Processes an [ApplyPendingBalance] instruction.
-fn process_apply_pending_balance(accounts: &[AccountInfo]) -> ProgramResult {
+fn process_apply_pending_balance(
+    accounts: &[AccountInfo],
+    expected_incoming_transfer_count: Option<u64>,
+) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
     let confidential_account_info = next_account_info(account_info_iter)?;
@@ -811,12 +817,20 @@ fn process_apply_pending_balance(accounts: &[AccountInfo]) -> ProgramResult {
         account_info_iter.as_slice(),
     )?;
 
+    if let Some(expected_incoming_transfer_count) = expected_incoming_transfer_count {
+        if expected_incoming_transfer_count != confidential_account.incoming_transfer_count.into() {
+            msg!("Incoming transfer count mismatch");
+            return Err(ProgramError::Custom(0));
+        }
+    }
+
     confidential_account.available_balance = ops::add(
         &confidential_account.available_balance,
         &confidential_account.pending_balance,
     )
     .ok_or(ProgramError::InvalidInstructionData)?;
     confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
+    confidential_account.incoming_transfer_count = 0.into();
 
     Ok(())
 }
@@ -895,7 +909,12 @@ pub fn process_instruction(
         }
         ConfidentialTokenInstruction::ApplyPendingBalance => {
             msg!("ApplyPendingBalance");
-            process_apply_pending_balance(accounts)
+
+            let expected_incoming_transfer_count =
+                decode_optional_instruction_data::<ApplyPendingBalanceData>(input)?
+                    .map(|d| d.expected_incoming_transfer_count.into());
+
+            process_apply_pending_balance(accounts, expected_incoming_transfer_count)
         }
         ConfidentialTokenInstruction::DisableInboundTransfers => {
             msg!("DisableInboundTransfers");
