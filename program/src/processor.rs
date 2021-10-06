@@ -743,11 +743,10 @@ fn process_transfer(accounts: &[AccountInfo]) -> ProgramResult {
         &previous_instruction,
     )?;
 
-    if data.validity_proof.transfer_public_keys.source_pk != confidential_account.elgamal_pk
-        || data.validity_proof.transfer_public_keys.dest_pk
-            != receiver_confidential_account.elgamal_pk
+    if data.transfer_public_keys.source_pk != confidential_account.elgamal_pk
+        || data.transfer_public_keys.dest_pk != receiver_confidential_account.elgamal_pk
         || (bool::from(&transfer_auditor.enabled)
-            && data.validity_proof.transfer_public_keys.auditor_pk != transfer_auditor.elgamal_pk)
+            && data.transfer_public_keys.auditor_pk != transfer_auditor.elgamal_pk)
     {
         msg!("Error: ElGamal public key mismatch");
         return Err(ProgramError::InvalidArgument);
@@ -756,14 +755,10 @@ fn process_transfer(accounts: &[AccountInfo]) -> ProgramResult {
     // Subtract from source available balance
     {
         // Combine commitments and handles
-        let source_lo_ct = pod::ElGamalCiphertext::from((
-            data.range_proof.amount_comms.lo,
-            data.validity_proof.decryption_handles_lo.source,
-        ));
-        let source_hi_ct = pod::ElGamalCiphertext::from((
-            data.range_proof.amount_comms.hi,
-            data.validity_proof.decryption_handles_hi.source,
-        ));
+        let source_lo_ct =
+            pod::ElGamalCiphertext::from((data.amount_comms.lo, data.decrypt_handles_lo.source));
+        let source_hi_ct =
+            pod::ElGamalCiphertext::from((data.amount_comms.hi, data.decrypt_handles_hi.source));
 
         confidential_account.available_balance = ops::subtract_with_lo_hi(
             &confidential_account.available_balance,
@@ -775,15 +770,11 @@ fn process_transfer(accounts: &[AccountInfo]) -> ProgramResult {
 
     // Add to destination pending balance
     {
-        let dest_lo_ct = pod::ElGamalCiphertext::from((
-            data.range_proof.amount_comms.lo,
-            data.validity_proof.decryption_handles_lo.dest,
-        ));
+        let dest_lo_ct =
+            pod::ElGamalCiphertext::from((data.amount_comms.lo, data.decrypt_handles_lo.dest));
 
-        let dest_hi_ct = pod::ElGamalCiphertext::from((
-            data.range_proof.amount_comms.hi,
-            data.validity_proof.decryption_handles_hi.dest,
-        ));
+        let dest_hi_ct =
+            pod::ElGamalCiphertext::from((data.amount_comms.hi, data.decrypt_handles_hi.dest));
 
         receiver_confidential_account.pending_balance = ops::add_with_lo_hi(
             &receiver_confidential_account.pending_balance,
