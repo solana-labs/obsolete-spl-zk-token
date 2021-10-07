@@ -244,7 +244,7 @@ async fn get_zk_token_balance(
 async fn test_configure_mint() {
     let owner = Keypair::new();
     let freeze_authority = Keypair::new();
-    let transfer_auditor_elgamal_pk = ElGamal::new().0;
+    let transfer_auditor_elgamal_pk = ElGamal::new().pk;
 
     let mut program_test = program_test();
     let mint = add_token_mint_account(&mut program_test, Some(freeze_authority.pubkey()));
@@ -317,6 +317,7 @@ async fn test_update_transfer_auditor() {
 #[tokio::test]
 async fn test_create_account() {
     let owner = Keypair::new();
+    let elgamal_pk = ElGamal::new().pk;
 
     let mut program_test = program_test();
 
@@ -325,7 +326,6 @@ async fn test_create_account() {
     let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
 
     let zk_token_account = get_confidential_token_address(&mint, &token_account);
-    let (elgamal_pk, _elgamal_sk) = ElGamal::new();
 
     let mut transaction = Transaction::new_with_payer(
         &spl_zk_token::instruction::create_account(
@@ -361,8 +361,10 @@ async fn test_create_account() {
 async fn test_close_account() {
     let owner = Keypair::new();
     let reclaim_account = Keypair::new();
-
-    let (elgamal_pk, elgamal_sk) = ElGamal::new();
+    let ElGamal {
+        pk: elgamal_pk,
+        sk: elgamal_sk,
+    } = ElGamal::new();
 
     let mut program_test = program_test();
 
@@ -421,7 +423,7 @@ async fn test_close_account() {
 async fn test_update_account_pk() {
     let owner = Keypair::new();
 
-    let (elgamal_pk, elgamal_sk) = ElGamal::new();
+    let elgamal = ElGamal::new();
 
     let mut program_test = program_test();
 
@@ -429,24 +431,25 @@ async fn test_update_account_pk() {
     let token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 123);
 
     let zk_available_balance = 123;
-    let zk_available_balance_ct = elgamal_pk.encrypt(zk_available_balance);
+    let zk_available_balance_ct = elgamal.pk.encrypt(zk_available_balance);
     let zk_token_account = add_zk_token_account(
         &mut program_test,
         mint,
         token_account,
-        elgamal_pk,
+        elgamal.pk,
         zk_available_balance_ct,
     );
 
     let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
-    let (new_elgamal_pk, new_elgamal_sk) = ElGamal::new();
+    let new_elgamal = ElGamal::new();
+
     let data = spl_zk_token::instruction::UpdateAccountPkData::new(
         zk_available_balance,
         zk_available_balance_ct,
-        elgamal_pk,
-        &elgamal_sk,
-        new_elgamal_pk,
-        &new_elgamal_sk,
+        elgamal.pk,
+        &elgamal.sk,
+        new_elgamal.pk,
+        &new_elgamal.sk,
     );
 
     let mut transaction = Transaction::new_with_payer(
@@ -470,7 +473,7 @@ async fn test_update_account_pk() {
         .expect("zk_token_account not found");
     let zk_token_state =
         spl_zk_token::state::ConfidentialAccount::from_bytes(&account.data).unwrap();
-    assert_eq!(zk_token_state.elgamal_pk, new_elgamal_pk.into());
+    assert_eq!(zk_token_state.elgamal_pk, new_elgamal.pk.into());
 }
 
 // Mark this test as BPF-only due to current `ProgramTest` limitations when CPIing into the SPL Token program
@@ -478,7 +481,7 @@ async fn test_update_account_pk() {
 #[tokio::test]
 async fn test_deposit() {
     let owner = Keypair::new();
-    let (elgamal_pk, _elgamal_sk) = ElGamal::new();
+    let elgamal_pk = ElGamal::new().pk;
 
     let mut program_test = program_test();
     let mint = add_token_mint_account(&mut program_test, None);
@@ -561,10 +564,10 @@ async fn test_deposit() {
 #[tokio::test]
 async fn test_withdraw() {
     let owner = Keypair::new();
-    let (elgamal_pk, elgamal_sk) = ElGamal::new();
+    let elgamal = ElGamal::new();
 
     let zk_available_balance = 123;
-    let zk_available_balance_ct = elgamal_pk.encrypt(zk_available_balance);
+    let zk_available_balance_ct = elgamal.pk.encrypt(zk_available_balance);
 
     let mut program_test = program_test();
     let mint = add_token_mint_account(&mut program_test, None);
@@ -576,7 +579,7 @@ async fn test_withdraw() {
         &mut program_test,
         mint,
         token_account,
-        elgamal_pk,
+        elgamal.pk,
         zk_available_balance_ct,
     );
     let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
@@ -589,8 +592,8 @@ async fn test_withdraw() {
 
     let withdraw_data = spl_zk_token::instruction::WithdrawData::new(
         1,
-        elgamal_pk,
-        &elgamal_sk,
+        elgamal.pk,
+        &elgamal.sk,
         zk_available_balance,
         zk_available_balance_ct,
     );
@@ -632,14 +635,14 @@ async fn test_withdraw() {
 #[tokio::test]
 async fn test_transfer() {
     let owner = Keypair::new();
-    let (src_elgamal_pk, src_elgamal_sk) = ElGamal::new();
-    let (dst_elgamal_pk, _dst_elgamal_sk) = ElGamal::new();
+    let src_elgamal = ElGamal::new();
+    let dst_elgamal = ElGamal::new();
 
     let src_zk_available_balance = 123_u64;
-    let src_zk_available_balance_ct = src_elgamal_pk.encrypt(src_zk_available_balance);
+    let src_zk_available_balance_ct = src_elgamal.pk.encrypt(src_zk_available_balance);
 
     let dst_zk_available_balance = 0_u64;
-    let dst_zk_available_balance_ct = dst_elgamal_pk.encrypt(dst_zk_available_balance);
+    let dst_zk_available_balance_ct = dst_elgamal.pk.encrypt(dst_zk_available_balance);
 
     let mut program_test = program_test();
     let mint = add_token_mint_account(&mut program_test, None);
@@ -653,7 +656,7 @@ async fn test_transfer() {
         &mut program_test,
         mint,
         src_token_account,
-        src_elgamal_pk,
+        src_elgamal.pk,
         src_zk_available_balance_ct,
     );
     let dst_token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 0);
@@ -661,7 +664,7 @@ async fn test_transfer() {
         &mut program_test,
         mint,
         dst_token_account,
-        dst_elgamal_pk,
+        dst_elgamal.pk,
         dst_zk_available_balance_ct,
     );
     let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
@@ -672,9 +675,9 @@ async fn test_transfer() {
         transfer_amount,
         src_zk_available_balance,
         src_zk_available_balance_ct,
-        src_elgamal_pk,
-        &src_elgamal_sk,
-        dst_elgamal_pk,
+        src_elgamal.pk,
+        &src_elgamal.sk,
+        dst_elgamal.pk,
         auditor_pk,
     );
 
