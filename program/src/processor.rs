@@ -102,15 +102,12 @@ fn _validate_confidential_account<'a, 'b>(
     let confidential_account =
         ConfidentialAccount::from_account_info(confidential_account_info, &id())?;
 
-    if !confidential_account.mint.equals(&token_account.mint) {
+    if confidential_account.mint != token_account.mint {
         msg!("Mint mismatch");
         return Err(ProgramError::InvalidArgument);
     }
 
-    if !confidential_account
-        .token_account
-        .equals(token_account_info.key)
-    {
+    if confidential_account.token_account != *token_account_info.key {
         msg!("Token account mismatch");
         return Err(ProgramError::InvalidArgument);
     }
@@ -351,7 +348,7 @@ fn process_update_transfer_auditor(
 
     let mut transfer_auditor = TransferAuditor::from_account_info(transfer_auditor_info, &id())?;
 
-    if !transfer_auditor.mint.equals(mint_info.key) {
+    if transfer_auditor.mint != *mint_info.key {
         msg!("Error: Mint mismatch");
         return Err(ProgramError::InvalidArgument);
     }

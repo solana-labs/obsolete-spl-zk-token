@@ -1,6 +1,7 @@
 use {
     crate::pod::*,
     bytemuck::{Pod, Zeroable},
+    solana_program::pubkey::Pubkey,
     spl_zk_token_sdk::zk_token_elgamal::pod,
 };
 
@@ -9,7 +10,7 @@ use {
 #[repr(C)]
 pub struct TransferAuditor {
     /// The SPL Token mint associated with this account
-    pub mint: PodPubkey,
+    pub mint: Pubkey,
 
     /// If true, transfers must include ElGamal cypertext using this public key.
     /// If false, transfer auditing is disabled
@@ -25,12 +26,12 @@ impl PodAccountInfo<'_, '_> for TransferAuditor {}
 #[repr(C)]
 pub struct ConfidentialAccount {
     /// The SPL Token mint associated with this confidential token account
-    pub mint: PodPubkey,
+    pub mint: Pubkey,
 
     /// The SPL Token account that corresponds to this confidential token account.
     /// The owner and close authority of the SPL Token account convey their authority over the
     /// confidential token account
-    pub token_account: PodPubkey,
+    pub token_account: Pubkey,
 
     /// The public key associated with ElGamal encryption
     pub elgamal_pk: pod::ElGamalPubkey,

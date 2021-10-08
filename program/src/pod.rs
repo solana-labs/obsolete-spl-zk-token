@@ -12,22 +12,6 @@ use {
     },
 };
 
-/// Placeholder until/if `Pod` is derived for `Pubkey`
-#[derive(Clone, Copy, Debug, PartialEq, Pod, Zeroable)]
-#[repr(transparent)]
-pub struct PodPubkey([u8; 32]);
-impl From<Pubkey> for PodPubkey {
-    fn from(pubkey: Pubkey) -> Self {
-        Self(pubkey.to_bytes())
-    }
-}
-impl PodPubkey {
-    /// Check for equality with a normal `Pubkey`
-    pub fn equals(&self, pubkey: &Pubkey) -> bool {
-        self.0 == pubkey.as_ref()
-    }
-}
-
 /// The standard `bool` is not a `Pod`, define a replacement that is
 #[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
 #[repr(transparent)]
