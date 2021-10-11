@@ -4783,6 +4783,7 @@ name = "spl-zk-token-sdk"
 version = "0.1.0"
 dependencies = [
  "arrayref",
+ "base64 0.13.0",
  "bincode",
  "bytemuck",
  "byteorder",
@@ -4794,6 +4795,7 @@ dependencies = [
  "num-traits",
  "rand 0.7.3",
  "serde",
+ "serde_json",
  "sha3",
  "solana-program",
  "subtle",
