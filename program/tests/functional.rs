@@ -151,7 +151,7 @@ fn add_zk_transfer_auditor_account(
     let zk_transfer_auditor_address = get_transfer_auditor_address(&mint);
 
     let zk_transfer_auditor_state = spl_zk_token::state::TransferAuditor {
-        mint: mint.into(),
+        mint,
         enabled: elgamal_pk.is_some().into(),
         elgamal_pk: elgamal_pk.unwrap_or_default().into(),
     };
@@ -177,8 +177,8 @@ fn add_zk_token_account(
     let zk_token_address = get_confidential_token_address(&mint, &token_account);
 
     let zk_token_account_state = spl_zk_token::state::ConfidentialAccount {
-        mint: mint.into(),
-        token_account: token_account.into(),
+        mint,
+        token_account,
         elgamal_pk: elgamal_pk.into(),
         available_balance: available_balance.into(),
         accept_incoming_transfers: true.into(),

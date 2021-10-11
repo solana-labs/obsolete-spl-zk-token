@@ -311,7 +311,7 @@ fn process_configure_mint(
 
     let mut transfer_auditor = TransferAuditor::from_account_info(transfer_auditor_info, &id())?;
 
-    transfer_auditor.mint = (*mint_info.key).into();
+    transfer_auditor.mint = *mint_info.key;
     if let Some(transfer_auditor_pk) = transfer_auditor_pk {
         transfer_auditor.enabled = true.into();
         transfer_auditor.elgamal_pk = *transfer_auditor_pk;
@@ -422,8 +422,8 @@ fn process_create_account(
 
     let mut confidential_account =
         ConfidentialAccount::from_account_info(confidential_account_info, &id())?;
-    confidential_account.mint = token_account.mint.into();
-    confidential_account.token_account = (*token_account_info.key).into();
+    confidential_account.mint = token_account.mint;
+    confidential_account.token_account = *token_account_info.key;
     confidential_account.elgamal_pk = data.elgamal_pk;
     confidential_account.accept_incoming_transfers = true.into();
 
