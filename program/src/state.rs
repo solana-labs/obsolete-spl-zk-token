@@ -43,7 +43,7 @@ pub struct ConfidentialAccount {
     pub available_balance: pod::ElGamalCiphertext,
 
     /// The decryptable available balance
-    pub decryptable_balance: AESCiphertext,
+    pub decryptable_balance: pod::OptionAESCiphertext,
 
     /// Prohibit incoming transfers if `false`
     pub accept_incoming_transfers: PodBool,
@@ -57,17 +57,12 @@ pub struct ConfidentialAccount {
 }
 impl PodAccountInfo<'_, '_> for ConfidentialAccount {}
 
-/// Temporary AES ciphertext struct
-#[derive(Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct AESCiphertext;
-
 // TODO: Add block hash
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct PreviousAvailableBalance {
     /// The `decryptable_balance` at the time of the most recent `ApplyPendingBalance` instruction
-    pub decryptable_balance: AESCiphertext,
+    pub decryptable_balance: pod::OptionAESCiphertext,
 
     /// The `incoming_transfer_count` at the time of the most recent `ApplyPendingBalance`
     /// instruction
