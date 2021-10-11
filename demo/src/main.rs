@@ -121,7 +121,7 @@ fn process_demo(
     let ElGamal {
         pk: elgamal_pk_a,
         sk: elgamal_sk_a,
-    } = ElGamal::new();
+    } = ElGamal::default();
 
     let zk_token_account_a = spl_zk_token::get_confidential_token_address(
         &token_mint.pubkey(),
@@ -132,7 +132,7 @@ fn process_demo(
     let ElGamal {
         pk: elgamal_pk_b,
         sk: elgamal_sk_b,
-    } = ElGamal::new();
+    } = ElGamal::default();
     let zk_token_account_b = spl_zk_token::get_confidential_token_address(
         &token_mint.pubkey(),
         &token_account_b.pubkey(),
