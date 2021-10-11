@@ -147,7 +147,7 @@ mod tests {
         assert!(pod_from_bytes::<PodBool>(&[0, 0]).is_none());
 
         for i in 0..=u8::MAX {
-            assert_eq!(i != 0, pod_from_bytes::<PodBool>(&[i]).unwrap().into());
+            assert_eq!(i != 0, bool::from(pod_from_bytes::<PodBool>(&[i]).unwrap()));
         }
     }
 
@@ -156,7 +156,7 @@ mod tests {
         assert!(pod_from_bytes::<PodU64>(&[]).is_none());
         assert_eq!(
             1u64,
-            (*pod_from_bytes::<PodU64>(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap()).into()
+            u64::from(*pod_from_bytes::<PodU64>(&[1, 0, 0, 0, 0, 0, 0, 0]).unwrap())
         );
     }
 }

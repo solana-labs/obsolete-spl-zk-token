@@ -806,7 +806,9 @@ fn process_apply_pending_balance(
     )?;
 
     if let Some(expected_incoming_transfer_count) = expected_incoming_transfer_count {
-        if expected_incoming_transfer_count != confidential_account.incoming_transfer_count.into() {
+        if expected_incoming_transfer_count
+            != u64::from(confidential_account.incoming_transfer_count)
+        {
             msg!("Incoming transfer count mismatch");
             return Err(ProgramError::Custom(0));
         }
