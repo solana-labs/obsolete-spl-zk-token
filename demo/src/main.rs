@@ -118,10 +118,10 @@ fn process_demo(
     let token_mint = Keypair::new();
 
     let token_account_a = Keypair::new();
-    let ElGamal {
+    let ElGamalKeypair {
         pk: elgamal_pk_a,
         sk: elgamal_sk_a,
-    } = ElGamal::default();
+    } = ElGamalKeypair::default();
 
     let zk_token_account_a = spl_zk_token::get_confidential_token_address(
         &token_mint.pubkey(),
@@ -129,10 +129,10 @@ fn process_demo(
     );
 
     let token_account_b = Keypair::new();
-    let ElGamal {
+    let ElGamalKeypair {
         pk: elgamal_pk_b,
         sk: elgamal_sk_b,
-    } = ElGamal::default();
+    } = ElGamalKeypair::default();
     let zk_token_account_b = spl_zk_token::get_confidential_token_address(
         &token_mint.pubkey(),
         &token_account_b.pubkey(),

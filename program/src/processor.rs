@@ -528,7 +528,7 @@ fn process_update_account_pk(accounts: &[AccountInfo]) -> ProgramResult {
     )?;
 
     if confidential_account.elgamal_pk != data.current_pk {
-        msg!("ElGamal PK mismatch");
+        msg!("ElGamalPubkey mismatch");
         return Err(ProgramError::InvalidInstructionData);
     }
 
