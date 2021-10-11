@@ -426,6 +426,7 @@ fn process_create_account(
     confidential_account.token_account = *token_account_info.key;
     confidential_account.elgamal_pk = data.elgamal_pk;
     confidential_account.accept_incoming_transfers = true.into();
+    confidential_account.incoming_transfer_count = 0.into();
 
     /*
         An ElGamal ciphertext is of the form
@@ -457,6 +458,15 @@ fn process_create_account(
     */
     confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
     confidential_account.available_balance = pod::ElGamalCiphertext::zeroed();
+
+    // Setting AESCiphertext to zeroed for now:
+    // - we can consider including a valid encryption of zero with the `CreateAccount` instruction
+    confidential_account.decryptable_balance = pod::OptionAESCiphertext::zeroed();
+
+    confidential_account.previous_available_balance = PreviousAvailableBalance {
+        decryptable_balance: pod::OptionAESCiphertext::zeroed(),
+        incoming_transfer_count: 0.into(),
+    };
 
     Ok(())
 }
@@ -814,6 +824,12 @@ fn process_apply_pending_balance(
         }
     }
 
+    // save current `decryptable_balance` and `incoming_transfer_count`
+    confidential_account.previous_available_balance = PreviousAvailableBalance {
+        decryptable_balance: confidential_account.decryptable_balance,
+        incoming_transfer_count: confidential_account.incoming_transfer_count,
+    };
+
     confidential_account.available_balance = ops::add(
         &confidential_account.available_balance,
         &confidential_account.pending_balance,
@@ -821,6 +837,9 @@ fn process_apply_pending_balance(
     .ok_or(ProgramError::InvalidInstructionData)?;
     confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
     confidential_account.incoming_transfer_count = 0.into();
+
+    // zero out current `decryptable_balance`
+    confidential_account.decryptable_balance = pod::OptionAESCiphertext::zeroed();
 
     Ok(())
 }
