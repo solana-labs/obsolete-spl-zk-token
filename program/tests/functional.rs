@@ -392,7 +392,7 @@ async fn test_close_account() {
             reclaim_account.pubkey(),
             owner.pubkey(),
             &[],
-            data,
+            &data,
         ),
         Some(&payer.pubkey()),
     );
@@ -458,7 +458,7 @@ async fn test_update_account_pk() {
             token_account,
             owner.pubkey(),
             &[],
-            data,
+            &data,
         ),
         Some(&payer.pubkey()),
     );
@@ -609,7 +609,7 @@ async fn test_withdraw() {
             &[],
             1,
             DECIMALS,
-            withdraw_data,
+            &withdraw_data,
         ),
         Some(&payer.pubkey()),
     );
@@ -689,7 +689,7 @@ async fn test_transfer() {
         &mint,
         owner.pubkey(),
         &[],
-        transfer_data,
+        &transfer_data,
     );
 
     instructions.push(spl_memo::build_memo(

@@ -433,15 +433,17 @@ pub fn create_account(
     )]
 }
 
-/// Create a `CloseAccount` instruction
-pub fn close_account(
+/// Create an inner `CloseAccount` instruction
+///
+/// This instruction is suitable for use with a cross-program `invoke` provided that the previous
+/// instruction is `ProofInstruction::VerifyCloseAccount`
+pub fn inner_close_account(
     zk_token_account: Pubkey,
     token_account: Pubkey,
     reclaim_account: Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
-    proof_data: CloseAccountData,
-) -> Vec<Instruction> {
+) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(zk_token_account, false),
         AccountMeta::new_readonly(token_account, false),
@@ -454,20 +456,40 @@ pub fn close_account(
         accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
     }
 
+    encode_instruction(accounts, ConfidentialTokenInstruction::CloseAccount, &())
+}
+
+/// Create a `CloseAccount` instruction
+pub fn close_account(
+    zk_token_account: Pubkey,
+    token_account: Pubkey,
+    reclaim_account: Pubkey,
+    authority: Pubkey,
+    multisig_signers: &[&Pubkey],
+    proof_data: &CloseAccountData,
+) -> Vec<Instruction> {
     vec![
-        ProofInstruction::VerifyCloseAccount.encode(&proof_data),
-        encode_instruction(accounts, ConfidentialTokenInstruction::CloseAccount, &()),
+        verify_close_account(proof_data),
+        inner_close_account(
+            zk_token_account,
+            token_account,
+            reclaim_account,
+            authority,
+            multisig_signers,
+        ),
     ]
 }
 
-/// Create a `UpdateAccountPk` instruction
-pub fn update_account_pk(
+/// Create a inner `UpdateAccountPk` instruction
+///
+/// This instruction is suitable for use with a cross-program `invoke` provided that the previous
+/// instruction is `ProofInstruction::VerifyUpdateAccountPk`
+pub fn inner_update_account_pk(
     zk_token_account: Pubkey,
     token_account: Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
-    proof_data: UpdateAccountPkData,
-) -> Vec<Instruction> {
+) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(zk_token_account, false),
         AccountMeta::new_readonly(token_account, false),
@@ -479,9 +501,20 @@ pub fn update_account_pk(
         accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
     }
 
+    encode_instruction(accounts, ConfidentialTokenInstruction::UpdateAccountPk, &())
+}
+
+/// Create a `UpdateAccountPk` instruction
+pub fn update_account_pk(
+    zk_token_account: Pubkey,
+    token_account: Pubkey,
+    authority: Pubkey,
+    multisig_signers: &[&Pubkey],
+    proof_data: &UpdateAccountPkData,
+) -> Vec<Instruction> {
     vec![
-        ProofInstruction::VerifyUpdateAccountPk.encode(&proof_data),
-        encode_instruction(accounts, ConfidentialTokenInstruction::UpdateAccountPk, &()),
+        verify_update_account_pk(proof_data),
+        inner_update_account_pk(zk_token_account, token_account, authority, multisig_signers),
     ]
 }
 
@@ -521,9 +554,11 @@ pub fn deposit(
     )]
 }
 
-/// Create a `Withdraw` instruction
-#[allow(clippy::too_many_arguments)]
-pub fn withdraw(
+/// Create a inner `Withdraw` instruction
+///
+/// This instruction is suitable for use with a cross-program `invoke` provided that the previous
+/// instruction is `ProofInstruction::VerifyWithdraw`
+pub fn inner_withdraw(
     source_zk_token_account: Pubkey,
     source_token_account: Pubkey,
     destination_token_account: Pubkey,
@@ -532,8 +567,7 @@ pub fn withdraw(
     multisig_signers: &[&Pubkey],
     amount: u64,
     decimals: u8,
-    proof_data: WithdrawData,
-) -> Vec<Instruction> {
+) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
         AccountMeta::new_readonly(source_token_account, false),
@@ -549,22 +583,50 @@ pub fn withdraw(
         accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
     }
 
+    encode_instruction(
+        accounts,
+        ConfidentialTokenInstruction::Withdraw,
+        &WithdrawInstructionData {
+            amount: amount.into(),
+            decimals,
+        },
+    )
+}
+
+/// Create a `Withdraw` instruction
+#[allow(clippy::too_many_arguments)]
+pub fn withdraw(
+    source_zk_token_account: Pubkey,
+    source_token_account: Pubkey,
+    destination_token_account: Pubkey,
+    mint: &Pubkey,
+    authority: Pubkey,
+    multisig_signers: &[&Pubkey],
+    amount: u64,
+    decimals: u8,
+    proof_data: &WithdrawData,
+) -> Vec<Instruction> {
     vec![
-        ProofInstruction::VerifyWithdraw.encode(&proof_data),
-        encode_instruction(
-            accounts,
-            ConfidentialTokenInstruction::Withdraw,
-            &WithdrawInstructionData {
-                amount: amount.into(),
-                decimals,
-            },
+        verify_withdraw(proof_data),
+        inner_withdraw(
+            source_zk_token_account,
+            source_token_account,
+            destination_token_account,
+            mint,
+            authority,
+            multisig_signers,
+            amount,
+            decimals,
         ),
     ]
 }
 
-/// Create a `Transfer` instruction
+/// Create a inner `Transfer` instruction
+///
+/// This instruction is suitable for use with a cross-program `invoke` provided that the previous
+/// instruction is `ProofInstruction::VerifyTransfer`
 #[allow(clippy::too_many_arguments)]
-pub fn transfer(
+pub fn inner_transfer(
     source_zk_token_account: Pubkey,
     source_token_account: Pubkey,
     destination_zk_token_account: Pubkey,
@@ -572,8 +634,7 @@ pub fn transfer(
     mint: &Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
-    transfer_data: TransferData,
-) -> Vec<Instruction> {
+) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
         AccountMeta::new_readonly(source_token_account, false),
@@ -588,9 +649,32 @@ pub fn transfer(
         accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
     }
 
+    encode_instruction(accounts, ConfidentialTokenInstruction::Transfer, &())
+}
+
+/// Create a `Transfer` instruction
+#[allow(clippy::too_many_arguments)]
+pub fn transfer(
+    source_zk_token_account: Pubkey,
+    source_token_account: Pubkey,
+    destination_zk_token_account: Pubkey,
+    destination_token_account: Pubkey,
+    mint: &Pubkey,
+    authority: Pubkey,
+    multisig_signers: &[&Pubkey],
+    proof_data: &TransferData,
+) -> Vec<Instruction> {
     vec![
-        ProofInstruction::VerifyTransfer.encode(&transfer_data),
-        encode_instruction(accounts, ConfidentialTokenInstruction::Transfer, &()),
+        verify_transfer(proof_data),
+        inner_transfer(
+            source_zk_token_account,
+            source_token_account,
+            destination_zk_token_account,
+            destination_token_account,
+            mint,
+            authority,
+            multisig_signers,
+        ),
     ]
 }
 
