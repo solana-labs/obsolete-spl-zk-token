@@ -340,7 +340,7 @@ fn process_demo(
             &token_mint.pubkey(),
             payer.pubkey(),
             &[],
-            transfer_data,
+            &transfer_data,
         ),
         &[payer],
     )?;
@@ -400,7 +400,7 @@ fn process_demo(
             &[],
             current_balance_b,
             0,
-            spl_zk_token::instruction::WithdrawData::new(
+            &spl_zk_token::instruction::WithdrawData::new(
                 current_balance_b,
                 elgamal_pk_a,
                 &elgamal_sk_b,
