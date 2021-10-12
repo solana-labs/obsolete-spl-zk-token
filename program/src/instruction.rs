@@ -558,6 +558,7 @@ pub fn deposit(
 ///
 /// This instruction is suitable for use with a cross-program `invoke` provided that the previous
 /// instruction is `ProofInstruction::VerifyWithdraw`
+#[allow(clippy::too_many_arguments)]
 pub fn inner_withdraw(
     source_zk_token_account: Pubkey,
     source_token_account: Pubkey,
