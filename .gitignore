@@ -1,4 +1,5 @@
 /*-dump.txt
 /*.so
-/farf/
+farf/
 /target/
+*.sw?
