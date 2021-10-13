@@ -585,15 +585,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clear_on_drop"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9cc5db465b294c3fa986d5bbb0f3017cd850bff6dd6c52f9ccff8b4d21b7b08"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "cloudabi"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4787,7 +4778,6 @@ dependencies = [
  "bincode",
  "bytemuck",
  "byteorder",
- "clear_on_drop",
  "curve25519-dalek 3.2.0",
  "ed25519-dalek",
  "getrandom 0.1.16",
