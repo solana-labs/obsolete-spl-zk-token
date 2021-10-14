@@ -343,7 +343,7 @@ fn process_demo(
             payer.pubkey(),
             &[],
             AESCiphertext::default(),
-            transfer_proof_data,
+            &transfer_proof_data,
         ),
         &[payer],
     )?;
@@ -405,7 +405,7 @@ fn process_demo(
             current_balance_b,
             0,
             AESCiphertext::default(),
-            spl_zk_token::instruction::WithdrawData::new(
+            &spl_zk_token::instruction::WithdrawData::new(
                 current_balance_b,
                 elgamal_pk_a,
                 &elgamal_sk_b,

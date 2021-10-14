@@ -693,7 +693,7 @@ async fn test_transfer() {
         owner.pubkey(),
         &[],
         AESCiphertext::default(),
-        transfer_data,
+        &transfer_data,
     );
 
     instructions.push(spl_memo::build_memo(
