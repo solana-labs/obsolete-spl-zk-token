@@ -17,7 +17,7 @@ use {
         transaction::Transaction,
     },
     spl_zk_token::pod::*,
-    spl_zk_token_sdk::encryption::{discrete_log, elgamal::*},
+    spl_zk_token_sdk::encryption::{aes::AESCiphertext, discrete_log, elgamal::*},
     std::{convert::TryInto, process::exit, sync::Arc},
 };
 
@@ -217,7 +217,7 @@ fn process_demo(
                 payer.pubkey(),
                 zk_token_account,
                 *elgamal_pk,
-                None,
+                AESCiphertext::default(),
                 token_account.pubkey(),
                 payer.pubkey(),
                 &[],
@@ -253,7 +253,6 @@ fn process_demo(
             &[],
             mint_amount,
             0,
-            None,
         ),
         &[payer],
     )?;
@@ -268,7 +267,8 @@ fn process_demo(
             token_account_a.pubkey(),
             payer.pubkey(),
             &[],
-            None,
+            1,
+            AESCiphertext::default(),
         ),
         &[payer],
     )?;
@@ -298,7 +298,7 @@ fn process_demo(
         current_balance_a
     );
 
-    let transfer_data = spl_zk_token::instruction::TransferData::new(
+    let transfer_proof_data = spl_zk_token::instruction::TransferData::new(
         mint_amount,
         current_balance_a,
         current_balance_ct_a,
@@ -306,12 +306,11 @@ fn process_demo(
         &elgamal_sk_a,
         elgamal_pk_b,
         auditor_elgamal_pk,
-        None,
     );
 
     // Extract transfer amount from `transfer_data` and demonstrate decrypting using
     // `elgamal_sk_a` and `elgamal_sk_b`
-    let source_ciphertext = transfer_data.source_ciphertext();
+    let source_ciphertext = transfer_proof_data.source_ciphertext();
     assert_eq!(
         source_ciphertext
             .unwrap()
@@ -320,7 +319,7 @@ fn process_demo(
         mint_amount,
     );
 
-    let dest_ciphertext = transfer_data.dest_ciphertext();
+    let dest_ciphertext = transfer_proof_data.dest_ciphertext();
     assert_eq!(
         dest_ciphertext
             .unwrap()
@@ -343,7 +342,8 @@ fn process_demo(
             &token_mint.pubkey(),
             payer.pubkey(),
             &[],
-            &transfer_data,
+            AESCiphertext::default(),
+            transfer_proof_data,
         ),
         &[payer],
     )?;
@@ -356,7 +356,8 @@ fn process_demo(
             token_account_b.pubkey(),
             payer.pubkey(),
             &[],
-            None,
+            1,
+            AESCiphertext::default(),
         ),
         &[payer],
     )?;
@@ -403,13 +404,13 @@ fn process_demo(
             &[],
             current_balance_b,
             0,
-            &spl_zk_token::instruction::WithdrawData::new(
+            AESCiphertext::default(),
+            spl_zk_token::instruction::WithdrawData::new(
                 current_balance_b,
                 elgamal_pk_a,
                 &elgamal_sk_b,
                 current_balance_b,
                 current_balance_ct_b,
-                None,
             ),
         ),
         &[payer],
