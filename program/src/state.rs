@@ -52,21 +52,23 @@ pub struct ConfidentialAccount {
     /// instruction
     pub incoming_transfer_count: PodU64,
 
-    /// Record of previous available balance
-    pub previous_available_balance: PreviousAvailableBalance,
+    /// Record of `incoming_transfer_count` at the time of the most recent `ApplyPendingBalance`
+    pub incoming_transfer_count_record: TransferCountRecord,
 }
 impl PodAccountInfo<'_, '_> for ConfidentialAccount {}
 
-// TODO: Add block hash
+/// After submitting `ApplyPendingBalance`, the client should compare the expected and the actual
+/// transfer counts. If they are equal, then the `decryptable_balance` is consistent with
+/// `avaialble_balance`. If they differ, then the client should update the `decryptable_balance`.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-pub struct PreviousAvailableBalance {
-    /// The `decryptable_balance` at the time of the most recent `ApplyPendingBalance` instruction
-    pub decryptable_balance: pod::OptionAESCiphertext,
-
-    /// The `incoming_transfer_count` at the time of the most recent `ApplyPendingBalance`
+pub struct TransferCountRecord {
+    /// The expected `incoming_transfer_count` that was included in the `ApplyPendingBalance`
     /// instruction
-    pub incoming_transfer_count: PodU64,
+    pub expected_incoming_transfer_count: PodU64,
+
+    /// The actual `incoming_transfer_count` at the time the `ApplyPendingBalance` was executed
+    pub actual_incoming_transfer_count: PodU64,
 }
 
 #[cfg(test)]
