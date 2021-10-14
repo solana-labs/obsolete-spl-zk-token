@@ -544,10 +544,6 @@ pub fn deposit(
     multisig_signers: &[&Pubkey],
     amount: u64,
     decimals: u8,
-<<<<<<< HEAD
-    aes_ciphertext: AESCiphertext,
-=======
->>>>>>> 9fa2664 (remove aes ciphertext from the proof program)
 ) -> Vec<Instruction> {
     let mut accounts = vec![
         AccountMeta::new(source_token_account, false),
@@ -588,12 +584,7 @@ pub fn inner_withdraw(
     amount: u64,
     decimals: u8,
     aes_ciphertext: AESCiphertext,
-<<<<<<< HEAD
 ) -> Instruction {
-=======
-    proof_data: WithdrawData,
-) -> Vec<Instruction> {
->>>>>>> 9fa2664 (remove aes ciphertext from the proof program)
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
         AccountMeta::new_readonly(source_token_account, false),
@@ -664,12 +655,7 @@ pub fn inner_transfer(
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
     aes_ciphertext: AESCiphertext,
-<<<<<<< HEAD
 ) -> Instruction {
-=======
-    proof_data: TransferData,
-) -> Vec<Instruction> {
->>>>>>> 9fa2664 (remove aes ciphertext from the proof program)
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
         AccountMeta::new_readonly(source_token_account, false),
@@ -684,7 +670,13 @@ pub fn inner_transfer(
         accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
     }
 
-    encode_instruction(accounts, ConfidentialTokenInstruction::Transfer, &())
+    encode_instruction(
+        accounts,
+        ConfidentialTokenInstruction::Transfer,
+        &TransferInstructionData {
+            aes_ciphertext: aes_ciphertext.into(),
+        },
+    )
 }
 
 /// Create a `Transfer` instruction
@@ -701,7 +693,6 @@ pub fn transfer(
     proof_data: &TransferData,
 ) -> Vec<Instruction> {
     vec![
-<<<<<<< HEAD
         verify_transfer(proof_data),
         inner_transfer(
             source_zk_token_account,
@@ -712,15 +703,6 @@ pub fn transfer(
             authority,
             multisig_signers,
             aes_ciphertext,
-=======
-        ProofInstruction::VerifyTransfer.encode(&proof_data),
-        encode_instruction(
-            accounts,
-            ConfidentialTokenInstruction::Transfer,
-            &TransferInstructionData {
-                aes_ciphertext: aes_ciphertext.into(),
-            },
->>>>>>> 9fa2664 (remove aes ciphertext from the proof program)
         ),
     ]
 }

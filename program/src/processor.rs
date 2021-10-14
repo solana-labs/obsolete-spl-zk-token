@@ -817,10 +817,6 @@ fn process_apply_pending_balance(
         account_info_iter.as_slice(),
     )?;
 
-    if expected_incoming_transfer_count != confidential_account.incoming_transfer_count.into() {
-        msg!("Incoming transfer count mismatch");
-        return Err(ProgramError::Custom(0));
-    }
     confidential_account
         .applied_incoming_transfer_count
         .expected_incoming_transfer_count = expected_incoming_transfer_count.into();
