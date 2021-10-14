@@ -43,7 +43,7 @@ pub struct ConfidentialAccount {
     pub available_balance: pod::ElGamalCiphertext,
 
     /// The decryptable available balance
-    pub decryptable_balance: pod::OptionAESCiphertext,
+    pub decryptable_balance: pod::AESCiphertext,
 
     /// Prohibit incoming transfers if `false`
     pub accept_incoming_transfers: PodBool,
