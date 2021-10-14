@@ -679,6 +679,7 @@ async fn test_transfer() {
         &src_elgamal.secret,
         dst_elgamal.public,
         auditor_pk,
+        None,
     );
 
     let mut instructions = spl_zk_token::instruction::transfer(
@@ -710,7 +711,7 @@ async fn test_transfer() {
             dst_token_account,
             owner.pubkey(),
             &[],
-            Some(1),
+            None,
         ),
         Some(&payer.pubkey()),
     );
