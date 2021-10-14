@@ -1,7 +1,6 @@
 //! Program instructions
 //!
 
-use spl_zk_token_sdk::encryption::aes::AESCiphertext;
 #[cfg(not(target_arch = "bpf"))]
 use spl_zk_token_sdk::encryption::elgamal::ElGamalPubkey;
 use {
@@ -18,7 +17,7 @@ use {
     spl_zk_token_sdk::zk_token_elgamal::pod,
 };
 
-pub use spl_zk_token_sdk::zk_token_proof_instruction::*;
+pub use spl_zk_token_sdk::{encryption::aes::AESCiphertext, zk_token_proof_instruction::*};
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
@@ -50,8 +49,6 @@ pub struct DepositInstructionData {
     pub amount: PodU64,
     /// Expected number of base 10 digits to the right of the decimal place.
     pub decimals: u8,
-    /// The AES ciphertext data
-    pub aes_ciphertext: pod::AESCiphertext,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]

@@ -427,7 +427,6 @@ fn process_create_account(
     confidential_account.token_account = *token_account_info.key;
     confidential_account.elgamal_pk = data.elgamal_pk;
     confidential_account.accept_incoming_transfers = true.into();
-    confidential_account.incoming_transfer_count = 0.into();
 
     /*
         An ElGamal ciphertext is of the form
@@ -617,7 +616,6 @@ fn process_deposit(
     confidential_account.pending_balance =
         ops::add_to(&confidential_account.pending_balance, amount)
             .ok_or(ProgramError::InvalidInstructionData)?;
-    confidential_account.decryptable_balance = aes_ciphertext;
 
     Ok(())
 }
@@ -906,7 +904,6 @@ pub fn process_instruction(
                 accounts,
                 data.amount.into(),
                 data.decimals,
-                data.aes_ciphertext,
             )
         }
         ConfidentialTokenInstruction::Withdraw => {
