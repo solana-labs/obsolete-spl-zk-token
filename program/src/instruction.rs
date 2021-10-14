@@ -67,6 +67,13 @@ pub struct WithdrawInstructionData {
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
+pub struct TransferInstructionData {
+    /// The AES ciphertext data
+    pub aes_ciphertext: pod::AESCiphertext,
+}
+
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct ApplyPendingBalanceData {
     /// Counts the number of incoming transfers since the last successful `ApplyPendingBalance`
     /// instruction
@@ -260,7 +267,7 @@ pub enum ConfidentialTokenInstruction {
     ///   6.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     /// Data expected by this instruction:
-    ///   None
+    ///   `TransferInstructionData`
     ///
     /// The preceding instruction must be ProofInstruction::VerifyTransfer.
     ///
@@ -652,6 +659,7 @@ pub fn inner_transfer(
     mint: &Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
+    aes_ciphertext: AESCiphertext,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
@@ -680,6 +688,7 @@ pub fn transfer(
     mint: &Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
+    aes_ciphertext: AESCiphertext,
     proof_data: &TransferData,
 ) -> Vec<Instruction> {
     vec![
@@ -692,6 +701,7 @@ pub fn transfer(
             mint,
             authority,
             multisig_signers,
+            aes_ciphertext,
         ),
     ]
 }

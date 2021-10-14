@@ -461,11 +461,6 @@ fn process_create_account(
     confidential_account.available_balance = pod::ElGamalCiphertext::zeroed();
     confidential_account.decryptable_balance = data.aes_ciphertext;
 
-    confidential_account.previous_available_balance = PreviousAvailableBalance {
-        decryptable_balance: pod::AESCiphertext::zeroed(),
-        incoming_transfer_count: 0.into(),
-    };
-
     Ok(())
 }
 
@@ -667,8 +662,6 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    confidential_account.decryptable_balance = data.aes_ciphertext;
-
     // Ensure omnibus token account address derivation is correct
     let (omnibus_token_address, omnibus_token_bump_seed) =
         get_omnibus_token_address_with_seed(mint_info.key);
@@ -708,7 +701,7 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
     Ok(())
 }
 /// Processes a [Transfer] instruction.
-fn process_transfer(accounts: &[AccountInfo]) -> ProgramResult {
+fn process_transfer(accounts: &[AccountInfo], aes_ciphertext: pod::AESCiphertext) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let confidential_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
@@ -782,7 +775,7 @@ fn process_transfer(accounts: &[AccountInfo]) -> ProgramResult {
     }
 
     // Update source decryptable balance
-    confidential_account.decryptable_balance = data.aes_ciphertext;
+    confidential_account.decryptable_balance = aes_ciphertext;
 
     // Add to destination pending balance
     {
@@ -832,11 +825,9 @@ fn process_apply_pending_balance(
         return Err(ProgramError::Custom(0));
     }
 
-    // save current `decryptable_balance` and `incoming_transfer_count`
-    confidential_account.previous_available_balance = PreviousAvailableBalance {
-        decryptable_balance: confidential_account.decryptable_balance,
-        incoming_transfer_count: confidential_account.incoming_transfer_count,
-    };
+    confidential_account
+        .incoming_transfer_count_record
+        .actual_incoming_transfer_count = confidential_account.incoming_transfer_count;
 
     confidential_account.available_balance = ops::add(
         &confidential_account.available_balance,
@@ -925,7 +916,8 @@ pub fn process_instruction(
         }
         ConfidentialTokenInstruction::Transfer => {
             msg!("Transfer");
-            process_transfer(accounts)
+            let data = decode_instruction_data::<TransferInstructionData>(input)?;
+            process_transfer(accounts, data.aes_ciphertext)
         }
         ConfidentialTokenInstruction::ApplyPendingBalance => {
             msg!("ApplyPendingBalance");
