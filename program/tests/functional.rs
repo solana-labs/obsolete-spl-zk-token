@@ -9,7 +9,10 @@ use {
         transaction::Transaction,
     },
     spl_zk_token::{self, pod::*, *},
-    spl_zk_token_sdk::encryption::elgamal::{ElGamalCiphertext, ElGamalKeypair, ElGamalPubkey},
+    spl_zk_token_sdk::encryption::{
+        aes::AESCiphertext,
+        elgamal::{ElGamalCiphertext, ElGamalKeypair, ElGamalPubkey},
+    },
 };
 #[cfg(feature = "test-bpf")]
 use {
@@ -679,7 +682,6 @@ async fn test_transfer() {
         &src_elgamal.secret,
         dst_elgamal.public,
         auditor_pk,
-        None,
     );
 
     let mut instructions = spl_zk_token::instruction::transfer(
@@ -690,7 +692,8 @@ async fn test_transfer() {
         &mint,
         owner.pubkey(),
         &[],
-        &transfer_data,
+        AESCiphertext::default(),
+        transfer_data,
     );
 
     instructions.push(spl_memo::build_memo(
@@ -711,7 +714,8 @@ async fn test_transfer() {
             dst_token_account,
             owner.pubkey(),
             &[],
-            None,
+            1,
+            AESCiphertext::default(),
         ),
         Some(&payer.pubkey()),
     );
