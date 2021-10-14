@@ -667,6 +667,8 @@ fn process_withdraw(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Prog
         return Err(ProgramError::InvalidInstructionData);
     }
 
+    confidential_account.decryptable_balance = data.aes_ciphertext;
+
     // Ensure omnibus token account address derivation is correct
     let (omnibus_token_address, omnibus_token_bump_seed) =
         get_omnibus_token_address_with_seed(mint_info.key);
@@ -778,6 +780,9 @@ fn process_transfer(accounts: &[AccountInfo]) -> ProgramResult {
         )
         .ok_or(ProgramError::InvalidInstructionData)?;
     }
+
+    // Update source decryptable balance
+    confidential_account.decryptable_balance = data.aes_ciphertext;
 
     // Add to destination pending balance
     {
