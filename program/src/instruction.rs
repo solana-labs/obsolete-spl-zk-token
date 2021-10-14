@@ -1,6 +1,7 @@
 //! Program instructions
 //!
 
+use spl_zk_token_sdk::encryption::aes::AESCiphertext;
 #[cfg(not(target_arch = "bpf"))]
 use spl_zk_token_sdk::encryption::elgamal::ElGamalPubkey;
 use {
@@ -38,6 +39,8 @@ pub struct UpdateTransferAuditorInstructionData {
 pub struct CreateAccountInstructionData {
     /// The public key associated with the account
     pub elgamal_pk: pod::ElGamalPubkey,
+    /// The AES ciphertext data
+    pub aes_ciphertext: pod::AESCiphertext,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -47,6 +50,8 @@ pub struct DepositInstructionData {
     pub amount: PodU64,
     /// Expected number of base 10 digits to the right of the decimal place.
     pub decimals: u8,
+    /// The AES ciphertext data
+    pub aes_ciphertext: pod::AESCiphertext,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -56,6 +61,8 @@ pub struct WithdrawInstructionData {
     pub amount: PodU64,
     /// Expected number of base 10 digits to the right of the decimal place.
     pub decimals: u8,
+    /// The AES ciphertext data
+    pub aes_ciphertext: pod::AESCiphertext,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -64,6 +71,8 @@ pub struct ApplyPendingBalanceData {
     /// Counts the number of incoming transfers since the last successful `ApplyPendingBalance`
     /// instruction
     pub expected_incoming_transfer_count: PodU64,
+    /// The AES ciphertext data
+    pub aes_ciphertext: pod::AESCiphertext,
 }
 
 #[derive(Clone, Copy, Debug, FromPrimitive, ToPrimitive)]
@@ -407,6 +416,7 @@ pub fn create_account(
     funding_address: Pubkey,
     zk_token_account: Pubkey,
     elgamal_pk: ElGamalPubkey,
+    aes_ciphertext: AESCiphertext,
     token_account: Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
@@ -429,6 +439,7 @@ pub fn create_account(
         ConfidentialTokenInstruction::CreateAccount,
         &CreateAccountInstructionData {
             elgamal_pk: elgamal_pk.into(),
+            aes_ciphertext: aes_ciphertext.into(),
         },
     )]
 }
@@ -529,6 +540,7 @@ pub fn deposit(
     multisig_signers: &[&Pubkey],
     amount: u64,
     decimals: u8,
+    aes_ciphertext: AESCiphertext,
 ) -> Vec<Instruction> {
     let mut accounts = vec![
         AccountMeta::new(source_token_account, false),
@@ -550,6 +562,7 @@ pub fn deposit(
         &DepositInstructionData {
             amount: amount.into(),
             decimals,
+            aes_ciphertext: aes_ciphertext.into(),
         },
     )]
 }
@@ -568,6 +581,7 @@ pub fn inner_withdraw(
     multisig_signers: &[&Pubkey],
     amount: u64,
     decimals: u8,
+    aes_ciphertext: AESCiphertext,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
@@ -590,6 +604,7 @@ pub fn inner_withdraw(
         &WithdrawInstructionData {
             amount: amount.into(),
             decimals,
+            aes_ciphertext: aes_ciphertext.into(),
         },
     )
 }
@@ -605,6 +620,7 @@ pub fn withdraw(
     multisig_signers: &[&Pubkey],
     amount: u64,
     decimals: u8,
+    aes_ciphertext: AESCiphertext,
     proof_data: &WithdrawData,
 ) -> Vec<Instruction> {
     vec![
@@ -618,6 +634,7 @@ pub fn withdraw(
             multisig_signers,
             amount,
             decimals,
+            aes_ciphertext,
         ),
     ]
 }
@@ -685,7 +702,8 @@ pub fn apply_pending_balance(
     token_account: Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
-    expected_incoming_transfer_count: Option<u64>,
+    incoming_transfer_count: u64,
+    aes_ciphertext: AESCiphertext,
 ) -> Vec<Instruction> {
     let mut accounts = vec![
         AccountMeta::new(zk_token_account, false),
@@ -697,19 +715,12 @@ pub fn apply_pending_balance(
         accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
     }
 
-    if let Some(expected_incoming_transfer_count) = expected_incoming_transfer_count {
-        vec![encode_instruction(
-            accounts,
-            ConfidentialTokenInstruction::ApplyPendingBalance,
-            &ApplyPendingBalanceData {
-                expected_incoming_transfer_count: expected_incoming_transfer_count.into(),
-            },
-        )]
-    } else {
-        vec![encode_instruction(
-            accounts,
-            ConfidentialTokenInstruction::ApplyPendingBalance,
-            &(),
-        )]
-    }
+    vec![encode_instruction(
+        accounts,
+        ConfidentialTokenInstruction::ApplyPendingBalance,
+        &ApplyPendingBalanceData {
+            expected_incoming_transfer_count: incoming_transfer_count.into(),
+            aes_ciphertext: aes_ciphertext.into(),
+        },
+    )]
 }

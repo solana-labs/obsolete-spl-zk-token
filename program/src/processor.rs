@@ -18,6 +18,7 @@ use {
         sysvar::{self, Sysvar},
     },
     spl_zk_token_sdk::{
+        encryption::aes::AESCiphertext,
         zk_token_elgamal::{ops, pod},
         zk_token_proof_program,
     },
@@ -458,13 +459,10 @@ fn process_create_account(
     */
     confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
     confidential_account.available_balance = pod::ElGamalCiphertext::zeroed();
-
-    // Setting AESCiphertext to zeroed for now:
-    // - we can consider including a valid encryption of zero with the `CreateAccount` instruction
-    confidential_account.decryptable_balance = pod::OptionAESCiphertext::zeroed();
+    confidential_account.decryptable_balance = data.aes_ciphertext;
 
     confidential_account.previous_available_balance = PreviousAvailableBalance {
-        decryptable_balance: pod::OptionAESCiphertext::zeroed(),
+        decryptable_balance: pod::AESCiphertext::zeroed(),
         incoming_transfer_count: 0.into(),
     };
 
@@ -559,7 +557,12 @@ fn process_update_account_pk(accounts: &[AccountInfo]) -> ProgramResult {
 }
 
 /// Processes a [Deposit] instruction.
-fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> ProgramResult {
+fn process_deposit(
+    accounts: &[AccountInfo],
+    amount: u64,
+    decimals: u8,
+    aes_ciphertext: pod::AESCiphertext,
+) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
     let source_token_account_info = next_account_info(account_info_iter)?;
@@ -619,6 +622,7 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
     confidential_account.pending_balance =
         ops::add_to(&confidential_account.pending_balance, amount)
             .ok_or(ProgramError::InvalidInstructionData)?;
+    confidential_account.decryptable_balance = aes_ciphertext;
 
     Ok(())
 }
@@ -800,7 +804,8 @@ fn process_transfer(accounts: &[AccountInfo]) -> ProgramResult {
 /// Processes an [ApplyPendingBalance] instruction.
 fn process_apply_pending_balance(
     accounts: &[AccountInfo],
-    expected_incoming_transfer_count: Option<u64>,
+    expected_incoming_transfer_count: u64,
+    aes_ciphertext: AESCiphertext,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
@@ -815,13 +820,11 @@ fn process_apply_pending_balance(
         account_info_iter.as_slice(),
     )?;
 
-    if let Some(expected_incoming_transfer_count) = expected_incoming_transfer_count {
-        if expected_incoming_transfer_count
-            != u64::from(confidential_account.incoming_transfer_count)
-        {
-            msg!("Incoming transfer count mismatch");
-            return Err(ProgramError::Custom(0));
-        }
+    if expected_incoming_transfer_count
+        != u64::from(confidential_account.incoming_transfer_count)
+    {
+        msg!("Incoming transfer count mismatch");
+        return Err(ProgramError::Custom(0));
     }
 
     // save current `decryptable_balance` and `incoming_transfer_count`
@@ -837,9 +840,7 @@ fn process_apply_pending_balance(
     .ok_or(ProgramError::InvalidInstructionData)?;
     confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
     confidential_account.incoming_transfer_count = 0.into();
-
-    // zero out current `decryptable_balance`
-    confidential_account.decryptable_balance = pod::OptionAESCiphertext::zeroed();
+    confidential_account.decryptable_balance = aes_ciphertext.into();
 
     Ok(())
 }
@@ -905,7 +906,12 @@ pub fn process_instruction(
         ConfidentialTokenInstruction::Deposit => {
             msg!("Deposit");
             let data = decode_instruction_data::<DepositInstructionData>(input)?;
-            process_deposit(accounts, data.amount.into(), data.decimals)
+            process_deposit(
+                accounts,
+                data.amount.into(),
+                data.decimals,
+                data.aes_ciphertext,
+            )
         }
         ConfidentialTokenInstruction::Withdraw => {
             msg!("Withdraw");
@@ -919,11 +925,13 @@ pub fn process_instruction(
         ConfidentialTokenInstruction::ApplyPendingBalance => {
             msg!("ApplyPendingBalance");
 
-            let expected_incoming_transfer_count =
-                decode_optional_instruction_data::<ApplyPendingBalanceData>(input)?
-                    .map(|d| d.expected_incoming_transfer_count.into());
+            let data = decode_instruction_data::<ApplyPendingBalanceData>(input)?;
 
-            process_apply_pending_balance(accounts, expected_incoming_transfer_count)
+            process_apply_pending_balance(
+                accounts,
+                data.expected_incoming_transfer_count.into(),
+                data.aes_ciphertext.into(),
+            )
         }
         ConfidentialTokenInstruction::DisableInboundTransfers => {
             msg!("DisableInboundTransfers");
