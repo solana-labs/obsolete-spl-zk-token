@@ -217,6 +217,7 @@ fn process_demo(
                 payer.pubkey(),
                 zk_token_account,
                 *elgamal_pk,
+                None,
                 token_account.pubkey(),
                 payer.pubkey(),
                 &[],
@@ -252,6 +253,7 @@ fn process_demo(
             &[],
             mint_amount,
             0,
+            None,
         ),
         &[payer],
     )?;
@@ -304,6 +306,7 @@ fn process_demo(
         &elgamal_sk_a,
         elgamal_pk_b,
         auditor_elgamal_pk,
+        None,
     );
 
     // Extract transfer amount from `transfer_data` and demonstrate decrypting using
@@ -353,7 +356,7 @@ fn process_demo(
             token_account_b.pubkey(),
             payer.pubkey(),
             &[],
-            Some(1),
+            None,
         ),
         &[payer],
     )?;
@@ -406,6 +409,7 @@ fn process_demo(
                 &elgamal_sk_b,
                 current_balance_b,
                 current_balance_ct_b,
+                None,
             ),
         ),
         &[payer],
