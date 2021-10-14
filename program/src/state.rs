@@ -48,12 +48,11 @@ pub struct ConfidentialAccount {
     /// Prohibit incoming transfers if `false`
     pub accept_incoming_transfers: PodBool,
 
-    /// Counts the number of incoming transfers since the last successful `ApplyPendingBalance`
-    /// instruction
+    /// Counts the number of incoming transfers
     pub incoming_transfer_count: PodU64,
 
     /// Record of `incoming_transfer_count` at the time of the most recent `ApplyPendingBalance`
-    pub incoming_transfer_count_record: TransferCountRecord,
+    pub applied_incoming_transfer_count: TransferCountRecord,
 }
 impl PodAccountInfo<'_, '_> for ConfidentialAccount {}
 
