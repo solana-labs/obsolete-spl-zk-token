@@ -58,7 +58,7 @@ impl PodAccountInfo<'_, '_> for ConfidentialAccount {}
 
 /// After submitting `ApplyPendingBalance`, the client should compare the expected and the actual
 /// transfer counts. If they are equal, then the `decryptable_balance` is consistent with
-/// `avaialble_balance`. If they differ, then the client should update the `decryptable_balance`.
+/// `available_balance`. If they differ, then the client should update the `decryptable_balance`.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct TransferCountRecord {
