@@ -175,31 +175,6 @@ pub enum ConfidentialTokenInstruction {
     ///
     CloseAccount,
 
-    /// Update the confidential token account's ElGamal public key.
-    ///
-    /// This instruction will fail the pending balance is not empty, so invoking
-    /// `ApplyPendingBalance` first is recommended.
-    ///
-    /// If the account is heavily used, consider invoking `DisableInboundTransfers` in a separate
-    /// transaction first to avoid new inbound transfers from causing this instruction to fail.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   0. `[writable]` The confidential token account to update
-    ///   1. `[]` Corresponding SPL Token account
-    ///   2. `[]` Instructions sysvar
-    ///   3. `[signer]` The single account owner
-    /// or:
-    ///   3. `[]` The multisig account owner
-    ///   4.. `[signer]` Required M signer accounts for the SPL Token Multisig account
-    ///
-    /// Data expected by this instruction:
-    ///   None
-    ///
-    /// The preceding instruction must be ProofInstruction::VerifyUpdateAccountPk.
-    ///
-    UpdateAccountPk,
-
     /// Deposit SPL Tokens into the pending balance of a confidential token account.
     ///
     /// The account owner can then invoke the `ApplyPendingBalance` instruction to roll the deposit
@@ -492,44 +467,6 @@ pub fn close_account(
             authority,
             multisig_signers,
         ),
-    ]
-}
-
-/// Create a inner `UpdateAccountPk` instruction
-///
-/// This instruction is suitable for use with a cross-program `invoke` provided that the previous
-/// instruction is `ProofInstruction::VerifyUpdateAccountPk`
-pub fn inner_update_account_pk(
-    zk_token_account: Pubkey,
-    token_account: Pubkey,
-    authority: Pubkey,
-    multisig_signers: &[&Pubkey],
-) -> Instruction {
-    let mut accounts = vec![
-        AccountMeta::new(zk_token_account, false),
-        AccountMeta::new_readonly(token_account, false),
-        AccountMeta::new_readonly(sysvar::instructions::id(), false),
-        AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
-    ];
-
-    for multisig_signer in multisig_signers.iter() {
-        accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
-    }
-
-    encode_instruction(accounts, ConfidentialTokenInstruction::UpdateAccountPk, &())
-}
-
-/// Create a `UpdateAccountPk` instruction
-pub fn update_account_pk(
-    zk_token_account: Pubkey,
-    token_account: Pubkey,
-    authority: Pubkey,
-    multisig_signers: &[&Pubkey],
-    proof_data: &UpdateAccountPkData,
-) -> Vec<Instruction> {
-    vec![
-        verify_update_account_pk(proof_data),
-        inner_update_account_pk(zk_token_account, token_account, authority, multisig_signers),
     ]
 }
 

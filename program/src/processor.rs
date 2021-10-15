@@ -507,48 +507,6 @@ fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
     Ok(())
 }
 
-/// Processes an [UpdateAccountPk] instruction.
-fn process_update_account_pk(accounts: &[AccountInfo]) -> ProgramResult {
-    let account_info_iter = &mut accounts.iter();
-    let confidential_account_info = next_account_info(account_info_iter)?;
-    let token_account_info = next_account_info(account_info_iter)?;
-    let instructions_sysvar_info = next_account_info(account_info_iter)?;
-    let owner_info = next_account_info(account_info_iter)?;
-
-    let (mut confidential_account, _token_account) = validate_confidential_account_is_signer(
-        confidential_account_info,
-        token_account_info,
-        owner_info,
-        account_info_iter.as_slice(),
-    )?;
-
-    let previous_instruction = get_previous_instruction(instructions_sysvar_info)?;
-    let data = decode_proof_instruction::<UpdateAccountPkData>(
-        ProofInstruction::VerifyUpdateAccountPk,
-        &previous_instruction,
-    )?;
-
-    if confidential_account.elgamal_pk != data.current_pk {
-        msg!("ElGamalPubkey mismatch");
-        return Err(ProgramError::InvalidInstructionData);
-    }
-
-    if confidential_account.pending_balance != pod::ElGamalCiphertext::zeroed() {
-        msg!("Pending balance is not zero");
-        return Err(ProgramError::InvalidAccountData);
-    }
-
-    if confidential_account.available_balance != data.current_ct {
-        msg!("Available balance mismatch");
-        return Err(ProgramError::InvalidInstructionData);
-    }
-
-    confidential_account.elgamal_pk = data.new_pk;
-    confidential_account.available_balance = data.new_ct;
-
-    Ok(())
-}
-
 /// Processes a [Deposit] instruction.
 fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
@@ -889,10 +847,6 @@ pub fn process_instruction(
         ConfidentialTokenInstruction::CloseAccount => {
             msg!("CloseAccount");
             process_close_account(accounts)
-        }
-        ConfidentialTokenInstruction::UpdateAccountPk => {
-            msg!("UpdateAccountPk");
-            process_update_account_pk(accounts)
         }
         ConfidentialTokenInstruction::Deposit => {
             msg!("Deposit");

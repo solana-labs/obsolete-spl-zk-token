@@ -8,7 +8,7 @@ use {
         signature::{Keypair, Signer},
         transaction::Transaction,
     },
-    spl_zk_token::{self, pod::*, *},
+    spl_zk_token::{self, *},
     spl_zk_token_sdk::encryption::{
         aes::AESCiphertext,
         elgamal::{ElGamalCiphertext, ElGamalKeypair, ElGamalPubkey},
@@ -420,63 +420,6 @@ async fn test_close_account() {
             .expect("get_balance"),
         ACCOUNT_RENT_EXEMPTION
     );
-}
-
-#[tokio::test]
-async fn test_update_account_pk() {
-    let owner = Keypair::new();
-
-    let elgamal = ElGamalKeypair::default();
-
-    let mut program_test = program_test();
-
-    let mint = add_token_mint_account(&mut program_test, None);
-    let token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 123);
-
-    let zk_available_balance = 123;
-    let zk_available_balance_ct = elgamal.public.encrypt(zk_available_balance);
-    let zk_token_account = add_zk_token_account(
-        &mut program_test,
-        mint,
-        token_account,
-        elgamal.public,
-        zk_available_balance_ct,
-    );
-
-    let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
-    let new_elgamal = ElGamalKeypair::default();
-
-    let data = spl_zk_token::instruction::UpdateAccountPkData::new(
-        zk_available_balance,
-        zk_available_balance_ct,
-        elgamal.public,
-        &elgamal.secret,
-        new_elgamal.public,
-        &new_elgamal.secret,
-    );
-
-    let mut transaction = Transaction::new_with_payer(
-        &spl_zk_token::instruction::update_account_pk(
-            zk_token_account,
-            token_account,
-            owner.pubkey(),
-            &[],
-            &data,
-        ),
-        Some(&payer.pubkey()),
-    );
-    transaction.sign(&[&payer, &owner], recent_blockhash);
-    assert_transaction_size(&transaction);
-    banks_client.process_transaction(transaction).await.unwrap();
-
-    let account = banks_client
-        .get_account(zk_token_account)
-        .await
-        .expect("get_account")
-        .expect("zk_token_account not found");
-    let zk_token_state =
-        spl_zk_token::state::ConfidentialAccount::from_bytes(&account.data).unwrap();
-    assert_eq!(zk_token_state.elgamal_pk, new_elgamal.public.into());
 }
 
 // Mark this test as BPF-only due to current `ProgramTest` limitations when CPIing into the SPL Token program
