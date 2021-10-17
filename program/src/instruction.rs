@@ -17,7 +17,7 @@ use {
     spl_zk_token_sdk::zk_token_elgamal::pod,
 };
 
-pub use spl_zk_token_sdk::{encryption::aes::AESCiphertext, zk_token_proof_instruction::*};
+pub use spl_zk_token_sdk::{encryption::aes::AesCiphertext, zk_token_proof_instruction::*};
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
@@ -39,7 +39,7 @@ pub struct CreateAccountInstructionData {
     /// The public key associated with the account
     pub elgamal_pk: pod::ElGamalPubkey,
     /// The AES ciphertext data
-    pub aes_ciphertext: pod::AESCiphertext,
+    pub aes_ciphertext: pod::AesCiphertext,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -59,14 +59,14 @@ pub struct WithdrawInstructionData {
     /// Expected number of base 10 digits to the right of the decimal place.
     pub decimals: u8,
     /// The AES ciphertext data
-    pub aes_ciphertext: pod::AESCiphertext,
+    pub aes_ciphertext: pod::AesCiphertext,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct TransferInstructionData {
     /// The AES ciphertext data
-    pub aes_ciphertext: pod::AESCiphertext,
+    pub aes_ciphertext: pod::AesCiphertext,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -76,7 +76,7 @@ pub struct ApplyPendingBalanceData {
     /// instruction
     pub expected_incoming_transfer_count: PodU64,
     /// The AES ciphertext data
-    pub aes_ciphertext: pod::AESCiphertext,
+    pub aes_ciphertext: pod::AesCiphertext,
 }
 
 #[derive(Clone, Copy, Debug, FromPrimitive, ToPrimitive)]
@@ -395,7 +395,7 @@ pub fn create_account(
     funding_address: Pubkey,
     zk_token_account: Pubkey,
     elgamal_pk: ElGamalPubkey,
-    aes_ciphertext: AESCiphertext,
+    aes_ciphertext: AesCiphertext,
     token_account: Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
@@ -520,7 +520,7 @@ pub fn inner_withdraw(
     multisig_signers: &[&Pubkey],
     amount: u64,
     decimals: u8,
-    aes_ciphertext: AESCiphertext,
+    aes_ciphertext: AesCiphertext,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
@@ -559,7 +559,7 @@ pub fn withdraw(
     multisig_signers: &[&Pubkey],
     amount: u64,
     decimals: u8,
-    aes_ciphertext: AESCiphertext,
+    aes_ciphertext: AesCiphertext,
     proof_data: &WithdrawData,
 ) -> Vec<Instruction> {
     vec![
@@ -591,7 +591,7 @@ pub fn inner_transfer(
     mint: &Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
-    aes_ciphertext: AESCiphertext,
+    aes_ciphertext: AesCiphertext,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
@@ -626,7 +626,7 @@ pub fn transfer(
     mint: &Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
-    aes_ciphertext: AESCiphertext,
+    aes_ciphertext: AesCiphertext,
     proof_data: &TransferData,
 ) -> Vec<Instruction> {
     vec![
@@ -651,7 +651,7 @@ pub fn apply_pending_balance(
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
     incoming_transfer_count: u64,
-    aes_ciphertext: AESCiphertext,
+    aes_ciphertext: AesCiphertext,
 ) -> Vec<Instruction> {
     let mut accounts = vec![
         AccountMeta::new(zk_token_account, false),

@@ -577,7 +577,7 @@ fn process_withdraw(
     accounts: &[AccountInfo],
     amount: u64,
     decimals: u8,
-    aes_ciphertext: pod::AESCiphertext,
+    aes_ciphertext: pod::AesCiphertext,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
@@ -658,7 +658,7 @@ fn process_withdraw(
     Ok(())
 }
 /// Processes a [Transfer] instruction.
-fn process_transfer(accounts: &[AccountInfo], aes_ciphertext: pod::AESCiphertext) -> ProgramResult {
+fn process_transfer(accounts: &[AccountInfo], aes_ciphertext: pod::AesCiphertext) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let confidential_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
@@ -760,7 +760,7 @@ fn process_transfer(accounts: &[AccountInfo], aes_ciphertext: pod::AESCiphertext
 fn process_apply_pending_balance(
     accounts: &[AccountInfo],
     expected_incoming_transfer_count: u64,
-    aes_ciphertext: pod::AESCiphertext,
+    aes_ciphertext: pod::AesCiphertext,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
