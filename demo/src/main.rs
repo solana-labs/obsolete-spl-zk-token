@@ -17,7 +17,7 @@ use {
         transaction::Transaction,
     },
     spl_zk_token::pod::*,
-    spl_zk_token_sdk::encryption::{aes::AESCiphertext, discrete_log, elgamal::*},
+    spl_zk_token_sdk::encryption::{aes::AesCiphertext, discrete_log, elgamal::*},
     std::{convert::TryInto, process::exit, sync::Arc},
 };
 
@@ -217,7 +217,7 @@ fn process_demo(
                 payer.pubkey(),
                 zk_token_account,
                 *elgamal_pk,
-                AESCiphertext::default(),
+                AesCiphertext::default(),
                 token_account.pubkey(),
                 payer.pubkey(),
                 &[],
@@ -268,7 +268,7 @@ fn process_demo(
             payer.pubkey(),
             &[],
             1,
-            AESCiphertext::default(),
+            AesCiphertext::default(),
         ),
         &[payer],
     )?;
@@ -342,7 +342,7 @@ fn process_demo(
             &token_mint.pubkey(),
             payer.pubkey(),
             &[],
-            AESCiphertext::default(),
+            AesCiphertext::default(),
             &transfer_proof_data,
         ),
         &[payer],
@@ -357,7 +357,7 @@ fn process_demo(
             payer.pubkey(),
             &[],
             1,
-            AESCiphertext::default(),
+            AesCiphertext::default(),
         ),
         &[payer],
     )?;
@@ -404,7 +404,7 @@ fn process_demo(
             &[],
             current_balance_b,
             0,
-            AESCiphertext::default(),
+            AesCiphertext::default(),
             &spl_zk_token::instruction::WithdrawData::new(
                 current_balance_b,
                 elgamal_pk_a,

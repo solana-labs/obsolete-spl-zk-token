@@ -10,7 +10,7 @@ use {
     },
     spl_zk_token::{self, *},
     spl_zk_token_sdk::encryption::{
-        aes::AESCiphertext,
+        aes::AesCiphertext,
         elgamal::{ElGamalCiphertext, ElGamalKeypair, ElGamalPubkey},
     },
 };
@@ -635,7 +635,7 @@ async fn test_transfer() {
         &mint,
         owner.pubkey(),
         &[],
-        AESCiphertext::default(),
+        AesCiphertext::default(),
         &transfer_data,
     );
 
@@ -658,7 +658,7 @@ async fn test_transfer() {
             owner.pubkey(),
             &[],
             1,
-            AESCiphertext::default(),
+            AesCiphertext::default(),
         ),
         Some(&payer.pubkey()),
     );
