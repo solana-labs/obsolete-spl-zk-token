@@ -2,7 +2,7 @@
 //!
 
 #[cfg(not(target_arch = "bpf"))]
-use spl_zk_token_sdk::encryption::elgamal::ElGamalPubkey;
+use spl_zk_token_sdk::encryption::{aes::AesCiphertext, elgamal::ElGamalPubkey};
 use {
     crate::{pod::*, *},
     bytemuck::{Pod, Zeroable},
@@ -17,7 +17,7 @@ use {
     spl_zk_token_sdk::zk_token_elgamal::pod,
 };
 
-pub use spl_zk_token_sdk::{encryption::aes::AesCiphertext, zk_token_proof_instruction::*};
+pub use spl_zk_token_sdk::zk_token_proof_instruction::*;
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
@@ -520,7 +520,7 @@ pub fn inner_withdraw(
     multisig_signers: &[&Pubkey],
     amount: u64,
     decimals: u8,
-    aes_ciphertext: AesCiphertext,
+    aes_ciphertext: pod::AesCiphertext,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
@@ -543,13 +543,14 @@ pub fn inner_withdraw(
         &WithdrawInstructionData {
             amount: amount.into(),
             decimals,
-            aes_ciphertext: aes_ciphertext.into(),
+            aes_ciphertext,
         },
     )
 }
 
 /// Create a `Withdraw` instruction
 #[allow(clippy::too_many_arguments)]
+#[cfg(not(target_arch = "bpf"))]
 pub fn withdraw(
     source_zk_token_account: Pubkey,
     source_token_account: Pubkey,
@@ -573,7 +574,7 @@ pub fn withdraw(
             multisig_signers,
             amount,
             decimals,
-            aes_ciphertext,
+            aes_ciphertext.into(),
         ),
     ]
 }
@@ -591,7 +592,7 @@ pub fn inner_transfer(
     mint: &Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
-    aes_ciphertext: AesCiphertext,
+    aes_ciphertext: pod::AesCiphertext,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
@@ -610,14 +611,13 @@ pub fn inner_transfer(
     encode_instruction(
         accounts,
         ConfidentialTokenInstruction::Transfer,
-        &TransferInstructionData {
-            aes_ciphertext: aes_ciphertext.into(),
-        },
+        &TransferInstructionData { aes_ciphertext },
     )
 }
 
 /// Create a `Transfer` instruction
 #[allow(clippy::too_many_arguments)]
+#[cfg(not(target_arch = "bpf"))]
 pub fn transfer(
     source_zk_token_account: Pubkey,
     source_token_account: Pubkey,
@@ -639,20 +639,23 @@ pub fn transfer(
             mint,
             authority,
             multisig_signers,
-            aes_ciphertext,
+            aes_ciphertext.int(),
         ),
     ]
 }
 
-/// Create a `ApplyPendingBalance` instruction
-pub fn apply_pending_balance(
+/// Create a inner `ApplyPendingBalance` instruction
+///
+/// This instruction is suitable for use with a cross-program `invoke`
+#[allow(clippy::too_many_arguments)]
+pub fn inner_apply_pending_balance(
     zk_token_account: Pubkey,
     token_account: Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
     incoming_transfer_count: u64,
-    aes_ciphertext: AesCiphertext,
-) -> Vec<Instruction> {
+    aes_ciphertext: pod::AesCiphertext,
+) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(zk_token_account, false),
         AccountMeta::new_readonly(token_account, false),
@@ -663,12 +666,32 @@ pub fn apply_pending_balance(
         accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
     }
 
-    vec![encode_instruction(
+    encode_instruction(
         accounts,
         ConfidentialTokenInstruction::ApplyPendingBalance,
         &ApplyPendingBalanceData {
             expected_incoming_transfer_count: incoming_transfer_count.into(),
-            aes_ciphertext: aes_ciphertext.into(),
+            aes_ciphertext,
         },
+    )
+}
+
+/// Create a `ApplyPendingBalance` instruction
+#[cfg(not(target_arch = "bpf"))]
+pub fn apply_pending_balance(
+    zk_token_account: Pubkey,
+    token_account: Pubkey,
+    authority: Pubkey,
+    multisig_signers: &[&Pubkey],
+    incoming_transfer_count: u64,
+    aes_ciphertext: AesCiphertext,
+) -> Vec<Instruction> {
+    vec![inner_apply_pending_balance(
+        zk_token_account,
+        token_account,
+        authority,
+        multisig_signers,
+        incoming_transfer_count,
+        aes_ciphertext.into(),
     )]
 }
