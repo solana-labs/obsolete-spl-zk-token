@@ -639,7 +639,7 @@ pub fn transfer(
             mint,
             authority,
             multisig_signers,
-            aes_ciphertext.int(),
+            aes_ciphertext.into(),
         ),
     ]
 }
