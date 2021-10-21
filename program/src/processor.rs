@@ -38,6 +38,8 @@ fn get_previous_instruction(
     if current_instruction == 0 {
         return Err(ProgramError::InvalidInstructionData);
     }
+
+    #[allow(deprecated)]
     sysvar::instructions::load_instruction_at(current_instruction as usize - 1, &instruction_sysvar)
         .map_err(|_| ProgramError::InvalidInstructionData)
 }
@@ -47,8 +49,8 @@ fn decode_proof_instruction<T: Pod>(
     expected: ProofInstruction,
     instruction: &Instruction,
 ) -> Result<&T, ProgramError> {
-    if ProofInstruction::decode_type(&zk_token_proof_program::id(), &instruction.data)
-        != Some(expected)
+    if instruction.program_id != zk_token_proof_program::id()
+        || ProofInstruction::decode_type(&instruction.data) != Some(expected)
     {
         msg!("Unexpected proof instruction");
         return Err(ProgramError::InvalidInstructionData);
