@@ -6,6 +6,11 @@
 here="$(dirname "$0")"
 cd "$here"/..
 
+if [[ ! -d ../programs/bpf ]]; then
+  echo "Monorepo not found at .."
+  exit 1
+fi
+
 if [[ -f Cargo.toml.org ]]; then
   echo "Error: Already ran $0 (Cargo.toml.org exists)"
   exit 1
@@ -18,6 +23,11 @@ touch Cargo.toml
 
 cat Cargo.toml >> ../Cargo.toml
 cat Cargo.toml >> ../programs/bpf/Cargo.toml
+if [[ -d ../spl ]]; then
+  ../spl/patch.crates-io.sh ..
+  cat Cargo.toml >> ../spl/Cargo.toml
+fi
+
 cat >> Cargo.toml <<EOF
 [workspace]
 members = [
