@@ -38,6 +38,7 @@ crates=(
   solana-program-test
   solana-remote-wallet
   solana-sdk
+  solana-test-validator
   solana-validator
 )
 

@@ -609,7 +609,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(test)]
 mod test {
-    use {super::*, solana_validator::test_validator::*};
+    use {super::*, solana_test_validator::*};
 
     #[test]
     #[ignore]
