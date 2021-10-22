@@ -4856,7 +4856,6 @@ dependencies = [
  "byteorder",
  "cipher",
  "curve25519-dalek 3.2.0",
- "ed25519-dalek",
  "getrandom 0.1.16",
  "merlin",
  "num-derive",
