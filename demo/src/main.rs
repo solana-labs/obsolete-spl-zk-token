@@ -28,25 +28,20 @@ struct Config {
     verbose: bool,
 }
 
-fn get_zk_token_transfer_auditor(
+fn get_zk_token_auditor(
     rpc_client: &RpcClient,
     token_mint: &Pubkey,
 ) -> client_error::Result<ElGamalPubkey> {
-    let zk_transfer_auditor = spl_zk_token::get_transfer_auditor_address(token_mint);
-    let account = rpc_client.get_account(&zk_transfer_auditor)?;
+    let zk_auditor = spl_zk_token::get_auditor_address(token_mint);
+    let account = rpc_client.get_account(&zk_auditor)?;
 
-    spl_zk_token::state::TransferAuditor::from_bytes(&account.data)
-        .map(|transfer_auditor| {
-            transfer_auditor
-                .elgamal_pk
-                .try_into()
-                .expect("valid elgamal_pk")
-        })
+    spl_zk_token::state::Auditor::from_bytes(&account.data)
+        .map(|auditor| auditor.elgamal_pk.try_into().expect("valid elgamal_pk"))
         .ok_or_else(|| client_error::ClientError {
             request: None,
             kind: client_error::ClientErrorKind::Custom(format!(
                 "Invalid account data: {}",
-                zk_transfer_auditor,
+                zk_auditor,
             )),
         })
 }
@@ -172,7 +167,7 @@ fn process_demo(
         &[payer, &token_mint],
     )?;
 
-    let auditor_elgamal_pk = get_zk_token_transfer_auditor(rpc_client, &token_mint.pubkey())?;
+    let auditor_elgamal_pk = get_zk_token_auditor(rpc_client, &token_mint.pubkey())?;
     let mint_amount = 100;
     let omnibus_token_account = spl_zk_token::get_omnibus_token_address(&token_mint.pubkey());
 

@@ -15,8 +15,8 @@ pub(crate) fn get_omnibus_token_address_with_seed(spl_token_mint: &Pubkey) -> (P
     Pubkey::find_program_address(&[spl_token_mint.as_ref(), br"omnibus"], &id())
 }
 
-pub(crate) fn get_transfer_auditor_address_with_seed(spl_token_mint: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[spl_token_mint.as_ref(), br"transfer auditor"], &id())
+pub(crate) fn get_auditor_address_with_seed(spl_token_mint: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[spl_token_mint.as_ref(), br"auditor"], &id())
 }
 
 pub(crate) fn get_confidential_token_address_with_seed(
@@ -42,15 +42,15 @@ pub fn get_omnibus_token_address(spl_token_mint: &Pubkey) -> Pubkey {
     get_omnibus_token_address_with_seed(spl_token_mint).0
 }
 
-/// Derive the address of the Transfer Auditor account for a given SPL Token mint
+/// Derive the address of the Auditor account for a given SPL Token mint
 ///
-/// The Transfer Auditor account optionally holds an ElGamal public key for the entity that is
+/// The Auditor account optionally holds an ElGamal public key for the entity that is
 /// authorized to view all confidential transfers for the given SPL Token regardless of receiver.
 ///
-/// Only the SPL Token mint's freeze authority may configure a transfer auditor.
+/// Only the SPL Token mint's freeze authority may configure an auditor.
 ///
-pub fn get_transfer_auditor_address(spl_token_mint: &Pubkey) -> Pubkey {
-    get_transfer_auditor_address_with_seed(spl_token_mint).0
+pub fn get_auditor_address(spl_token_mint: &Pubkey) -> Pubkey {
+    get_auditor_address_with_seed(spl_token_mint).0
 }
 
 /// Derive the confidential account address for a given SPL Token account address

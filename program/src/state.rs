@@ -8,7 +8,7 @@ use {
 /// Account used for auditing confidential transfers
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
-pub struct TransferAuditor {
+pub struct Auditor {
     /// The SPL Token mint associated with this account
     pub mint: Pubkey,
 
@@ -16,10 +16,10 @@ pub struct TransferAuditor {
     /// If false, transfer auditing is disabled
     pub enabled: PodBool,
 
-    /// ElGamal public key for the transfer auditor.
+    /// ElGamal public key for the auditor.
     pub elgamal_pk: pod::ElGamalPubkey,
 }
-impl PodAccountInfo<'_, '_> for TransferAuditor {}
+impl PodAccountInfo<'_, '_> for Auditor {}
 
 /// State for a confidential token account
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -78,8 +78,8 @@ mod tests {
     #[test]
     fn test_get_packed_len() {
         assert_eq!(
-            TransferAuditor::get_packed_len(),
-            solana_program::borsh::get_packed_len::<TransferAuditor>()
+            Auditor::get_packed_len(),
+            solana_program::borsh::get_packed_len::<Auditor>()
         );
 
         assert_eq!(

@@ -205,13 +205,13 @@ fn create_pda_account<'a>(
 /// Processes an [ConfigureMint] instruction.
 fn process_configure_mint(
     accounts: &[AccountInfo],
-    transfer_auditor_pk: Option<&pod::ElGamalPubkey>,
+    auditor_pk: Option<&pod::ElGamalPubkey>,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let funder_info = next_account_info(account_info_iter)?;
     let mint_info = next_account_info(account_info_iter)?;
     let omnibus_info = next_account_info(account_info_iter)?;
-    let transfer_auditor_info = next_account_info(account_info_iter)?;
+    let auditor_info = next_account_info(account_info_iter)?;
     let system_program_info = next_account_info(account_info_iter)?;
     let spl_token_program_info = next_account_info(account_info_iter)?;
     let rent_sysvar_info = next_account_info(account_info_iter)?;
@@ -232,11 +232,9 @@ fn process_configure_mint(
         )?;
     } else {
         // If the mint has no freeze authority, anybody may enabled confidential transfers but
-        // cannot configure a transfer auditor
-        if transfer_auditor_pk.is_some() {
-            msg!(
-                "Error: Transfer auditor may not be configured on a mint with no freeze authority"
-            );
+        // cannot configure an auditor
+        if auditor_pk.is_some() {
+            msg!("Error: auditor may not be configured on a mint with no freeze authority");
             return Err(ProgramError::InvalidArgument);
         }
     }
@@ -256,19 +254,15 @@ fn process_configure_mint(
         &[omnibus_token_bump_seed],
     ];
 
-    // Ensure transfer auditor account address derivation is correct
-    let (transfer_auditor_address, transfer_auditor_bump_seed) =
-        get_transfer_auditor_address_with_seed(mint_info.key);
-    if transfer_auditor_address != *transfer_auditor_info.key {
-        msg!("Error: Transfer auditor address does not match seed derivation");
+    // Ensure auditor account address derivation is correct
+    let (auditor_address, auditor_bump_seed) = get_auditor_address_with_seed(mint_info.key);
+    if auditor_address != *auditor_info.key {
+        msg!("Error: auditor address does not match seed derivation");
         return Err(ProgramError::InvalidSeeds);
     }
 
-    let transfer_auditor_account_signer_seeds: &[&[_]] = &[
-        &mint_info.key.to_bytes(),
-        br"transfer auditor",
-        &[transfer_auditor_bump_seed],
-    ];
+    let auditor_account_signer_seeds: &[&[_]] =
+        &[&mint_info.key.to_bytes(), br"auditor", &[auditor_bump_seed]];
 
     msg!("Creating omnibus token account: {}", omnibus_info.key);
     create_pda_account(
@@ -295,38 +289,35 @@ fn process_configure_mint(
         ],
     )?;
 
-    msg!(
-        "Creating transfer auditor account: {}",
-        transfer_auditor_info.key
-    );
+    msg!("Creating auditor account: {}", auditor_info.key);
     create_pda_account(
         funder_info,
         rent,
-        TransferAuditor::get_packed_len(),
+        Auditor::get_packed_len(),
         &id(),
         system_program_info,
-        transfer_auditor_info,
-        transfer_auditor_account_signer_seeds,
+        auditor_info,
+        auditor_account_signer_seeds,
     )?;
 
-    let mut transfer_auditor = TransferAuditor::from_account_info(transfer_auditor_info, &id())?;
+    let mut auditor = Auditor::from_account_info(auditor_info, &id())?;
 
-    transfer_auditor.mint = *mint_info.key;
-    if let Some(transfer_auditor_pk) = transfer_auditor_pk {
-        transfer_auditor.enabled = true.into();
-        transfer_auditor.elgamal_pk = *transfer_auditor_pk;
+    auditor.mint = *mint_info.key;
+    if let Some(auditor_pk) = auditor_pk {
+        auditor.enabled = true.into();
+        auditor.elgamal_pk = *auditor_pk;
     }
 
     Ok(())
 }
 
-/// Processes an [UpdateTransferAuditor] instruction.
-fn process_update_transfer_auditor(
+/// Processes an [UpdateAuditor] instruction.
+fn process_update_auditor(
     accounts: &[AccountInfo],
-    new_transfer_auditor_pk: Option<&pod::ElGamalPubkey>,
+    new_auditor_pk: Option<&pod::ElGamalPubkey>,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
-    let transfer_auditor_info = next_account_info(account_info_iter)?;
+    let auditor_info = next_account_info(account_info_iter)?;
     let mint_info = next_account_info(account_info_iter)?;
 
     validate_account_owner(mint_info, &spl_token::id())?;
@@ -342,26 +333,26 @@ fn process_update_transfer_auditor(
             account_info_iter.as_slice(),
         )?;
     } else {
-        msg!("Error: Transfer auditor may not be updated on a mint with no freeze authority");
+        msg!("Error: auditor may not be updated on a mint with no freeze authority");
         return Err(ProgramError::InvalidArgument);
     }
 
-    let mut transfer_auditor = TransferAuditor::from_account_info(transfer_auditor_info, &id())?;
+    let mut auditor = Auditor::from_account_info(auditor_info, &id())?;
 
-    if transfer_auditor.mint != *mint_info.key {
+    if auditor.mint != *mint_info.key {
         msg!("Error: Mint mismatch");
         return Err(ProgramError::InvalidArgument);
     }
 
-    if !bool::from(&transfer_auditor.enabled) {
-        msg!("Error: Transfer auditor is disabled");
+    if !bool::from(&auditor.enabled) {
+        msg!("Error: auditor is disabled");
         return Err(ProgramError::InvalidAccountData);
     }
 
-    match new_transfer_auditor_pk {
-        Some(new_transfer_auditor_pk) => transfer_auditor.elgamal_pk = *new_transfer_auditor_pk,
+    match new_auditor_pk {
+        Some(new_auditor_pk) => auditor.elgamal_pk = *new_auditor_pk,
         None => {
-            transfer_auditor.enabled = false.into();
+            auditor.enabled = false.into();
         }
     }
 
@@ -667,7 +658,7 @@ fn process_transfer(accounts: &[AccountInfo], aes_ciphertext: pod::AesCiphertext
     let token_account_info = next_account_info(account_info_iter)?;
     let receiver_confidential_account_info = next_account_info(account_info_iter)?;
     let receiver_token_account_info = next_account_info(account_info_iter)?;
-    let transfer_auditor_info = next_account_info(account_info_iter)?;
+    let auditor_info = next_account_info(account_info_iter)?;
     let instructions_sysvar_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
@@ -684,10 +675,10 @@ fn process_transfer(accounts: &[AccountInfo], aes_ciphertext: pod::AesCiphertext
             receiver_token_account_info,
         )?;
 
-    let transfer_auditor = TransferAuditor::from_account_info(transfer_auditor_info, &id())?;
+    let auditor = Auditor::from_account_info(auditor_info, &id())?;
 
     if confidential_account.mint != receiver_confidential_account.mint
-        || confidential_account.mint != transfer_auditor.mint
+        || confidential_account.mint != auditor.mint
     {
         msg!("Mint mismatch");
         return Err(ProgramError::InvalidArgument);
@@ -711,8 +702,8 @@ fn process_transfer(accounts: &[AccountInfo], aes_ciphertext: pod::AesCiphertext
 
     if data.transfer_public_keys.source_pk != confidential_account.elgamal_pk
         || data.transfer_public_keys.dest_pk != receiver_confidential_account.elgamal_pk
-        || (bool::from(&transfer_auditor.enabled)
-            && data.transfer_public_keys.auditor_pk != transfer_auditor.elgamal_pk)
+        || (bool::from(&auditor.enabled)
+            && data.transfer_public_keys.auditor_pk != auditor.elgamal_pk)
     {
         msg!("Error: ElGamal public key mismatch");
         return Err(ProgramError::InvalidArgument);
@@ -828,17 +819,17 @@ pub fn process_instruction(
     match decode_instruction_type(input)? {
         ConfidentialTokenInstruction::ConfigureMint => {
             msg!("ConfigureMint!");
-            let transfer_auditor_pk =
+            let auditor_pk =
                 decode_optional_instruction_data::<ConfigureMintInstructionData>(input)?
-                    .map(|d| &d.transfer_auditor_pk);
-            process_configure_mint(accounts, transfer_auditor_pk)
+                    .map(|d| &d.auditor_pk);
+            process_configure_mint(accounts, auditor_pk)
         }
-        ConfidentialTokenInstruction::UpdateTransferAuditor => {
-            msg!("UpdateTransferAuditor");
-            let new_transfer_auditor_pk =
-                decode_optional_instruction_data::<UpdateTransferAuditorInstructionData>(input)?
-                    .map(|d| &d.new_transfer_auditor_pk);
-            process_update_transfer_auditor(accounts, new_transfer_auditor_pk)
+        ConfidentialTokenInstruction::UpdateAuditor => {
+            msg!("UpdateAuditor");
+            let new_auditor_pk =
+                decode_optional_instruction_data::<UpdateAuditorInstructionData>(input)?
+                    .map(|d| &d.new_auditor_pk);
+            process_update_auditor(accounts, new_auditor_pk)
         }
         ConfidentialTokenInstruction::CreateAccount => {
             msg!("CreateAccount");
