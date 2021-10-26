@@ -146,28 +146,28 @@ fn add_omnibus_token_account(program_test: &mut ProgramTest, mint: Pubkey, balan
     omnibus_token_address
 }
 
-fn add_zk_transfer_auditor_account(
+fn add_zk_auditor_account(
     program_test: &mut ProgramTest,
     mint: Pubkey,
     elgamal_pk: Option<ElGamalPubkey>,
 ) -> Pubkey {
-    let zk_transfer_auditor_address = get_transfer_auditor_address(&mint);
+    let zk_auditor_address = get_auditor_address(&mint);
 
-    let zk_transfer_auditor_state = spl_zk_token::state::TransferAuditor {
+    let zk_auditor_state = spl_zk_token::state::Auditor {
         mint,
         enabled: elgamal_pk.is_some().into(),
         elgamal_pk: elgamal_pk.unwrap_or_default().into(),
     };
-    let zk_transfer_auditor_account = Account::create(
+    let zk_auditor_account = Account::create(
         ACCOUNT_RENT_EXEMPTION,
-        bytemuck::bytes_of(&zk_transfer_auditor_state).to_vec(),
+        bytemuck::bytes_of(&zk_auditor_state).to_vec(),
         id(),
         false,
         Epoch::default(),
     );
 
-    program_test.add_account(zk_transfer_auditor_address, zk_transfer_auditor_account);
-    zk_transfer_auditor_address
+    program_test.add_account(zk_auditor_address, zk_auditor_account);
+    zk_auditor_address
 }
 
 fn add_zk_token_account(
@@ -246,7 +246,7 @@ async fn get_zk_token_balance(
 async fn test_configure_mint() {
     let owner = Keypair::new();
     let freeze_authority = Keypair::new();
-    let transfer_auditor_elgamal_pk = ElGamalKeypair::default().public;
+    let auditor_elgamal_pk = ElGamalKeypair::default().public;
 
     let mut program_test = program_test();
     let mint = add_token_mint_account(&mut program_test, Some(freeze_authority.pubkey()));
@@ -255,7 +255,7 @@ async fn test_configure_mint() {
     let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
 
     let omnibus_token_address = get_omnibus_token_address(&mint);
-    let transfer_auditor_address = get_transfer_auditor_address(&mint);
+    let auditor_address = get_auditor_address(&mint);
 
     // Failure case: cannot configure the zk mint without the freeze authority signing
     let mut transaction = Transaction::new_with_payer(
@@ -282,7 +282,7 @@ async fn test_configure_mint() {
             mint,
             Some(freeze_authority.pubkey()),
             &[],
-            Some(transfer_auditor_elgamal_pk.into()),
+            Some(auditor_elgamal_pk.into()),
         )],
         Some(&payer.pubkey()),
     );
@@ -296,23 +296,22 @@ async fn test_configure_mint() {
         0
     );
 
-    // TransferAuditor account now exists
-    let transfer_auditor_account = banks_client
-        .get_account(transfer_auditor_address)
+    // Auditor account now exists
+    let auditor_account = banks_client
+        .get_account(auditor_address)
         .await
         .expect("get_account")
-        .expect("transfer_auditor_account not found");
+        .expect("auditor_account not found");
 
-    assert_eq!(transfer_auditor_account.owner, spl_zk_token::id());
-    let transfer_auditor =
-        pod_from_bytes::<state::TransferAuditor>(&transfer_auditor_account.data).unwrap();
-    assert_eq!(transfer_auditor.enabled, true.into());
-    assert_eq!(transfer_auditor.mint, mint.into());
+    assert_eq!(auditor_account.owner, spl_zk_token::id());
+    let auditor = pod_from_bytes::<state::Auditor>(&auditor_account.data).unwrap();
+    assert_eq!(auditor.enabled, true.into());
+    assert_eq!(auditor.mint, mint.into());
 }
 
 #[tokio::test]
 #[ignore]
-async fn test_update_transfer_auditor() {
+async fn test_update_auditor() {
     todo!()
 }
 
@@ -607,8 +606,7 @@ async fn test_transfer() {
     let mint = add_token_mint_account(&mut program_test, None);
 
     let auditor_pk = ElGamalPubkey::default();
-    let _zk_transfer_auditor_address =
-        add_zk_transfer_auditor_account(&mut program_test, mint, None);
+    let _zk_auditor_address = add_zk_auditor_account(&mut program_test, mint, None);
 
     let src_token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 0);
     let src_zk_token_account = add_zk_token_account(

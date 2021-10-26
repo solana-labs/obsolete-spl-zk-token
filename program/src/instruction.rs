@@ -22,15 +22,15 @@ pub use spl_zk_token_sdk::zk_token_proof_instruction::*;
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct ConfigureMintInstructionData {
-    /// The `transfer_auditor` public key.
-    pub transfer_auditor_pk: pod::ElGamalPubkey,
+    /// The `auditor` public key.
+    pub auditor_pk: pod::ElGamalPubkey,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(transparent)]
-pub struct UpdateTransferAuditorInstructionData {
-    /// The new `transfer_auditor` public key.
-    pub new_transfer_auditor_pk: pod::ElGamalPubkey,
+pub struct UpdateAuditorInstructionData {
+    /// The new `auditor` public key.
+    pub new_auditor_pk: pod::ElGamalPubkey,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -87,11 +87,11 @@ pub enum ConfidentialTokenInstruction {
     /// This instruction:
     /// * Creates the omnibus account that will be used to store all SPL Tokens deposited into the
     ///   confidential accounts this mint.
-    /// * Creates the TransferAuditor account.
+    /// * Creates the Auditor account.
     ///
     /// If the SPL Token has a freeze authority configured, the freeze authority must be a signer
-    /// and a transfer auditor may be optionally configured.  Otherwise this instruction requires
-    /// no signers, and a transfer auditor is cannot be configured.
+    /// and an auditor may be optionally configured.  Otherwise this instruction requires
+    /// no signers, and an auditor cannot be configured.
     ///
     /// The instruction fails if the confidential transfers are already configured for the mint.
     ///
@@ -100,7 +100,7 @@ pub enum ConfidentialTokenInstruction {
     ///   0. `[writeable,signer]` Funding account (must be a system account)
     ///   1. `[]` The SPL Token mint account to enable confidential transfers on
     ///   2. `[writable]` The omnibus SPL Token account to create, computed by `get_omnibus_token_address()`
-    ///   3. `[writable]` The TransferAuditor account to create, computed by `get_transfer_auditor_address()`
+    ///   3. `[writable]` The Auditor account to create, computed by `get_auditor_address()`
     ///   4. `[]` System program
     ///   5. `[]` SPL Token program
     ///   6. `[]` Rent sysvar (remove once https://github.com/solana-labs/solana-program-library/pull/2282 is deployed)
@@ -111,18 +111,18 @@ pub enum ConfidentialTokenInstruction {
     ///
     //
     /// Data expected by this instruction:
-    ///   `ConfigureMintInstructionData` (optional) if not provided then the transfer auditor is
+    ///   `ConfigureMintInstructionData` (optional) if not provided then the auditor is
     ///   permanently disabled for this SPL Token mint.
-    ///   A transfer auditor may only be specified when the mint freeze authority if not `None`
+    ///   A auditor may only be specified when the mint freeze authority if not `None`
     ///
     ConfigureMint,
 
-    /// Updates the transfer auditor ElGamal public key.
-    /// This instruction fails if a transfer auditor is currently `None` for this Token mint.
+    /// Updates the auditor ElGamal public key.
+    /// This instruction fails if an auditor is currently `None` for this Token mint.
     ///
     /// Accounts expected by this instruction:
     ///
-    ///   0. `[writable]` The TransferAuditor account, computed by `get_transfer_auditor_address()`
+    ///   0. `[writable]` The Auditor account, computed by `get_auditor_address()`
     ///   1. `[]` The SPL Token mint account
     ///   2. `[signer]` The single SPL Token Mint freeze authority
     /// or:
@@ -130,10 +130,10 @@ pub enum ConfidentialTokenInstruction {
     ///   3.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     /// Data expected by this instruction:
-    ///   `UpdateTransferAuditorInstructionData` (optional) if not provided then the transfer auditor is
+    ///   `UpdateAuditorInstructionData` (optional) if not provided then the auditor is
     ///   permanently disabled for this SPL Token mint
     ///
-    UpdateTransferAuditor,
+    UpdateAuditor,
 
     /// Create a confidential token account
     ///
@@ -235,7 +235,7 @@ pub enum ConfidentialTokenInstruction {
     ///   1. `[]` The source SPL Token account
     ///   2. `[writeable]` The destination confidential token account
     ///   3. `[]` The destination token account
-    ///   4. `[]` The TransferAuditor account, computed by `get_transfer_auditor_address()`
+    ///   4. `[]` The Auditor account, computed by `get_auditor_address()`
     ///   5. `[]` Instructions sysvar
     ///   6. `[signer]` The single source account owner
     /// or:
@@ -348,16 +348,16 @@ pub fn configure_mint(
     token_mint_address: Pubkey,
     freeze_authority: Option<Pubkey>,
     freeze_authority_multisig_signers: &[&Pubkey],
-    transfer_auditor_pk: Option<ElGamalPubkey>,
+    auditor_pk: Option<ElGamalPubkey>,
 ) -> Instruction {
     let omnibus_token_address = get_omnibus_token_address(&token_mint_address);
-    let transfer_auditor_address = get_transfer_auditor_address(&token_mint_address);
+    let auditor_address = get_auditor_address(&token_mint_address);
 
     let mut accounts = vec![
         AccountMeta::new(funding_address, true),
         AccountMeta::new_readonly(token_mint_address, false),
         AccountMeta::new(omnibus_token_address, false),
-        AccountMeta::new(transfer_auditor_address, false),
+        AccountMeta::new(auditor_address, false),
         AccountMeta::new_readonly(solana_program::system_program::id(), false),
         AccountMeta::new_readonly(spl_token::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
@@ -370,12 +370,12 @@ pub fn configure_mint(
         }
     }
 
-    if let Some(transfer_auditor_pk) = transfer_auditor_pk {
+    if let Some(auditor_pk) = auditor_pk {
         encode_instruction(
             accounts,
             ConfidentialTokenInstruction::ConfigureMint,
             &ConfigureMintInstructionData {
-                transfer_auditor_pk: transfer_auditor_pk.into(),
+                auditor_pk: auditor_pk.into(),
             },
         )
     } else {
@@ -593,7 +593,7 @@ pub fn inner_transfer(
         AccountMeta::new_readonly(source_token_account, false),
         AccountMeta::new(destination_zk_token_account, false),
         AccountMeta::new_readonly(destination_token_account, false),
-        AccountMeta::new(get_transfer_auditor_address(mint), false),
+        AccountMeta::new(get_auditor_address(mint), false),
         AccountMeta::new_readonly(sysvar::instructions::id(), false),
         AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
     ];
