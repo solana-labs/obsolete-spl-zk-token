@@ -49,13 +49,13 @@ pub struct ConfidentialAccount {
     pub allow_pending_balance_credits: PodBool,
 
     /// The total number of `Deposit` and `Transfer` instructions that have credited `pending_balance`
-    pub pending_balance_instructions: PodU64,
+    pub pending_balance_credit_counter: PodU64,
 
-    /// The expected `pending_balance_instructions` that was included in the last `ApplyPendingBalance`
-    /// instruction
-    pub expected_apply_pending_balance_instructions: PodU64,
+    /// The `expected_pending_balance_credit_counter` value that was included in the last
+    /// `ApplyPendingBalance` instruction
+    pub expected_pending_balance_credit_counter: PodU64,
 
-    /// The actual `pending_balance_instructions` at last time the `ApplyPendingBalance` was executed
-    pub actual_applied_pending_balance_instructions: PodU64,
+    /// The actual `pending_balance_credit_counter` when the last `ApplyPendingBalance` instruction was executed
+    pub actual_pending_balance_credit_counter: PodU64,
 }
 impl PodAccountInfo<'_, '_> for ConfidentialAccount {}
