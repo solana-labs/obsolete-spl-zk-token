@@ -90,8 +90,8 @@ allow the transfer auditor to observe the transfer amount.
 ### Enabling confidential transfers for a particular token holder
 Once confidential transfers are enabled for a SPL Token mint, a token holder can
 opt in to confidential transfers by executing the
-`ConfidentialTokenInstruction::CreateAccount` instruction and providing their confidential
-pubic encryption key.
+`ConfidentialTokenInstruction::ConfigureAccount` instruction and providing their 
+confidential pubic encryption key.
 
 The confidential token account address is a PDA derived from their normal token.
 
