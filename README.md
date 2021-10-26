@@ -43,7 +43,7 @@ $ cargo build-bpf
 Then start the `solana-test-validator`:
 ```
 $ cd solana/
-$ ./validator/solana-test-validator --reset \
+$ ./validator/solana-test-validator --reset --limit-ledger-size 500000000 \
     --bpf-program ZkTokenXHhH6t1juaWF74WLcfv4XoNocjXA6sPWHNg1 \
     zk-token/target/deploy/spl_zk_token.so
 ```
