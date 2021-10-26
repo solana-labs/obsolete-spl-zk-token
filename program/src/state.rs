@@ -45,8 +45,8 @@ pub struct ConfidentialAccount {
     /// The decryptable available balance
     pub decryptable_balance: pod::AesCiphertext,
 
-    /// Prohibit incoming transfers if `false`
-    pub accept_incoming_transfers: PodBool,
+    /// `pending_balance` may only be credited by `Deposit` or `Transfer` instructions if `true`
+    pub allow_pending_balance_credits: PodBool,
 
     /// The total number of `Deposit` and `Transfer` instructions that have credited `pending_balance`
     pub pending_balance_instructions: PodU64,

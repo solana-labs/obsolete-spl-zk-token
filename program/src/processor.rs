@@ -416,7 +416,7 @@ fn process_configure_account(
     confidential_account.mint = token_account.mint;
     confidential_account.token_account = *token_account_info.key;
     confidential_account.elgamal_pk = data.elgamal_pk;
-    confidential_account.accept_incoming_transfers = true.into();
+    confidential_account.allow_pending_balance_credits = true.into();
 
     /*
         An ElGamal ciphertext is of the form
@@ -519,8 +519,8 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
         return Err(ProgramError::InvalidAccountData);
     }
 
-    if !bool::from(&confidential_account.accept_incoming_transfers) {
-        msg!("Error: Incoming transfers are disabled");
+    if !bool::from(&confidential_account.allow_pending_balance_credits) {
+        msg!("Error: deposit instruction disabled");
         return Err(ProgramError::InvalidArgument);
     }
 
@@ -689,8 +689,8 @@ fn process_transfer(accounts: &[AccountInfo], aes_ciphertext: pod::AesCiphertext
         return Err(ProgramError::InvalidAccountData);
     }
 
-    if !bool::from(&receiver_confidential_account.accept_incoming_transfers) {
-        msg!("Error: Incoming transfers are disabled");
+    if !bool::from(&receiver_confidential_account.allow_pending_balance_credits) {
+        msg!("Error: transfer instruction disabled");
         return Err(ProgramError::InvalidArgument);
     }
 
@@ -785,10 +785,10 @@ fn process_apply_pending_balance(
     Ok(())
 }
 
-/// Processes an [EnableInboundTransfers] or [DisableInboundTransfers] instruction.
-fn process_enable_disable_inbound_transfers(
+/// Processes an [AllowPendingBalanceCredits] or [RejectPendingBalanceCredits] instruction.
+fn process_allow_reject_pending_balance_credits(
     accounts: &[AccountInfo],
-    accept_incoming_transfers: bool,
+    allow_pending_balance_credits: bool,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
@@ -803,7 +803,7 @@ fn process_enable_disable_inbound_transfers(
         account_info_iter.as_slice(),
     )?;
 
-    confidential_account.accept_incoming_transfers = accept_incoming_transfers.into();
+    confidential_account.allow_pending_balance_credits = allow_pending_balance_credits.into();
 
     Ok(())
 }
@@ -870,13 +870,13 @@ pub fn process_instruction(
                 data.aes_ciphertext,
             )
         }
-        ConfidentialTokenInstruction::DisableInboundTransfers => {
-            msg!("DisableInboundTransfers");
-            process_enable_disable_inbound_transfers(accounts, false)
+        ConfidentialTokenInstruction::RejectPendingBalanceCredits => {
+            msg!("RejectPendingBalanceCredits");
+            process_allow_reject_pending_balance_credits(accounts, false)
         }
-        ConfidentialTokenInstruction::EnableInboundTransfers => {
-            msg!("EnableInboundTransfers");
-            process_enable_disable_inbound_transfers(accounts, true)
+        ConfidentialTokenInstruction::AllowPendingBalanceCredits => {
+            msg!("AllowPendingBalanceCredits");
+            process_allow_reject_pending_balance_credits(accounts, true)
         }
     }
 }

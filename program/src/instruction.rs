@@ -160,7 +160,8 @@ pub enum ConfidentialTokenInstruction {
 
     /// Close a confidential token account by transferring all lamports it holds to the reclaim
     /// account. The account must not hold any confidential tokens in its pending or available
-    /// balances. Use `DisableInboundTransfers` to block inbound transfers first if necessary.
+    /// balances. Use `RejectPendingBalanceCredits` to block pending balance credits first if
+    /// necessary.
     ///
     ///   0. `[writable]` The CToken account to close
     ///   1. `[]` Corresponding SPL Token account
@@ -273,7 +274,7 @@ pub enum ConfidentialTokenInstruction {
     ///
     ApplyPendingBalance,
 
-    /// Disable incoming transfers to a confidential token account.
+    /// Reject `Deposit` and `Transfer` instructions for the given confidential token account.
     ///
     /// Accounts expected by this instruction:
     ///
@@ -287,9 +288,9 @@ pub enum ConfidentialTokenInstruction {
     /// Data expected by this instruction:
     ///   None
     ///
-    DisableInboundTransfers,
+    RejectPendingBalanceCredits,
 
-    /// Enable incoming transfers for a confidential token account.
+    /// Allow `Deposit` and `Transfer` instructions for the given confidential token account.
     ///
     /// Accounts expected by this instruction:
     ///
@@ -303,7 +304,7 @@ pub enum ConfidentialTokenInstruction {
     /// Data expected by this instruction:
     ///   None
     ///
-    EnableInboundTransfers,
+    AllowPendingBalanceCredits,
 }
 
 pub(crate) fn decode_instruction_type(
