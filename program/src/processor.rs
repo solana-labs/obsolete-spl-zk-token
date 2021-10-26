@@ -560,8 +560,8 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
         ops::add_to(&confidential_account.pending_balance, amount)
             .ok_or(ProgramError::InvalidInstructionData)?;
 
-    confidential_account.incoming_transfer_count =
-        (u64::from(confidential_account.incoming_transfer_count) + 1).into();
+    confidential_account.pending_balance_instructions =
+        (u64::from(confidential_account.pending_balance_instructions) + 1).into();
 
     Ok(())
 }
@@ -744,8 +744,8 @@ fn process_transfer(accounts: &[AccountInfo], aes_ciphertext: pod::AesCiphertext
         .ok_or(ProgramError::InvalidInstructionData)?;
     }
 
-    receiver_confidential_account.incoming_transfer_count =
-        (u64::from(receiver_confidential_account.incoming_transfer_count) + 1).into();
+    receiver_confidential_account.pending_balance_instructions =
+        (u64::from(receiver_confidential_account.pending_balance_instructions) + 1).into();
 
     Ok(())
 }
@@ -753,7 +753,7 @@ fn process_transfer(accounts: &[AccountInfo], aes_ciphertext: pod::AesCiphertext
 /// Processes an [ApplyPendingBalance] instruction.
 fn process_apply_pending_balance(
     accounts: &[AccountInfo],
-    expected_incoming_transfer_count: u64,
+    expected_pending_balance_instructions: PodU64,
     aes_ciphertext: pod::AesCiphertext,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
@@ -769,21 +769,18 @@ fn process_apply_pending_balance(
         account_info_iter.as_slice(),
     )?;
 
-    confidential_account
-        .applied_incoming_transfer_count
-        .expected_incoming_transfer_count = expected_incoming_transfer_count.into();
-
-    confidential_account
-        .applied_incoming_transfer_count
-        .actual_incoming_transfer_count = confidential_account.incoming_transfer_count;
-
     confidential_account.available_balance = ops::add(
         &confidential_account.available_balance,
         &confidential_account.pending_balance,
     )
     .ok_or(ProgramError::InvalidInstructionData)?;
-    confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
+
+    confidential_account.actual_applied_pending_balance_instructions =
+        confidential_account.pending_balance_instructions;
+    confidential_account.expected_apply_pending_balance_instructions =
+        expected_pending_balance_instructions;
     confidential_account.decryptable_balance = aes_ciphertext;
+    confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
 
     Ok(())
 }
@@ -869,7 +866,7 @@ pub fn process_instruction(
 
             process_apply_pending_balance(
                 accounts,
-                data.expected_incoming_transfer_count.into(),
+                data.expected_pending_balance_instructions,
                 data.aes_ciphertext,
             )
         }
