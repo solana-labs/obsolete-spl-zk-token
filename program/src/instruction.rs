@@ -35,7 +35,7 @@ pub struct UpdateAuditorInstructionData {
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
-pub struct CreateAccountInstructionData {
+pub struct ConfigureAccountInstructionData {
     /// The public key associated with the account
     pub elgamal_pk: pod::ElGamalPubkey,
     /// The AES ciphertext data
@@ -135,7 +135,7 @@ pub enum ConfidentialTokenInstruction {
     ///
     UpdateAuditor,
 
-    /// Create a confidential token account
+    /// Configures confidential transfers for a given SPL Token account
     ///
     /// This is a PDA, derived from the token mint and linked token account. Ownership is held in
     /// the linked SPL Token account. The new account will be rent-exempt.
@@ -155,9 +155,9 @@ pub enum ConfidentialTokenInstruction {
     ///   6.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     /// Data expected by this instruction:
-    ///   `CreateAccountInstructionData`
+    ///   `ConfigureAccountInstructionData`
     ///
-    CreateAccount,
+    ConfigureAccount,
 
     /// Close a confidential token account by transferring all lamports it holds to the reclaim
     /// account. The account must not hold any confidential tokens in its pending or available
@@ -383,9 +383,9 @@ pub fn configure_mint(
     }
 }
 
-/// Create a `CreateAccount` instruction
+/// Create a `ConfigureAccount` instruction
 #[cfg(not(target_arch = "bpf"))]
-pub fn create_account(
+pub fn configure_account(
     funding_address: Pubkey,
     zk_token_account: Pubkey,
     elgamal_pk: ElGamalPubkey,
@@ -409,8 +409,8 @@ pub fn create_account(
 
     vec![encode_instruction(
         accounts,
-        ConfidentialTokenInstruction::CreateAccount,
-        &CreateAccountInstructionData {
+        ConfidentialTokenInstruction::ConfigureAccount,
+        &ConfigureAccountInstructionData {
             elgamal_pk: elgamal_pk.into(),
             aes_ciphertext: aes_ciphertext.into(),
         },

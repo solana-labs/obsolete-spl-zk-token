@@ -56,7 +56,7 @@ pub fn get_auditor_address(spl_token_mint: &Pubkey) -> Pubkey {
 /// Derive the confidential account address for a given SPL Token account address
 ///
 /// This account is created when the token holder executes
-/// `ConfidentialTokenInstruction::CreateAccount` to disclose their ElGamal public key
+/// `ConfidentialTokenInstruction::ConfigureAccount` to disclose their ElGamal public key
 pub fn get_confidential_token_address(
     spl_token_mint: &Pubkey,
     spl_token_account: &Pubkey,

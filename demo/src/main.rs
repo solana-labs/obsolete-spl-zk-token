@@ -213,8 +213,11 @@ fn process_demo(
         );
         send(
             rpc_client,
-            &format!("Creating confidential token account {}", zk_token_account),
-            &spl_zk_token::instruction::create_account(
+            &format!(
+                "Configuring confidential token account {}",
+                zk_token_account
+            ),
+            &spl_zk_token::instruction::configure_account(
                 payer.pubkey(),
                 zk_token_account,
                 *elgamal_pk,
