@@ -45,7 +45,7 @@ fn get_zk_token_transfer_auditor(
         .ok_or_else(|| client_error::ClientError {
             request: None,
             kind: client_error::ClientErrorKind::Custom(format!(
-                "Invalid acccount data: {}",
+                "Invalid account data: {}",
                 zk_transfer_auditor,
             )),
         })
@@ -62,7 +62,7 @@ fn get_zk_token_state(
         .ok_or_else(|| client_error::ClientError {
             request: None,
             kind: client_error::ClientErrorKind::Custom(format!(
-                "Invalid acccount data: {}",
+                "Invalid account data: {}",
                 zk_token_account
             )),
         })
@@ -161,7 +161,7 @@ fn process_demo(
                 None,
                 0,
             )?,
-            spl_zk_token::instruction::configure_mint(payer.pubkey(), token_mint.pubkey()),
+            spl_zk_token::instruction::configure_mint(payer.pubkey(), token_mint.pubkey(), None, &[], None),
         ],
         &[payer, &token_mint],
     )?;
@@ -246,7 +246,7 @@ fn process_demo(
         ),
         &spl_zk_token::instruction::deposit(
             token_account_a.pubkey(),
-            &token_mint.pubkey(),
+            token_mint.pubkey(),
             zk_token_account_a,
             token_account_a.pubkey(),
             payer.pubkey(),

@@ -8,7 +8,7 @@ use {
         signature::{Keypair, Signer},
         transaction::Transaction,
     },
-    spl_zk_token::{self, *},
+    spl_zk_token::{self, pod::*, *},
     spl_zk_token_sdk::encryption::{
         aes::AesCiphertext,
         elgamal::{ElGamalCiphertext, ElGamalKeypair, ElGamalPubkey},
@@ -263,6 +263,9 @@ async fn test_configure_mint() {
         &[spl_zk_token::instruction::configure_mint(
             payer.pubkey(),
             mint,
+            None,
+            &[],
+            None,
         )],
         Some(&payer.pubkey()),
     );
@@ -275,14 +278,13 @@ async fn test_configure_mint() {
 
     // Success case: configure the zk mint
     let mut transaction = Transaction::new_with_payer(
-        &[
-            spl_zk_token::instruction::configure_mint_with_transfer_auditor(
-                payer.pubkey(),
-                mint,
-                transfer_auditor_elgamal_pk.into(),
-                freeze_authority.pubkey(),
-            ),
-        ],
+        &[spl_zk_token::instruction::configure_mint(
+            payer.pubkey(),
+            mint,
+            Some(freeze_authority.pubkey()),
+            &[],
+            Some(transfer_auditor_elgamal_pk.into()),
+        )],
         Some(&payer.pubkey()),
     );
     transaction.sign(&[&payer, &freeze_authority], recent_blockhash);
@@ -335,6 +337,7 @@ async fn test_create_account() {
             payer.pubkey(),
             zk_token_account,
             elgamal_pk,
+            AesCiphertext::default(),
             token_account,
             owner.pubkey(),
             &[],
@@ -454,7 +457,7 @@ async fn test_deposit() {
     let mut transaction = Transaction::new_with_payer(
         &spl_zk_token::instruction::deposit(
             token_account,
-            &mint,
+            mint,
             zk_token_account,
             token_account,
             owner.pubkey(),
@@ -485,13 +488,23 @@ async fn test_deposit() {
         (expected_pending_ct, ElGamalCiphertext::default())
     );
 
+    assert_eq!(
+        u64::from(
+            get_zk_token_state(&mut banks_client, zk_token_account)
+                .await
+                .incoming_transfer_count
+        ),
+        1,
+    );
+
     let mut transaction = Transaction::new_with_payer(
         &spl_zk_token::instruction::apply_pending_balance(
             zk_token_account,
             token_account,
             owner.pubkey(),
             &[],
-            None,
+            /*incoming_transfer_count=*/ 1,
+            AesCiphertext::default(),
         ),
         Some(&payer.pubkey()),
     );
@@ -555,6 +568,7 @@ async fn test_withdraw() {
             &[],
             1,
             DECIMALS,
+            AesCiphertext::default(),
             &withdraw_data,
         ),
         Some(&payer.pubkey()),
@@ -648,6 +662,16 @@ async fn test_transfer() {
 
     assert_transaction_size(&transaction);
     banks_client.process_transaction(transaction).await.unwrap();
+
+
+    assert_eq!(
+        u64::from(
+            get_zk_token_state(&mut banks_client, dst_zk_token_account)
+                .await
+                .incoming_transfer_count
+        ),
+        1,
+    );
 
     // TODO: Check balances of src_zk_token_account and dst_zk_token_accounts
 
