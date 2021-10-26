@@ -18,9 +18,10 @@ A specific fork of the Solana monorepo is required for development:
 $ git clone git@github.com:mvines/solana.git -b ctoken
 ```
 
-Then clone this repository as a subdirectory of the Solana monorepo:
+Then clone this repository as a subdirectory of the Solana monorepo, using the v1.8 branch:
 ```
 $ cd solana/
+$ git checkout v1.8
 $ git clone git@github.com:solana-labs/spl-zk-token.git zk-token
 ```
 
