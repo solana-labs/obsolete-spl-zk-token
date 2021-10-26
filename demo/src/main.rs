@@ -161,7 +161,13 @@ fn process_demo(
                 None,
                 0,
             )?,
-            spl_zk_token::instruction::configure_mint(payer.pubkey(), token_mint.pubkey(), None, &[], None),
+            spl_zk_token::instruction::configure_mint(
+                payer.pubkey(),
+                token_mint.pubkey(),
+                None,
+                &[],
+                None,
+            ),
         ],
         &[payer, &token_mint],
     )?;

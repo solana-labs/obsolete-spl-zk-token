@@ -212,7 +212,6 @@ async fn get_token_balance(banks_client: &mut BanksClient, token_address: Pubkey
     state.amount
 }
 
-#[cfg(feature = "test-bpf")]
 async fn get_zk_token_state(
     banks_client: &mut BanksClient,
     zk_token_account: Pubkey,
@@ -662,7 +661,6 @@ async fn test_transfer() {
 
     assert_transaction_size(&transaction);
     banks_client.process_transaction(transaction).await.unwrap();
-
 
     assert_eq!(
         u64::from(
