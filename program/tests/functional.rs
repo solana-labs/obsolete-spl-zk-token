@@ -318,7 +318,7 @@ async fn test_update_auditor() {
 // Mark this test as BPF-only due to current `ProgramTest` limitations when CPIing into the system program
 #[cfg(feature = "test-bpf")]
 #[tokio::test]
-async fn test_create_account() {
+async fn test_configure_account() {
     let owner = Keypair::new();
     let elgamal_pk = ElGamalKeypair::default().public;
 
@@ -331,7 +331,7 @@ async fn test_create_account() {
     let zk_token_account = get_confidential_token_address(&mint, &token_account);
 
     let mut transaction = Transaction::new_with_payer(
-        &spl_zk_token::instruction::create_account(
+        &spl_zk_token::instruction::configure_account(
             payer.pubkey(),
             zk_token_account,
             elgamal_pk,

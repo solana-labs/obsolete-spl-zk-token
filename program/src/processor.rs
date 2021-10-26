@@ -359,10 +359,10 @@ fn process_update_auditor(
     Ok(())
 }
 
-/// Processes an [CreateAccount] instruction.
-fn process_create_account(
+/// Processes an [ConfigureAccount] instruction.
+fn process_configure_account(
     accounts: &[AccountInfo],
-    data: &CreateAccountInstructionData,
+    data: &ConfigureAccountInstructionData,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let funder_info = next_account_info(account_info_iter)?;
@@ -431,11 +431,11 @@ fn process_create_account(
         - r: encryption randomness (Scalar)
         - x: message (Scalar)
 
-        Upon receiving a `CreateAccount` instruction, the ZK Token program should encrypt x=0 (i.e.
+        Upon receiving a `ConfigureAccount` instruction, the ZK Token program should encrypt x=0 (i.e.
         Scalar::zero()) and store it as `pending_balance` and `available_balance`.
 
         For regular encryption, it is important that r is generated from a proper randomness source. But
-        for the `CreateAccount` instruction, it is already known that x is always 0. So r can just be
+        for the `ConfigureAccount` instruction, it is already known that x is always 0. So r can just be
         set Scalar::zero().
 
         This means that the ElGamalCiphertext should simply be
@@ -831,11 +831,11 @@ pub fn process_instruction(
                     .map(|d| &d.new_auditor_pk);
             process_update_auditor(accounts, new_auditor_pk)
         }
-        ConfidentialTokenInstruction::CreateAccount => {
-            msg!("CreateAccount");
-            process_create_account(
+        ConfidentialTokenInstruction::ConfigureAccount => {
+            msg!("ConfigureAccount");
+            process_configure_account(
                 accounts,
-                decode_instruction_data::<CreateAccountInstructionData>(input)?,
+                decode_instruction_data::<ConfigureAccountInstructionData>(input)?,
             )
         }
         ConfidentialTokenInstruction::CloseAccount => {
