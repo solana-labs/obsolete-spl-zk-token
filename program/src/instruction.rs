@@ -72,8 +72,9 @@ pub struct TransferInstructionData {
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct ApplyPendingBalanceData {
-    /// The expected number of operations since the last successful `ApplyPendingBalance` instruction
-    pub expected_pending_balance_instructions: PodU64,
+    /// The expected number of pending balance credits since the last successful
+    /// `ApplyPendingBalance` instruction
+    pub expected_pending_balance_credit_counter: PodU64,
     /// The AES ciphertext corresponding to the expected number of operations
     pub aes_ciphertext: pod::AesCiphertext,
 }
@@ -253,7 +254,7 @@ pub enum ConfidentialTokenInstruction {
     /// and/or `Transfer` instructions.
     ///
     /// After submitting `ApplyPendingBalance`, the client should compare
-    /// `ConfidentialAccount::expected_apply_pending_balance_instructions` with
+    /// `ConfidentialAccount::expected_pending_balance_credit_counter` with
     /// `ConfidentialAccount::actual_applied_pending_balance_instructions`.  If they are equal then the
     /// `ConfidentialAccount::decryptable_balance` is consistent with
     /// `ConfidentialAccount::available_balance`. If they differ then there is more pending
@@ -655,7 +656,7 @@ pub fn inner_apply_pending_balance(
     token_account: Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
-    pending_balance_instructions: u64,
+    expected_pending_balance_credit_counter: u64,
     aes_ciphertext: pod::AesCiphertext,
 ) -> Instruction {
     let mut accounts = vec![
@@ -672,7 +673,7 @@ pub fn inner_apply_pending_balance(
         accounts,
         ConfidentialTokenInstruction::ApplyPendingBalance,
         &ApplyPendingBalanceData {
-            expected_pending_balance_instructions: pending_balance_instructions.into(),
+            expected_pending_balance_credit_counter: expected_pending_balance_credit_counter.into(),
             aes_ciphertext,
         },
     )

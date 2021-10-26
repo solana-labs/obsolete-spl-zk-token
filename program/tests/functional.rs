@@ -490,7 +490,7 @@ async fn test_deposit() {
         u64::from(
             get_zk_token_state(&mut banks_client, zk_token_account)
                 .await
-                .pending_balance_instructions
+                .pending_balance_credit_counter
         ),
         1,
     );
@@ -501,7 +501,7 @@ async fn test_deposit() {
             token_account,
             owner.pubkey(),
             &[],
-            /*pending_balance_instructions=*/ 1,
+            /*expected_pending_balance_credit_counter=*/ 1,
             AesCiphertext::default(),
         ),
         Some(&payer.pubkey()),
@@ -664,7 +664,7 @@ async fn test_transfer() {
         u64::from(
             get_zk_token_state(&mut banks_client, dst_zk_token_account)
                 .await
-                .pending_balance_instructions
+                .pending_balance_credit_counter
         ),
         1,
     );
