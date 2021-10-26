@@ -104,12 +104,16 @@ pub enum ConfidentialTokenInstruction {
     ///   4. `[]` System program
     ///   5. `[]` SPL Token program
     ///   6. `[]` Rent sysvar (remove once https://github.com/solana-labs/solana-program-library/pull/2282 is deployed)
-    ///   7. `[signer]` (optional) The SPL Token mint freeze authority if not `None`
+    ///   7. `[signer]` (optional) The single SPL Token mint freeze authority if not `None`
+    /// or:
+    ///   7. `[]` (optiona) The multisig SPL Token freeze authority if not `None`
+    ///   8.. `[signer]` (optiona) Required M signer accounts for the SPL Token Multisig account
     ///
     //
     /// Data expected by this instruction:
     ///   `ConfigureMintInstructionData` (optional) if not provided then the transfer auditor is
-    ///   permanently disabled for this SPL Token mint
+    ///   permanently disabled for this SPL Token mint.
+    ///   A transfer auditor may only be specified when the mint freeze authority if not `None`
     ///
     ConfigureMint,
 
@@ -337,10 +341,14 @@ pub(crate) fn encode_instruction<T: Pod>(
     }
 }
 
-fn _configure_mint(
+/// Create a `ConfigureMint` instruction
+#[cfg(not(target_arch = "bpf"))]
+pub fn configure_mint(
     funding_address: Pubkey,
     token_mint_address: Pubkey,
-    transfer_auditor_pk_and_freeze_authority: Option<(pod::ElGamalPubkey, Pubkey)>,
+    freeze_authority: Option<Pubkey>,
+    freeze_authority_multisig_signers: &[&Pubkey],
+    transfer_auditor_pk: Option<ElGamalPubkey>,
 ) -> Instruction {
     let omnibus_token_address = get_omnibus_token_address(&token_mint_address);
     let transfer_auditor_address = get_transfer_auditor_address(&token_mint_address);
@@ -355,38 +363,24 @@ fn _configure_mint(
         AccountMeta::new_readonly(sysvar::rent::id(), false),
     ];
 
-    if let Some((transfer_auditor_pk, freeze_authority)) = transfer_auditor_pk_and_freeze_authority
-    {
+    if let Some(freeze_authority) = freeze_authority {
         accounts.push(AccountMeta::new(freeze_authority, true));
+        for multisig_signer in freeze_authority_multisig_signers.iter() {
+            accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
+        }
+    }
+
+    if let Some(transfer_auditor_pk) = transfer_auditor_pk {
         encode_instruction(
             accounts,
             ConfidentialTokenInstruction::ConfigureMint,
             &ConfigureMintInstructionData {
-                transfer_auditor_pk,
+                transfer_auditor_pk: transfer_auditor_pk.into(),
             },
         )
     } else {
         encode_instruction(accounts, ConfidentialTokenInstruction::ConfigureMint, &())
     }
-}
-
-/// Create a `ConfigureMint` instruction
-pub fn configure_mint(funding_address: Pubkey, token_mint_address: Pubkey) -> Instruction {
-    _configure_mint(funding_address, token_mint_address, None)
-}
-
-/// Create a `ConfigureMint` instruction with a transfer auditor
-pub fn configure_mint_with_transfer_auditor(
-    funding_address: Pubkey,
-    token_mint_address: Pubkey,
-    transfer_auditor_pk: pod::ElGamalPubkey,
-    freeze_authority: Pubkey,
-) -> Instruction {
-    _configure_mint(
-        funding_address,
-        token_mint_address,
-        Some((transfer_auditor_pk, freeze_authority)),
-    )
 }
 
 /// Create a `CreateAccount` instruction
@@ -474,7 +468,7 @@ pub fn close_account(
 #[allow(clippy::too_many_arguments)]
 pub fn deposit(
     source_token_account: Pubkey,
-    mint: &Pubkey,
+    mint: Pubkey,
     destination_zk_token_account: Pubkey,
     destination_token_account: Pubkey,
     authority: Pubkey,
@@ -486,8 +480,8 @@ pub fn deposit(
         AccountMeta::new(source_token_account, false),
         AccountMeta::new(destination_zk_token_account, false),
         AccountMeta::new_readonly(destination_token_account, false),
-        AccountMeta::new(get_omnibus_token_address(mint), false),
-        AccountMeta::new_readonly(*mint, false),
+        AccountMeta::new(get_omnibus_token_address(&mint), false),
+        AccountMeta::new_readonly(mint, false),
         AccountMeta::new_readonly(spl_token::id(), false),
         AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
     ];

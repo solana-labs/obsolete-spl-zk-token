@@ -569,6 +569,9 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
         ops::add_to(&confidential_account.pending_balance, amount)
             .ok_or(ProgramError::InvalidInstructionData)?;
 
+    confidential_account.incoming_transfer_count =
+        (u64::from(confidential_account.incoming_transfer_count) + 1).into();
+
     Ok(())
 }
 
