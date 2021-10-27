@@ -15,10 +15,10 @@ to confidential token accounts.
 ### Setup
 A specific fork of the Solana monorepo is required for development:
 ```
-$ git clone git@github.com:mvines/solana.git -b ctoken
+$ git clone git@github.com:mvines/solana.git -b zk_token_stable
 ```
 
-Then clone this repository as a subdirectory of the Solana monorepo, using the v1.8 branch:
+Then clone this repository as a subdirectory of the Solana monorepo
 ```
 $ cd solana/
 $ git checkout v1.8
@@ -91,7 +91,7 @@ allow the transfer auditor to observe the transfer amount.
 ### Enabling confidential transfers for a particular token holder
 Once confidential transfers are enabled for a SPL Token mint, a token holder can
 opt in to confidential transfers by executing the
-`ConfidentialTokenInstruction::ConfigureAccount` instruction and providing their 
+`ConfidentialTokenInstruction::ConfigureAccount` instruction and providing their
 confidential pubic encryption key.
 
 The confidential token account address is a PDA derived from their normal token.
