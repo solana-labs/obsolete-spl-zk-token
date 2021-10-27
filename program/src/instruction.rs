@@ -38,8 +38,8 @@ pub struct UpdateAuditorInstructionData {
 pub struct ConfigureAccountInstructionData {
     /// The public key associated with the account
     pub elgamal_pk: pod::ElGamalPubkey,
-    /// The AES ciphertext data
-    pub aes_ciphertext: pod::AesCiphertext,
+    /// The decryptable balance (always 0) once the configure account succeeds
+    pub decryptable_zero_balance: pod::AesCiphertext,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -58,15 +58,15 @@ pub struct WithdrawInstructionData {
     pub amount: PodU64,
     /// Expected number of base 10 digits to the right of the decimal place.
     pub decimals: u8,
-    /// The AES ciphertext data
-    pub aes_ciphertext: pod::AesCiphertext,
+    /// The new decryptable balance if the withrawal succeeds
+    pub new_decryptable_balance: pod::AesCiphertext,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct TransferInstructionData {
-    /// The AES ciphertext data
-    pub aes_ciphertext: pod::AesCiphertext,
+    /// The new source decryptable balance if the transfer succeeds
+    pub new_source_decryptable_balance: pod::AesCiphertext,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -75,8 +75,8 @@ pub struct ApplyPendingBalanceData {
     /// The expected number of pending balance credits since the last successful
     /// `ApplyPendingBalance` instruction
     pub expected_pending_balance_credit_counter: PodU64,
-    /// The AES ciphertext corresponding to the expected number of operations
-    pub aes_ciphertext: pod::AesCiphertext,
+    /// The new decryptable balance if the pending balance is applied successfully
+    pub new_decryptable_balance: pod::AesCiphertext,
 }
 
 #[derive(Clone, Copy, Debug, FromPrimitive, ToPrimitive)]
@@ -398,7 +398,7 @@ pub fn configure_account(
     funding_address: Pubkey,
     zk_token_account: Pubkey,
     elgamal_pk: ElGamalPubkey,
-    aes_ciphertext: AesCiphertext,
+    decryptable_zero_balance: AesCiphertext,
     token_account: Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
@@ -421,7 +421,7 @@ pub fn configure_account(
         ConfidentialTokenInstruction::ConfigureAccount,
         &ConfigureAccountInstructionData {
             elgamal_pk: elgamal_pk.into(),
-            aes_ciphertext: aes_ciphertext.into(),
+            decryptable_zero_balance: decryptable_zero_balance.into(),
         },
     )]
 }
@@ -523,7 +523,7 @@ pub fn inner_withdraw(
     multisig_signers: &[&Pubkey],
     amount: u64,
     decimals: u8,
-    aes_ciphertext: pod::AesCiphertext,
+    new_decryptable_balance: pod::AesCiphertext,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
@@ -546,7 +546,7 @@ pub fn inner_withdraw(
         &WithdrawInstructionData {
             amount: amount.into(),
             decimals,
-            aes_ciphertext,
+            new_decryptable_balance,
         },
     )
 }
@@ -563,7 +563,7 @@ pub fn withdraw(
     multisig_signers: &[&Pubkey],
     amount: u64,
     decimals: u8,
-    aes_ciphertext: AesCiphertext,
+    new_decryptable_balance: AesCiphertext,
     proof_data: &WithdrawData,
 ) -> Vec<Instruction> {
     vec![
@@ -577,7 +577,7 @@ pub fn withdraw(
             multisig_signers,
             amount,
             decimals,
-            aes_ciphertext.into(),
+            new_decryptable_balance.into(),
         ),
     ]
 }
@@ -595,7 +595,7 @@ pub fn inner_transfer(
     mint: &Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
-    aes_ciphertext: pod::AesCiphertext,
+    new_source_decryptable_balance: pod::AesCiphertext,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
@@ -614,7 +614,9 @@ pub fn inner_transfer(
     encode_instruction(
         accounts,
         ConfidentialTokenInstruction::Transfer,
-        &TransferInstructionData { aes_ciphertext },
+        &TransferInstructionData {
+            new_source_decryptable_balance,
+        },
     )
 }
 
@@ -629,7 +631,7 @@ pub fn transfer(
     mint: &Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
-    aes_ciphertext: AesCiphertext,
+    new_source_decryptable_balance: AesCiphertext,
     proof_data: &TransferData,
 ) -> Vec<Instruction> {
     vec![
@@ -642,7 +644,7 @@ pub fn transfer(
             mint,
             authority,
             multisig_signers,
-            aes_ciphertext.into(),
+            new_source_decryptable_balance.into(),
         ),
     ]
 }
@@ -657,7 +659,7 @@ pub fn inner_apply_pending_balance(
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
     expected_pending_balance_credit_counter: u64,
-    aes_ciphertext: pod::AesCiphertext,
+    new_decryptable_balance: pod::AesCiphertext,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(zk_token_account, false),
@@ -674,7 +676,7 @@ pub fn inner_apply_pending_balance(
         ConfidentialTokenInstruction::ApplyPendingBalance,
         &ApplyPendingBalanceData {
             expected_pending_balance_credit_counter: expected_pending_balance_credit_counter.into(),
-            aes_ciphertext,
+            new_decryptable_balance,
         },
     )
 }
@@ -687,7 +689,7 @@ pub fn apply_pending_balance(
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
     pending_balance_instructions: u64,
-    aes_ciphertext: AesCiphertext,
+    new_decryptable_balance: AesCiphertext,
 ) -> Vec<Instruction> {
     vec![inner_apply_pending_balance(
         zk_token_account,
@@ -695,6 +697,6 @@ pub fn apply_pending_balance(
         authority,
         multisig_signers,
         pending_balance_instructions,
-        aes_ciphertext.into(),
+        new_decryptable_balance.into(),
     )]
 }
