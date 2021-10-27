@@ -448,7 +448,7 @@ fn process_configure_account(
     */
     confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
     confidential_account.available_balance = pod::ElGamalCiphertext::zeroed();
-    confidential_account.decryptable_balance = data.aes_ciphertext;
+    confidential_account.decryptable_balance = data.decryptable_zero_balance;
 
     Ok(())
 }
@@ -571,7 +571,7 @@ fn process_withdraw(
     accounts: &[AccountInfo],
     amount: u64,
     decimals: u8,
-    aes_ciphertext: pod::AesCiphertext,
+    new_decryptable_balance: pod::AesCiphertext,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
@@ -611,7 +611,7 @@ fn process_withdraw(
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    confidential_account.decryptable_balance = aes_ciphertext;
+    confidential_account.decryptable_balance = new_decryptable_balance;
 
     // Ensure omnibus token account address derivation is correct
     let (omnibus_token_address, omnibus_token_bump_seed) =
@@ -652,7 +652,10 @@ fn process_withdraw(
     Ok(())
 }
 /// Processes a [Transfer] instruction.
-fn process_transfer(accounts: &[AccountInfo], aes_ciphertext: pod::AesCiphertext) -> ProgramResult {
+fn process_transfer(
+    accounts: &[AccountInfo],
+    new_source_decryptable_balance: pod::AesCiphertext,
+) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let confidential_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
@@ -726,7 +729,7 @@ fn process_transfer(accounts: &[AccountInfo], aes_ciphertext: pod::AesCiphertext
     }
 
     // Update source decryptable balance
-    confidential_account.decryptable_balance = aes_ciphertext;
+    confidential_account.decryptable_balance = new_source_decryptable_balance;
 
     // Add to destination pending balance
     {
@@ -754,7 +757,7 @@ fn process_transfer(accounts: &[AccountInfo], aes_ciphertext: pod::AesCiphertext
 fn process_apply_pending_balance(
     accounts: &[AccountInfo],
     expected_pending_balance_credit_counter: PodU64,
-    aes_ciphertext: pod::AesCiphertext,
+    new_decryptable_balance: pod::AesCiphertext,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
@@ -779,7 +782,7 @@ fn process_apply_pending_balance(
         confidential_account.pending_balance_credit_counter;
     confidential_account.expected_pending_balance_credit_counter =
         expected_pending_balance_credit_counter;
-    confidential_account.decryptable_balance = aes_ciphertext;
+    confidential_account.decryptable_balance = new_decryptable_balance;
     confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
 
     Ok(())
@@ -851,13 +854,13 @@ pub fn process_instruction(
                 accounts,
                 data.amount.into(),
                 data.decimals,
-                data.aes_ciphertext,
+                data.new_decryptable_balance,
             )
         }
         ConfidentialTokenInstruction::Transfer => {
             msg!("Transfer");
             let data = decode_instruction_data::<TransferInstructionData>(input)?;
-            process_transfer(accounts, data.aes_ciphertext)
+            process_transfer(accounts, data.new_source_decryptable_balance)
         }
         ConfidentialTokenInstruction::ApplyPendingBalance => {
             msg!("ApplyPendingBalance");
@@ -867,7 +870,7 @@ pub fn process_instruction(
             process_apply_pending_balance(
                 accounts,
                 data.expected_pending_balance_credit_counter,
-                data.aes_ciphertext,
+                data.new_decryptable_balance,
             )
         }
         ConfidentialTokenInstruction::RejectPendingBalanceCredits => {
