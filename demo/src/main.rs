@@ -107,9 +107,6 @@ fn process_demo(
     rpc_client: &RpcClient,
     payer: &dyn Signer,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("==> Precomputing discrete log data for decryption (~300kb)");
-    let decryption_data = discrete_log::decode_u32_precomputation_for_G(); // TODO: Move to build time
-
     let token_mint = Keypair::new();
 
     let token_account_a = Keypair::new();
@@ -297,7 +294,10 @@ fn process_demo(
     // NOTE: account balance ciphertexts can still be decrypted as long as the balance is < 2^32
     assert_eq!(
         current_balance_ct_a
-            .decrypt_u32_online(&elgamal_sk_a, &decryption_data)
+            .decrypt_u32_online(
+                &elgamal_sk_a,
+                &discrete_log::DECODE_U32_PRECOMPUTATION_FOR_G
+            )
             .unwrap() as u64,
         current_balance_a
     );
@@ -318,7 +318,10 @@ fn process_demo(
     assert_eq!(
         source_ciphertext
             .unwrap()
-            .decrypt_u32_online(&elgamal_sk_a, &decryption_data)
+            .decrypt_u32_online(
+                &elgamal_sk_a,
+                &discrete_log::DECODE_U32_PRECOMPUTATION_FOR_G
+            )
             .unwrap() as u64,
         mint_amount,
     );
@@ -327,7 +330,10 @@ fn process_demo(
     assert_eq!(
         dest_ciphertext
             .unwrap()
-            .decrypt_u32_online(&elgamal_sk_b, &decryption_data)
+            .decrypt_u32_online(
+                &elgamal_sk_b,
+                &discrete_log::DECODE_U32_PRECOMPUTATION_FOR_G
+            )
             .unwrap() as u64,
         mint_amount,
     );
@@ -377,14 +383,20 @@ fn process_demo(
 
     assert_eq!(
         current_balance_ct_a
-            .decrypt_u32_online(&elgamal_sk_a, &decryption_data)
+            .decrypt_u32_online(
+                &elgamal_sk_a,
+                &discrete_log::DECODE_U32_PRECOMPUTATION_FOR_G
+            )
             .unwrap() as u64,
         current_balance_a
     );
 
     assert_eq!(
         current_balance_ct_b
-            .decrypt_u32_online(&elgamal_sk_b, &decryption_data)
+            .decrypt_u32_online(
+                &elgamal_sk_b,
+                &discrete_log::DECODE_U32_PRECOMPUTATION_FOR_G
+            )
             .unwrap() as u64,
         current_balance_b
     );
@@ -446,14 +458,20 @@ fn process_demo(
 
     assert_eq!(
         current_balance_ct_a
-            .decrypt_u32_online(&elgamal_sk_a, &decryption_data)
+            .decrypt_u32_online(
+                &elgamal_sk_a,
+                &discrete_log::DECODE_U32_PRECOMPUTATION_FOR_G
+            )
             .unwrap() as u64,
         current_balance_a
     );
 
     assert_eq!(
         current_balance_ct_b
-            .decrypt_u32_online(&elgamal_sk_b, &decryption_data)
+            .decrypt_u32_online(
+                &elgamal_sk_b,
+                &discrete_log::DECODE_U32_PRECOMPUTATION_FOR_G
+            )
             .unwrap() as u64,
         current_balance_b
     );

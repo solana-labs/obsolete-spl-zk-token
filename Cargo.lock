@@ -4857,6 +4857,7 @@ dependencies = [
  "cipher",
  "curve25519-dalek 3.2.0",
  "getrandom 0.1.16",
+ "lazy_static",
  "merlin",
  "num-derive",
  "num-traits",
