@@ -112,40 +112,29 @@ fn process_demo(
     let token_mint = Keypair::new();
 
     let token_account_a = Keypair::new();
-    // let ElGamalKeypair {
-    //     public: elgamal_pk_a,
-    //     secret: elgamal_sk_a,
-    // } = ElGamalKeypair::default();
+    let ElGamalKeypair {
+        public: elgamal_pk_a,
+        secret: elgamal_sk_a,
+    } = ElGamalKeypair::default();
 
     let zk_token_account_a = spl_zk_token::get_confidential_token_address(
         &token_mint.pubkey(),
         &token_account_a.pubkey(),
     );
 
-    // trying out key derivation from signing key
-    let ElGamalKeypair {
-        public: elgamal_pk_a,
-        secret: elgamal_sk_a,
-    } = ElGamalKeypair::new(token_account_a.secret(), &zk_token_account_a);
-
-    let aes_key_a = AesKey::new(token_account_a.secret(), &zk_token_account_a);
+    let aes_key_a = AesKey::new(&token_account_a, &zk_token_account_a).unwrap();
 
     let token_account_b = Keypair::new();
-    // let ElGamalKeypair {
-    //     public: elgamal_pk_b,
-    //     secret: elgamal_sk_b,
-    // } = ElGamalKeypair::default();
+    let ElGamalKeypair {
+        public: elgamal_pk_b,
+        secret: elgamal_sk_b,
+    } = ElGamalKeypair::default();
     let zk_token_account_b = spl_zk_token::get_confidential_token_address(
         &token_mint.pubkey(),
         &token_account_b.pubkey(),
     );
 
-    let ElGamalKeypair {
-        public: elgamal_pk_b,
-        secret: elgamal_sk_b,
-    } = ElGamalKeypair::new(token_account_b.secret(), &zk_token_account_b);
-
-    let aes_key_b = AesKey::new(token_account_b.secret(), &zk_token_account_b);
+    let aes_key_b = AesKey::new(&token_account_b, &zk_token_account_b).unwrap();
 
     let mint_minimum_balance_for_rent_exemption = rpc_client
         .get_minimum_balance_for_rent_exemption(spl_token::state::Mint::get_packed_len())?;
@@ -285,7 +274,7 @@ fn process_demo(
     // `incoming_transfer_count` should be set to incremented to 1
     assert_eq!(
         get_zk_token_state(rpc_client, &zk_token_account_a)?
-            .incoming_transfer_count,
+            .pending_balance_credit_counter,
         1.into(),
     );
 
@@ -320,17 +309,6 @@ fn process_demo(
         get_zk_token_balance(rpc_client, &zk_token_account_a)?;
     assert_eq!(pending_balance_ct_a, ElGamalCiphertext::default());
 
-    // NOTE: ElGamal account balances can still be decrypted as long as the balance is < 2^32
-    assert_eq!(
-        current_balance_ct_a
-            .decrypt_u32_online(
-                &elgamal_sk_a,
-                &discrete_log::DECODE_U32_PRECOMPUTATION_FOR_G
-            )
-            .unwrap() as u64,
-        current_balance_a
-    );
-
     // Client should use `decryptable_balance` to recover the amount
     assert_eq!(
         current_balance_ct_a
@@ -341,8 +319,7 @@ fn process_demo(
 
     assert_eq!(
         get_zk_token_state(rpc_client, &zk_token_account_a)?
-            .applied_incoming_transfer_count
-            .actual_incoming_transfer_count,
+            .actual_pending_balance_credit_counter,
         1.into()
     );
 
