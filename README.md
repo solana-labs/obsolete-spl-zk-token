@@ -21,7 +21,6 @@ $ git clone git@github.com:mvines/solana.git -b zk_token_stable
 Then clone this repository as a subdirectory of the Solana monorepo
 ```
 $ cd solana/
-$ git checkout v1.8
 $ git clone git@github.com:solana-labs/spl-zk-token.git zk-token
 ```
 
