@@ -17,7 +17,11 @@ use {
         transaction::Transaction,
     },
     spl_zk_token::pod::*,
-    spl_zk_token_sdk::encryption::{aes::{AesCiphertext, AesKey}, discrete_log, elgamal::*},
+    spl_zk_token_sdk::encryption::{
+        aes::{AesCiphertext, AesKey},
+        discrete_log,
+        elgamal::*,
+    },
     std::{convert::TryInto, process::exit, sync::Arc},
 };
 
@@ -273,8 +277,7 @@ fn process_demo(
 
     // `incoming_transfer_count` should be set to incremented to 1
     assert_eq!(
-        get_zk_token_state(rpc_client, &zk_token_account_a)?
-            .pending_balance_credit_counter,
+        get_zk_token_state(rpc_client, &zk_token_account_a)?.pending_balance_credit_counter,
         1.into(),
     );
 
@@ -286,7 +289,7 @@ fn process_demo(
             token_account_a.pubkey(),
             payer.pubkey(),
             &[],
-            1, // expected `incoming_transfer_count`
+            1,                              // expected `incoming_transfer_count`
             aes_key_a.encrypt(mint_amount), // update AES ciphertext with mint amount
         ),
         &[payer],
@@ -311,15 +314,12 @@ fn process_demo(
 
     // Client should use `decryptable_balance` to recover the amount
     assert_eq!(
-        current_balance_ct_a
-            .decrypt(&aes_key_a)
-            .unwrap() as u64,
+        current_balance_ct_a.decrypt(&aes_key_a).unwrap() as u64,
         current_balance_a
     );
 
     assert_eq!(
-        get_zk_token_state(rpc_client, &zk_token_account_a)?
-            .actual_pending_balance_credit_counter,
+        get_zk_token_state(rpc_client, &zk_token_account_a)?.actual_pending_balance_credit_counter,
         1.into()
     );
 
@@ -403,16 +403,12 @@ fn process_demo(
         get_zk_token_balance(rpc_client, &zk_token_account_b)?;
 
     assert_eq!(
-        current_balance_ct_a
-            .decrypt(&aes_key_a)
-            .unwrap() as u64,
+        current_balance_ct_a.decrypt(&aes_key_a).unwrap() as u64,
         current_balance_a
     );
 
     assert_eq!(
-        current_balance_ct_b
-            .decrypt(&aes_key_b)
-            .unwrap() as u64,
+        current_balance_ct_b.decrypt(&aes_key_b).unwrap() as u64,
         current_balance_b
     );
 
@@ -472,16 +468,12 @@ fn process_demo(
         get_zk_token_balance(rpc_client, &zk_token_account_b)?;
 
     assert_eq!(
-        current_balance_ct_a
-            .decrypt(&aes_key_a)
-            .unwrap() as u64,
+        current_balance_ct_a.decrypt(&aes_key_a).unwrap() as u64,
         current_balance_a
     );
 
     assert_eq!(
-        current_balance_ct_b
-            .decrypt(&aes_key_b)
-            .unwrap() as u64,
+        current_balance_ct_b.decrypt(&aes_key_b).unwrap() as u64,
         current_balance_b
     );
 
