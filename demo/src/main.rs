@@ -17,7 +17,7 @@ use {
         transaction::Transaction,
     },
     spl_zk_token::pod::*,
-    spl_zk_token_sdk::encryption::{aes::AesCiphertext, discrete_log, elgamal::*},
+    spl_zk_token_sdk::encryption::{aes::{AesCiphertext, AesKey}, discrete_log, elgamal::*},
     std::{convert::TryInto, process::exit, sync::Arc},
 };
 
@@ -69,11 +69,13 @@ fn get_zk_token_balance(
 ) -> client_error::Result<(
     /* pending_balance: */ ElGamalCiphertext,
     /* available_balance: */ ElGamalCiphertext,
+    /* decryptable_balance: */ AesCiphertext,
 )> {
     get_zk_token_state(rpc_client, zk_token_account).map(|zk_token_state| {
         (
             zk_token_state.pending_balance.try_into().unwrap(),
             zk_token_state.available_balance.try_into().unwrap(),
+            zk_token_state.decryptable_balance.try_into().unwrap(),
         )
     })
 }
@@ -110,25 +112,40 @@ fn process_demo(
     let token_mint = Keypair::new();
 
     let token_account_a = Keypair::new();
-    let ElGamalKeypair {
-        public: elgamal_pk_a,
-        secret: elgamal_sk_a,
-    } = ElGamalKeypair::default();
+    // let ElGamalKeypair {
+    //     public: elgamal_pk_a,
+    //     secret: elgamal_sk_a,
+    // } = ElGamalKeypair::default();
 
     let zk_token_account_a = spl_zk_token::get_confidential_token_address(
         &token_mint.pubkey(),
         &token_account_a.pubkey(),
     );
 
-    let token_account_b = Keypair::new();
+    // trying out key derivation from signing key
     let ElGamalKeypair {
-        public: elgamal_pk_b,
-        secret: elgamal_sk_b,
-    } = ElGamalKeypair::default();
+        public: elgamal_pk_a,
+        secret: elgamal_sk_a,
+    } = ElGamalKeypair::new(token_account_a.secret(), &zk_token_account_a);
+
+    let aes_key_a = AesKey::new(token_account_a.secret(), &zk_token_account_a);
+
+    let token_account_b = Keypair::new();
+    // let ElGamalKeypair {
+    //     public: elgamal_pk_b,
+    //     secret: elgamal_sk_b,
+    // } = ElGamalKeypair::default();
     let zk_token_account_b = spl_zk_token::get_confidential_token_address(
         &token_mint.pubkey(),
         &token_account_b.pubkey(),
     );
+
+    let ElGamalKeypair {
+        public: elgamal_pk_b,
+        secret: elgamal_sk_b,
+    } = ElGamalKeypair::new(token_account_b.secret(), &zk_token_account_b);
+
+    let aes_key_b = AesKey::new(token_account_b.secret(), &zk_token_account_b);
 
     let mint_minimum_balance_for_rent_exemption = rpc_client
         .get_minimum_balance_for_rent_exemption(spl_token::state::Mint::get_packed_len())?;
@@ -168,9 +185,9 @@ fn process_demo(
     let mint_amount = 100;
     let omnibus_token_account = spl_zk_token::get_omnibus_token_address(&token_mint.pubkey());
 
-    for (token_account, elgamal_pk) in [
-        (&token_account_a, &elgamal_pk_a),
-        (&token_account_b, &elgamal_pk_b),
+    for (token_account, elgamal_pk, aes_key) in [
+        (&token_account_a, &elgamal_pk_a, &aes_key_a),
+        (&token_account_b, &elgamal_pk_b, &aes_key_b),
     ] {
         send(
             rpc_client,
@@ -204,10 +221,15 @@ fn process_demo(
             ],
             &[payer, token_account, payer],
         )?;
+
         let zk_token_account = spl_zk_token::get_confidential_token_address(
             &token_mint.pubkey(),
             &token_account.pubkey(),
         );
+
+        // encrypt zero using AES
+        let aes_ciphertext = aes_key.encrypt(0_u64);
+
         send(
             rpc_client,
             &format!(
@@ -218,7 +240,7 @@ fn process_demo(
                 payer.pubkey(),
                 zk_token_account,
                 *elgamal_pk,
-                AesCiphertext::default(),
+                aes_ciphertext,
                 token_account.pubkey(),
                 payer.pubkey(),
                 &[],
@@ -260,6 +282,13 @@ fn process_demo(
 
     current_balance_a += mint_amount;
 
+    // `incoming_transfer_count` should be set to incremented to 1
+    assert_eq!(
+        get_zk_token_state(rpc_client, &zk_token_account_a)?
+            .incoming_transfer_count,
+        1.into(),
+    );
+
     send(
         rpc_client,
         &format!("Applying pending balance for {}", zk_token_account_a),
@@ -268,8 +297,8 @@ fn process_demo(
             token_account_a.pubkey(),
             payer.pubkey(),
             &[],
-            1,
-            AesCiphertext::default(),
+            1, // expected `incoming_transfer_count`
+            aes_key_a.encrypt(mint_amount), // update AES ciphertext with mint amount
         ),
         &[payer],
     )?;
@@ -287,11 +316,11 @@ fn process_demo(
         "100",
     );
 
-    let (pending_balance_ct_a, current_balance_ct_a) =
+    let (pending_balance_ct_a, available_balance_ct_a, current_balance_ct_a) =
         get_zk_token_balance(rpc_client, &zk_token_account_a)?;
     assert_eq!(pending_balance_ct_a, ElGamalCiphertext::default());
 
-    // NOTE: account balance ciphertexts can still be decrypted as long as the balance is < 2^32
+    // NOTE: ElGamal account balances can still be decrypted as long as the balance is < 2^32
     assert_eq!(
         current_balance_ct_a
             .decrypt_u32_online(
@@ -302,10 +331,25 @@ fn process_demo(
         current_balance_a
     );
 
+    // Client should use `decryptable_balance` to recover the amount
+    assert_eq!(
+        current_balance_ct_a
+            .decrypt(&aes_key_a)
+            .unwrap() as u64,
+        current_balance_a
+    );
+
+    assert_eq!(
+        get_zk_token_state(rpc_client, &zk_token_account_a)?
+            .applied_incoming_transfer_count
+            .actual_incoming_transfer_count,
+        1.into()
+    );
+
     let transfer_proof_data = spl_zk_token::instruction::TransferData::new(
         mint_amount,
         current_balance_a,
-        current_balance_ct_a,
+        available_balance_ct_a,
         elgamal_pk_a,
         &elgamal_sk_a,
         elgamal_pk_b,
@@ -352,7 +396,7 @@ fn process_demo(
             &token_mint.pubkey(),
             payer.pubkey(),
             &[],
-            AesCiphertext::default(),
+            aes_key_a.encrypt(0_u64),
             &transfer_proof_data,
         ),
         &[payer],
@@ -367,7 +411,7 @@ fn process_demo(
             payer.pubkey(),
             &[],
             1,
-            AesCiphertext::default(),
+            aes_key_b.encrypt(100_u64),
         ),
         &[payer],
     )?;
@@ -375,33 +419,27 @@ fn process_demo(
     current_balance_b += current_balance_a;
     current_balance_a -= current_balance_a;
 
-    let (_pending_balance_ct_a, current_balance_ct_a) =
+    let (_pending_balance_ct_a, _available_balance_ct_a, current_balance_ct_a) =
         get_zk_token_balance(rpc_client, &zk_token_account_a)?;
 
-    let (_pending_balance_ct_b, current_balance_ct_b) =
+    let (_pending_balance_ct_b, _available_balance_ct_b, current_balance_ct_b) =
         get_zk_token_balance(rpc_client, &zk_token_account_b)?;
 
     assert_eq!(
         current_balance_ct_a
-            .decrypt_u32_online(
-                &elgamal_sk_a,
-                &discrete_log::DECODE_U32_PRECOMPUTATION_FOR_G
-            )
+            .decrypt(&aes_key_a)
             .unwrap() as u64,
         current_balance_a
     );
 
     assert_eq!(
         current_balance_ct_b
-            .decrypt_u32_online(
-                &elgamal_sk_b,
-                &discrete_log::DECODE_U32_PRECOMPUTATION_FOR_G
-            )
+            .decrypt(&aes_key_b)
             .unwrap() as u64,
         current_balance_b
     );
 
-    let (_pending_balance_ct_b, current_balance_ct_b) =
+    let (_pending_balance_ct_b, available_balance_ct_b, _current_balance_ct_b) =
         get_zk_token_balance(rpc_client, &zk_token_account_b)?;
     send(
         rpc_client,
@@ -420,13 +458,13 @@ fn process_demo(
             &[],
             current_balance_b,
             0,
-            AesCiphertext::default(),
+            aes_key_b.encrypt(0_u64),
             &spl_zk_token::instruction::WithdrawData::new(
                 current_balance_b,
                 elgamal_pk_a,
                 &elgamal_sk_b,
                 current_balance_b,
-                current_balance_ct_b,
+                available_balance_ct_b,
             ),
         ),
         &[payer],
@@ -450,28 +488,22 @@ fn process_demo(
     assert_eq!(current_balance_a, 0);
     assert_eq!(current_balance_b, 0);
 
-    let (_pending_balance_ct_a, current_balance_ct_a) =
+    let (_pending_balance_ct_a, _available_balance_ct_a, current_balance_ct_a) =
         get_zk_token_balance(rpc_client, &zk_token_account_a)?;
 
-    let (_pending_balance_ct_b, current_balance_ct_b) =
+    let (_pending_balance_ct_b, _available_balance_ct_b, current_balance_ct_b) =
         get_zk_token_balance(rpc_client, &zk_token_account_b)?;
 
     assert_eq!(
         current_balance_ct_a
-            .decrypt_u32_online(
-                &elgamal_sk_a,
-                &discrete_log::DECODE_U32_PRECOMPUTATION_FOR_G
-            )
+            .decrypt(&aes_key_a)
             .unwrap() as u64,
         current_balance_a
     );
 
     assert_eq!(
         current_balance_ct_b
-            .decrypt_u32_online(
-                &elgamal_sk_b,
-                &discrete_log::DECODE_U32_PRECOMPUTATION_FOR_G
-            )
+            .decrypt(&aes_key_b)
             .unwrap() as u64,
         current_balance_b
     );
