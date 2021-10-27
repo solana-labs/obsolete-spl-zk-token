@@ -308,9 +308,7 @@ pub enum ConfidentialTokenInstruction {
     AllowPendingBalanceCredits,
 }
 
-pub(crate) fn decode_instruction_type(
-    input: &[u8],
-) -> Result<ConfidentialTokenInstruction, ProgramError> {
+pub fn decode_instruction_type(input: &[u8]) -> Result<ConfidentialTokenInstruction, ProgramError> {
     if input.is_empty() {
         Err(ProgramError::InvalidInstructionData)
     } else {
@@ -318,7 +316,7 @@ pub(crate) fn decode_instruction_type(
     }
 }
 
-pub(crate) fn decode_instruction_data<T: Pod>(input: &[u8]) -> Result<&T, ProgramError> {
+pub fn decode_instruction_data<T: Pod>(input: &[u8]) -> Result<&T, ProgramError> {
     if input.is_empty() {
         Err(ProgramError::InvalidInstructionData)
     } else {
