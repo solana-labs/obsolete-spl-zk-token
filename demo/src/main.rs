@@ -19,7 +19,6 @@ use {
     spl_zk_token::pod::*,
     spl_zk_token_sdk::encryption::{
         aes::{AesCiphertext, AesKey},
-        discrete_log,
         elgamal::*,
     },
     std::{convert::TryInto, process::exit, sync::Arc},
@@ -335,26 +334,16 @@ fn process_demo(
 
     // Extract transfer amount from `transfer_data` and demonstrate decrypting using
     // `elgamal_sk_a` and `elgamal_sk_b`
-    let source_ciphertext = transfer_proof_data.source_ciphertext();
     assert_eq!(
-        source_ciphertext
-            .unwrap()
-            .decrypt_u32_online(
-                &elgamal_sk_a,
-                &discrete_log::DECODE_U32_PRECOMPUTATION_FOR_G
-            )
+        transfer_proof_data
+            .decrypt_amount(&spl_zk_token::instruction::Role::Source, &elgamal_sk_a,)
             .unwrap() as u64,
         mint_amount,
     );
 
-    let dest_ciphertext = transfer_proof_data.dest_ciphertext();
     assert_eq!(
-        dest_ciphertext
-            .unwrap()
-            .decrypt_u32_online(
-                &elgamal_sk_b,
-                &discrete_log::DECODE_U32_PRECOMPUTATION_FOR_G
-            )
+        transfer_proof_data
+            .decrypt_amount(&spl_zk_token::instruction::Role::Dest, &elgamal_sk_b,)
             .unwrap() as u64,
         mint_amount,
     );
