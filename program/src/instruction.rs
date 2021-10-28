@@ -164,7 +164,7 @@ pub enum ConfidentialTokenInstruction {
     /// balances. Use `RejectPendingBalanceCredits` to block pending balance credits first if
     /// necessary.
     ///
-    ///   0. `[writable]` The CToken account to close
+    ///   0. `[writable]` The confidential token account to close
     ///   1. `[]` Corresponding SPL Token account
     ///   2. `[writable]` The reclaim account
     ///   3. `[]` Instructions sysvar
