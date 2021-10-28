@@ -336,14 +336,14 @@ fn process_demo(
     // `elgamal_sk_a` and `elgamal_sk_b`
     assert_eq!(
         transfer_proof_data
-            .decrypt_amount(&spl_zk_token::instruction::Role::Source, &elgamal_sk_a,)
+            .decrypt_amount(spl_zk_token::instruction::Role::Source, &elgamal_sk_a,)
             .unwrap() as u64,
         mint_amount,
     );
 
     assert_eq!(
         transfer_proof_data
-            .decrypt_amount(&spl_zk_token::instruction::Role::Dest, &elgamal_sk_b,)
+            .decrypt_amount(spl_zk_token::instruction::Role::Dest, &elgamal_sk_b,)
             .unwrap() as u64,
         mint_amount,
     );
