@@ -450,7 +450,7 @@ fn process_demo(
     assert_eq!(current_balance_a, 0);
     assert_eq!(current_balance_b, 0);
 
-    let (_pending_balance_ct_a, _available_balance_ct_a, current_balance_ct_a) =
+    let (_pending_balance_ct_a, available_balance_ct_a, current_balance_ct_a) =
         get_zk_token_balance(rpc_client, &zk_token_account_a)?;
 
     let (_pending_balance_ct_b, _available_balance_ct_b, current_balance_ct_b) =
@@ -465,6 +465,24 @@ fn process_demo(
         current_balance_ct_b.decrypt(&aes_key_b).unwrap() as u64,
         current_balance_b
     );
+
+    // Close account A
+    let close_account_proof_data =
+        spl_zk_token::instruction::CloseAccountData::new(&elgamal_sk_a, available_balance_ct_a);
+
+    send(
+        rpc_client,
+        &format!("Closing confidential token account {}", zk_token_account_a),
+        &spl_zk_token::instruction::close_account(
+            zk_token_account_a,
+            token_account_a.pubkey(),
+            payer.pubkey(),
+            payer.pubkey(),
+            &[],
+            &close_account_proof_data,
+        ),
+        &[payer],
+    )?;
 
     Ok(())
 }
