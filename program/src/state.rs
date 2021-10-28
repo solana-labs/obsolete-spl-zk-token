@@ -59,3 +59,10 @@ pub struct ConfidentialAccount {
     pub actual_pending_balance_credit_counter: PodU64,
 }
 impl PodAccountInfo<'_, '_> for ConfidentialAccount {}
+
+impl ConfidentialAccount {
+    pub fn pending_balance_credits(&self) -> u64 {
+        u64::from(self.pending_balance_credit_counter)
+            .saturating_sub(self.actual_pending_balance_credit_counter.into())
+    }
+}
