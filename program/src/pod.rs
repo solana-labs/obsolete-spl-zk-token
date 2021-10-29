@@ -105,7 +105,7 @@ impl<'a, 'b, T: Pod> Deref for PodAccountInfoData<'a, 'b, T> {
 }
 
 impl<'a, 'b, T: Pod> PodAccountInfoData<'a, 'b, T> {
-    pub fn to_mut(self) -> PodAccountInfoDataMut<'a, 'b, T> {
+    pub fn into_mut(self) -> PodAccountInfoDataMut<'a, 'b, T> {
         let account_info = self.account_info;
         drop(self);
 

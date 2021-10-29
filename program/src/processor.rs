@@ -300,7 +300,7 @@ fn process_configure_mint(
         auditor_account_signer_seeds,
     )?;
 
-    let mut auditor = Auditor::from_account_info(auditor_info, &id())?.to_mut();
+    let mut auditor = Auditor::from_account_info(auditor_info, &id())?.into_mut();
 
     auditor.mint = *mint_info.key;
     if let Some(auditor_pk) = auditor_pk {
@@ -337,7 +337,7 @@ fn process_update_auditor(
         return Err(ProgramError::InvalidArgument);
     }
 
-    let mut auditor = Auditor::from_account_info(auditor_info, &id())?.to_mut();
+    let mut auditor = Auditor::from_account_info(auditor_info, &id())?.into_mut();
 
     if auditor.mint != *mint_info.key {
         msg!("Error: Mint mismatch");
@@ -412,7 +412,7 @@ fn process_configure_account(
     )?;
 
     let mut confidential_account =
-        ConfidentialAccount::from_account_info(confidential_account_info, &id())?.to_mut();
+        ConfidentialAccount::from_account_info(confidential_account_info, &id())?.into_mut();
     confidential_account.mint = token_account.mint;
     confidential_account.token_account = *token_account_info.key;
     confidential_account.elgamal_pk = data.elgamal_pk;
@@ -486,7 +486,7 @@ fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
     }
 
     // Zero account data
-    *confidential_account.to_mut() = ConfidentialAccount::zeroed();
+    *confidential_account.into_mut() = ConfidentialAccount::zeroed();
 
     // Drain lamports
     let dest_starting_lamports = reclaim_info.lamports();
@@ -556,7 +556,7 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
         &accounts,
     )?;
 
-    let mut confidential_account = confidential_account.to_mut();
+    let mut confidential_account = confidential_account.into_mut();
     confidential_account.pending_balance =
         ops::add_to(&confidential_account.pending_balance, amount)
             .ok_or(ProgramError::InvalidInstructionData)?;
@@ -603,7 +603,7 @@ fn process_withdraw(
         &previous_instruction,
     )?;
 
-    let mut confidential_account = confidential_account.to_mut();
+    let mut confidential_account = confidential_account.into_mut();
     confidential_account.available_balance =
         ops::subtract_from(&confidential_account.available_balance, amount)
             .ok_or(ProgramError::InvalidInstructionData)?;
@@ -751,10 +751,10 @@ fn process_transfer(
             drop(receiver_confidential_account);
             None
         } else {
-            Some(receiver_confidential_account.to_mut())
+            Some(receiver_confidential_account.into_mut())
         };
 
-    let mut confidential_account = confidential_account.to_mut();
+    let mut confidential_account = confidential_account.into_mut();
 
     confidential_account.available_balance = new_source_available_balance;
     confidential_account.decryptable_available_balance = new_source_decryptable_available_balance;
@@ -788,7 +788,7 @@ fn process_apply_pending_balance(
         account_info_iter.as_slice(),
     )?;
 
-    let mut confidential_account = confidential_account.to_mut();
+    let mut confidential_account = confidential_account.into_mut();
 
     confidential_account.available_balance = ops::add(
         &confidential_account.available_balance,
@@ -824,8 +824,9 @@ fn process_allow_reject_pending_balance_credits(
         account_info_iter.as_slice(),
     )?;
 
-    confidential_account.to_mut().allow_pending_balance_credits =
-        allow_pending_balance_credits.into();
+    confidential_account
+        .into_mut()
+        .allow_pending_balance_credits = allow_pending_balance_credits.into();
 
     Ok(())
 }
