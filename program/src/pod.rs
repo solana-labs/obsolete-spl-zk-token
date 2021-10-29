@@ -6,7 +6,7 @@ use {
         pubkey::Pubkey,
     },
     std::{
-        cell::RefMut,
+        cell::{Ref, RefMut},
         marker::PhantomData,
         ops::{Deref, DerefMut},
     },
@@ -91,7 +91,8 @@ pub fn pod_from_bytes_mut<T: Pod>(bytes: &mut [u8]) -> Result<&mut T, ProgramErr
 
 /// Represents a `Pod` within `AccountInfo::data`
 pub struct PodAccountInfoData<'a, 'b, T: Pod> {
-    account_data: RefMut<'a, &'b mut [u8]>,
+    account_info: &'a AccountInfo<'b>,
+    account_data: Ref<'a, &'b mut [u8]>,
     phantom: PhantomData<&'a T>,
 }
 
@@ -103,9 +104,16 @@ impl<'a, 'b, T: Pod> Deref for PodAccountInfoData<'a, 'b, T> {
     }
 }
 
-impl<'a, 'b, T: Pod> DerefMut for PodAccountInfoData<'a, 'b, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        pod_from_bytes_mut(&mut self.account_data).unwrap()
+impl<'a, 'b, T: Pod> PodAccountInfoData<'a, 'b, T> {
+    pub fn to_mut(self) -> PodAccountInfoDataMut<'a, 'b, T> {
+        let account_info = self.account_info;
+        drop(self);
+
+        let account_data = account_info.data.borrow_mut();
+        PodAccountInfoDataMut {
+            account_data,
+            phantom: PhantomData::default(),
+        }
     }
 }
 
@@ -123,9 +131,10 @@ pub trait PodAccountInfo<'a, 'b>: bytemuck::Pod {
             return Err(ProgramError::InvalidArgument);
         }
 
-        let account_data = account_info.data.borrow_mut();
+        let account_data = account_info.data.borrow();
         let _ = Self::from_bytes(&account_data).ok_or(ProgramError::InvalidArgument)?;
         Ok(PodAccountInfoData {
+            account_info,
             account_data,
             phantom: PhantomData::default(),
         })
@@ -134,6 +143,26 @@ pub trait PodAccountInfo<'a, 'b>: bytemuck::Pod {
     /// Get the packed length
     fn get_packed_len() -> usize {
         pod_get_packed_len::<Self>()
+    }
+}
+
+/// Represents a mutable `Pod` within `AccountInfo::data`
+pub struct PodAccountInfoDataMut<'a, 'b, T: Pod> {
+    account_data: RefMut<'a, &'b mut [u8]>,
+    phantom: PhantomData<&'a T>,
+}
+
+impl<'a, 'b, T: Pod> Deref for PodAccountInfoDataMut<'a, 'b, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        pod_from_bytes(&self.account_data).unwrap()
+    }
+}
+
+impl<'a, 'b, T: Pod> DerefMut for PodAccountInfoDataMut<'a, 'b, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        pod_from_bytes_mut(&mut self.account_data).unwrap()
     }
 }
 

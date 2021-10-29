@@ -300,7 +300,7 @@ fn process_configure_mint(
         auditor_account_signer_seeds,
     )?;
 
-    let mut auditor = Auditor::from_account_info(auditor_info, &id())?;
+    let mut auditor = Auditor::from_account_info(auditor_info, &id())?.to_mut();
 
     auditor.mint = *mint_info.key;
     if let Some(auditor_pk) = auditor_pk {
@@ -337,7 +337,7 @@ fn process_update_auditor(
         return Err(ProgramError::InvalidArgument);
     }
 
-    let mut auditor = Auditor::from_account_info(auditor_info, &id())?;
+    let mut auditor = Auditor::from_account_info(auditor_info, &id())?.to_mut();
 
     if auditor.mint != *mint_info.key {
         msg!("Error: Mint mismatch");
@@ -412,7 +412,7 @@ fn process_configure_account(
     )?;
 
     let mut confidential_account =
-        ConfidentialAccount::from_account_info(confidential_account_info, &id())?;
+        ConfidentialAccount::from_account_info(confidential_account_info, &id())?.to_mut();
     confidential_account.mint = token_account.mint;
     confidential_account.token_account = *token_account_info.key;
     confidential_account.elgamal_pk = data.elgamal_pk;
@@ -448,7 +448,7 @@ fn process_configure_account(
     */
     confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
     confidential_account.available_balance = pod::ElGamalCiphertext::zeroed();
-    confidential_account.decryptable_balance = data.decryptable_zero_balance;
+    confidential_account.decryptable_available_balance = data.decryptable_zero_balance;
 
     Ok(())
 }
@@ -462,7 +462,7 @@ fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
     let instructions_sysvar_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
-    let (mut confidential_account, _token_account) = validate_confidential_account_is_signer(
+    let (confidential_account, _token_account) = validate_confidential_account_is_signer(
         confidential_account_info,
         token_account_info,
         owner_info,
@@ -486,7 +486,7 @@ fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
     }
 
     // Zero account data
-    *confidential_account = ConfidentialAccount::zeroed();
+    *confidential_account.to_mut() = ConfidentialAccount::zeroed();
 
     // Drain lamports
     let dest_starting_lamports = reclaim_info.lamports();
@@ -511,7 +511,7 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
     let owner_info = next_account_info(account_info_iter)?;
     let signers = account_info_iter.as_slice();
 
-    let (mut confidential_account, token_account) =
+    let (confidential_account, token_account) =
         validate_confidential_account(confidential_account_info, token_account_info)?;
 
     if token_account.is_frozen() {
@@ -556,6 +556,7 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
         &accounts,
     )?;
 
+    let mut confidential_account = confidential_account.to_mut();
     confidential_account.pending_balance =
         ops::add_to(&confidential_account.pending_balance, amount)
             .ok_or(ProgramError::InvalidInstructionData)?;
@@ -571,7 +572,7 @@ fn process_withdraw(
     accounts: &[AccountInfo],
     amount: u64,
     decimals: u8,
-    new_decryptable_balance: pod::AesCiphertext,
+    new_decryptable_available_balance: pod::AesCiphertext,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
@@ -584,7 +585,7 @@ fn process_withdraw(
     let instructions_sysvar_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
-    let (mut confidential_account, token_account) = validate_confidential_account_is_signer(
+    let (confidential_account, token_account) = validate_confidential_account_is_signer(
         confidential_account_info,
         token_account_info,
         owner_info,
@@ -602,6 +603,7 @@ fn process_withdraw(
         &previous_instruction,
     )?;
 
+    let mut confidential_account = confidential_account.to_mut();
     confidential_account.available_balance =
         ops::subtract_from(&confidential_account.available_balance, amount)
             .ok_or(ProgramError::InvalidInstructionData)?;
@@ -611,7 +613,7 @@ fn process_withdraw(
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    confidential_account.decryptable_balance = new_decryptable_balance;
+    confidential_account.decryptable_available_balance = new_decryptable_available_balance;
 
     // Ensure omnibus token account address derivation is correct
     let (omnibus_token_address, omnibus_token_bump_seed) =
@@ -654,7 +656,7 @@ fn process_withdraw(
 /// Processes a [Transfer] instruction.
 fn process_transfer(
     accounts: &[AccountInfo],
-    new_source_decryptable_balance: pod::AesCiphertext,
+    new_source_decryptable_available_balance: pod::AesCiphertext,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let confidential_account_info = next_account_info(account_info_iter)?;
@@ -665,18 +667,17 @@ fn process_transfer(
     let instructions_sysvar_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
-    let (mut confidential_account, token_account) = validate_confidential_account_is_signer(
+    let (confidential_account, token_account) = validate_confidential_account_is_signer(
         confidential_account_info,
         token_account_info,
         owner_info,
         account_info_iter.as_slice(),
     )?;
 
-    let (mut receiver_confidential_account, receiver_token_account) =
-        validate_confidential_account(
-            receiver_confidential_account_info,
-            receiver_token_account_info,
-        )?;
+    let (receiver_confidential_account, receiver_token_account) = validate_confidential_account(
+        receiver_confidential_account_info,
+        receiver_token_account_info,
+    )?;
 
     let auditor = Auditor::from_account_info(auditor_info, &id())?;
 
@@ -712,43 +713,58 @@ fn process_transfer(
         return Err(ProgramError::InvalidArgument);
     }
 
-    // Subtract from source available balance
-    {
+    let new_source_available_balance = {
         // Combine commitments and handles
         let source_lo_ct =
             pod::ElGamalCiphertext::from((data.amount_comms.lo, data.decrypt_handles_lo.source));
         let source_hi_ct =
             pod::ElGamalCiphertext::from((data.amount_comms.hi, data.decrypt_handles_hi.source));
 
-        confidential_account.available_balance = ops::subtract_with_lo_hi(
+        ops::subtract_with_lo_hi(
             &confidential_account.available_balance,
             &source_lo_ct,
             &source_hi_ct,
         )
-        .ok_or(ProgramError::InvalidInstructionData)?;
-    }
+        .ok_or(ProgramError::InvalidInstructionData)?
+    };
 
-    // Update source decryptable balance
-    confidential_account.decryptable_balance = new_source_decryptable_balance;
-
-    // Add to destination pending balance
-    {
+    let new_receiver_pending_balance = {
         let dest_lo_ct =
             pod::ElGamalCiphertext::from((data.amount_comms.lo, data.decrypt_handles_lo.dest));
 
         let dest_hi_ct =
             pod::ElGamalCiphertext::from((data.amount_comms.hi, data.decrypt_handles_hi.dest));
 
-        receiver_confidential_account.pending_balance = ops::add_with_lo_hi(
+        ops::add_with_lo_hi(
             &receiver_confidential_account.pending_balance,
             &dest_lo_ct,
             &dest_hi_ct,
         )
-        .ok_or(ProgramError::InvalidInstructionData)?;
-    }
+        .ok_or(ProgramError::InvalidInstructionData)?
+    };
 
-    receiver_confidential_account.pending_balance_credit_counter =
+    let new_receiver_pending_balance_credit_counter =
         (u64::from(receiver_confidential_account.pending_balance_credit_counter) + 1).into();
+
+    let receiver_confidential_account =
+        if confidential_account_info.key == receiver_confidential_account_info.key {
+            drop(receiver_confidential_account);
+            None
+        } else {
+            Some(receiver_confidential_account.to_mut())
+        };
+
+    let mut confidential_account = confidential_account.to_mut();
+
+    confidential_account.available_balance = new_source_available_balance;
+    confidential_account.decryptable_available_balance = new_source_decryptable_available_balance;
+
+    let mut receiver_confidential_account =
+        receiver_confidential_account.unwrap_or(confidential_account);
+
+    receiver_confidential_account.pending_balance = new_receiver_pending_balance;
+    receiver_confidential_account.pending_balance_credit_counter =
+        new_receiver_pending_balance_credit_counter;
 
     Ok(())
 }
@@ -757,7 +773,7 @@ fn process_transfer(
 fn process_apply_pending_balance(
     accounts: &[AccountInfo],
     expected_pending_balance_credit_counter: PodU64,
-    new_decryptable_balance: pod::AesCiphertext,
+    new_decryptable_available_balance: pod::AesCiphertext,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
@@ -765,12 +781,14 @@ fn process_apply_pending_balance(
     let token_account_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
-    let (mut confidential_account, _token_account) = validate_confidential_account_is_signer(
+    let (confidential_account, _token_account) = validate_confidential_account_is_signer(
         confidential_account_info,
         token_account_info,
         owner_info,
         account_info_iter.as_slice(),
     )?;
+
+    let mut confidential_account = confidential_account.to_mut();
 
     confidential_account.available_balance = ops::add(
         &confidential_account.available_balance,
@@ -782,7 +800,7 @@ fn process_apply_pending_balance(
         confidential_account.pending_balance_credit_counter;
     confidential_account.expected_pending_balance_credit_counter =
         expected_pending_balance_credit_counter;
-    confidential_account.decryptable_balance = new_decryptable_balance;
+    confidential_account.decryptable_available_balance = new_decryptable_available_balance;
     confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
 
     Ok(())
@@ -799,14 +817,15 @@ fn process_allow_reject_pending_balance_credits(
     let token_account_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
-    let (mut confidential_account, _token_account) = validate_confidential_account_is_signer(
+    let (confidential_account, _token_account) = validate_confidential_account_is_signer(
         confidential_account_info,
         token_account_info,
         owner_info,
         account_info_iter.as_slice(),
     )?;
 
-    confidential_account.allow_pending_balance_credits = allow_pending_balance_credits.into();
+    confidential_account.to_mut().allow_pending_balance_credits =
+        allow_pending_balance_credits.into();
 
     Ok(())
 }
@@ -854,13 +873,13 @@ pub fn process_instruction(
                 accounts,
                 data.amount.into(),
                 data.decimals,
-                data.new_decryptable_balance,
+                data.new_decryptable_available_balance,
             )
         }
         ConfidentialTokenInstruction::Transfer => {
             msg!("Transfer");
             let data = decode_instruction_data::<TransferInstructionData>(input)?;
-            process_transfer(accounts, data.new_source_decryptable_balance)
+            process_transfer(accounts, data.new_source_decryptable_available_balance)
         }
         ConfidentialTokenInstruction::ApplyPendingBalance => {
             msg!("ApplyPendingBalance");
@@ -870,7 +889,7 @@ pub fn process_instruction(
             process_apply_pending_balance(
                 accounts,
                 data.expected_pending_balance_credit_counter,
-                data.new_decryptable_balance,
+                data.new_decryptable_available_balance,
             )
         }
         ConfidentialTokenInstruction::RejectPendingBalanceCredits => {

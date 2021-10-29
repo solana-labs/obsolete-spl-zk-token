@@ -690,6 +690,72 @@ async fn test_transfer() {
 }
 
 #[tokio::test]
+async fn test_transfer_self() {
+    let owner = Keypair::new();
+
+    let mut program_test = program_test();
+    let mint = add_token_mint_account(&mut program_test, None);
+
+    let auditor_pk = ElGamalPubkey::default();
+    let _zk_auditor_address = add_zk_auditor_account(&mut program_test, mint, None);
+
+    let token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 0);
+
+    let elgamal = ElGamalKeypair::new(&owner, &token_account).unwrap();
+    let zk_available_balance = 123_u64;
+    let zk_available_balance_ct = elgamal.public.encrypt(zk_available_balance);
+
+    let zk_token_account = add_zk_token_account(
+        &mut program_test,
+        mint,
+        token_account,
+        elgamal.public,
+        zk_available_balance_ct,
+    );
+    let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
+
+    let transfer_amount = 1;
+
+    let transfer_data = spl_zk_token::instruction::TransferData::new(
+        transfer_amount,
+        zk_available_balance,
+        zk_available_balance_ct,
+        elgamal.public,
+        &elgamal.secret,
+        elgamal.public,
+        auditor_pk,
+    );
+
+    let mut transaction = Transaction::new_with_payer(
+        &spl_zk_token::instruction::transfer(
+            zk_token_account,
+            token_account,
+            zk_token_account,
+            token_account,
+            &mint,
+            owner.pubkey(),
+            &[],
+            AesCiphertext::default(),
+            &transfer_data,
+        ),
+        Some(&payer.pubkey()),
+    );
+    transaction.sign(&[&payer, &owner], recent_blockhash);
+
+    assert_transaction_size(&transaction);
+    banks_client.process_transaction(transaction).await.unwrap();
+
+    assert_eq!(
+        u64::from(
+            get_zk_token_state(&mut banks_client, zk_token_account)
+                .await
+                .pending_balance_credit_counter
+        ),
+        1,
+    );
+}
+
+#[tokio::test]
 #[ignore]
 async fn test_multisig() {
     todo!()
