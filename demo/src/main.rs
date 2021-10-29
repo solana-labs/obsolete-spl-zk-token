@@ -78,7 +78,10 @@ fn get_zk_token_balance(
         (
             zk_token_state.pending_balance.try_into().unwrap(),
             zk_token_state.available_balance.try_into().unwrap(),
-            zk_token_state.decryptable_available_balance.try_into().unwrap(),
+            zk_token_state
+                .decryptable_available_balance
+                .try_into()
+                .unwrap(),
         )
     })
 }
