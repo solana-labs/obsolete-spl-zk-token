@@ -371,7 +371,10 @@ pub fn configure_mint(
     ];
 
     if let Some(freeze_authority) = freeze_authority {
-        accounts.push(AccountMeta::new(freeze_authority, true));
+        accounts.push(AccountMeta::new(
+            freeze_authority,
+            freeze_authority_multisig_signers.is_empty(),
+        ));
         for multisig_signer in freeze_authority_multisig_signers.iter() {
             accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
         }
@@ -387,6 +390,42 @@ pub fn configure_mint(
         )
     } else {
         encode_instruction(accounts, ConfidentialTokenInstruction::ConfigureMint, &())
+    }
+}
+
+/// Create an `UpdateAuditor` instruction
+#[cfg(not(target_arch = "bpf"))]
+pub fn update_auditor(
+    token_mint_address: Pubkey,
+    freeze_authority: Pubkey,
+    freeze_authority_multisig_signers: &[&Pubkey],
+    auditor_pk: Option<ElGamalPubkey>,
+) -> Instruction {
+    let auditor_address = get_auditor_address(&token_mint_address);
+
+    let mut accounts = vec![
+        AccountMeta::new(auditor_address, false),
+        AccountMeta::new_readonly(token_mint_address, false),
+        AccountMeta::new(
+            freeze_authority,
+            freeze_authority_multisig_signers.is_empty(),
+        ),
+    ];
+
+    for multisig_signer in freeze_authority_multisig_signers.iter() {
+        accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
+    }
+
+    if let Some(auditor_pk) = auditor_pk {
+        encode_instruction(
+            accounts,
+            ConfidentialTokenInstruction::UpdateAuditor,
+            &UpdateAuditorInstructionData {
+                new_auditor_pk: auditor_pk.into(),
+            },
+        )
+    } else {
+        encode_instruction(accounts, ConfidentialTokenInstruction::UpdateAuditor, &())
     }
 }
 
