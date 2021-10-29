@@ -72,13 +72,13 @@ fn get_zk_token_balance(
 ) -> client_error::Result<(
     /* pending_balance: */ ElGamalCiphertext,
     /* available_balance: */ ElGamalCiphertext,
-    /* decryptable_balance: */ AesCiphertext,
+    /* decryptable_available_balance: */ AesCiphertext,
 )> {
     get_zk_token_state(rpc_client, zk_token_account).map(|zk_token_state| {
         (
             zk_token_state.pending_balance.try_into().unwrap(),
             zk_token_state.available_balance.try_into().unwrap(),
-            zk_token_state.decryptable_balance.try_into().unwrap(),
+            zk_token_state.decryptable_available_balance.try_into().unwrap(),
         )
     })
 }
@@ -311,7 +311,7 @@ fn process_demo(
         get_zk_token_balance(rpc_client, &zk_token_account_a)?;
     assert_eq!(pending_balance_ct_a, ElGamalCiphertext::default());
 
-    // Client should use `decryptable_balance` to recover the amount
+    // Client should use `decryptable_available_balance` to recover the amount
     assert_eq!(
         current_balance_ct_a.decrypt(&aes_key_a).unwrap() as u64,
         current_balance_a
