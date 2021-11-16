@@ -48,7 +48,7 @@ pub struct ConfidentialAccount {
     pub decryptable_available_balance: pod::AesCiphertext,
 
     /// `pending_balance` may only be credited by `Deposit` or `Transfer` instructions if `true`
-    pub allow_pending_balance_credits: PodBool,
+    pub allow_balance_credits: PodBool,
 
     /// The total number of `Deposit` and `Transfer` instructions that have credited `pending_balance`
     pub pending_balance_credit_counter: PodU64,
@@ -63,8 +63,8 @@ pub struct ConfidentialAccount {
 impl PodAccountInfo<'_, '_> for ConfidentialAccount {}
 
 impl ConfidentialAccount {
-    pub fn allow_pending_balance_credits(&self) -> bool {
-        bool::from(&self.allow_pending_balance_credits)
+    pub fn allow_balance_credits(&self) -> bool {
+        bool::from(&self.allow_balance_credits)
     }
 
     pub fn pending_balance_credits(&self) -> u64 {

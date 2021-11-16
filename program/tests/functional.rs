@@ -184,7 +184,7 @@ fn add_zk_token_account(
         token_account,
         elgamal_pk: elgamal_pk.into(),
         available_balance: available_balance.into(),
-        allow_pending_balance_credits: true.into(),
+        allow_balance_credits: true.into(),
         ..spl_zk_token::state::ConfidentialAccount::zeroed()
     };
     let zk_token_account = Account::create(
@@ -358,7 +358,7 @@ async fn test_configure_account() {
     assert_eq!(zk_token_state.mint, mint.into());
     assert_eq!(zk_token_state.token_account, token_account.into());
     assert_eq!(zk_token_state.elgamal_pk, elgamal_pk.into());
-    assert_eq!(zk_token_state.allow_pending_balance_credits, true.into());
+    assert_eq!(zk_token_state.allow_balance_credits, false.into());
 }
 
 #[tokio::test]
