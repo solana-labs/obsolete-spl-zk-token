@@ -7,27 +7,56 @@ use {
 #[cfg(not(target_arch = "bpf"))]
 use {spl_zk_token_sdk::encryption::aes::AesKey, std::convert::TryInto};
 
-/// Account used for auditing confidential transfers
+/// Mint data
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
-pub struct Auditor {
-    /// The SPL Token mint associated with this account
+pub struct ZkMint {
+    /// The corresponding SPL Token Mint
     pub mint: Pubkey,
 
-    /// If true, transfers must include ElGamal cypertext using this public key.
-    /// If false, transfer auditing is disabled
-    pub enabled: PodBool,
-
-    /// ElGamal public key for the auditor.
-    pub elgamal_pk: pod::ElGamalPubkey,
+    /// Optional auditor
+    pub auditor: Auditor,
 }
-impl PodAccountInfo<'_, '_> for Auditor {}
+impl PodAccountInfo<'_, '_> for ZkMint {}
 
-/// State for a confidential token account
+/// Auditing configuration
+#[derive(Clone, Copy, Pod, Zeroable, PartialEq)]
+#[repr(C)]
+pub struct Auditor {
+    /// * If not Pubkey::default(), this authority must be provided to the `EnableBalanceCredits`
+    /// instruction and effectively provides central control over who may the corresponding
+    /// confidential token.
+    ///
+    /// * If Pubkey::default(), the token account owner must be provided to the
+    /// `EnableBalanceCredits` instruction. In this configuration a confidential token is available
+    /// for unrestricted public use.
+    pub enable_balance_credits_authority: Pubkey,
+
+    /// * If non-zero, transfers must include ElGamal cypertext with this public key.
+    /// * If all zero, transfer auditing is disabled.  Once disabled, auditing may not be
+    /// re-enabled.
+    pub auditor_pk: pod::ElGamalPubkey,
+}
+
+impl Auditor {
+    pub fn maybe_enable_balance_credits_authority(&self) -> Option<&Pubkey> {
+        if self.enable_balance_credits_authority != Pubkey::default() {
+            Some(&self.enable_balance_credits_authority)
+        } else {
+            None
+        }
+    }
+
+    pub fn auditor_enabled(&self) -> bool {
+        self.auditor_pk != pod::ElGamalPubkey::zeroed()
+    }
+}
+
+/// Account data
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
-pub struct ConfidentialAccount {
-    /// The SPL Token mint associated with this confidential token account
+pub struct ZkAccount {
+    /// The corresponding SPL Token Mint
     pub mint: Pubkey,
 
     /// The SPL Token account that corresponds to this confidential token account.
@@ -60,9 +89,9 @@ pub struct ConfidentialAccount {
     /// The actual `pending_balance_credit_counter` when the last `ApplyPendingBalance` instruction was executed
     pub actual_pending_balance_credit_counter: PodU64,
 }
-impl PodAccountInfo<'_, '_> for ConfidentialAccount {}
+impl PodAccountInfo<'_, '_> for ZkAccount {}
 
-impl ConfidentialAccount {
+impl ZkAccount {
     pub fn allow_balance_credits(&self) -> bool {
         bool::from(&self.allow_balance_credits)
     }

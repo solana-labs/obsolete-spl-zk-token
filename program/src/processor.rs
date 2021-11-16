@@ -79,8 +79,8 @@ fn validate_account_owner(account_info: &AccountInfo, owner: &Pubkey) -> Program
     }
 }
 
-fn _validate_confidential_account<'a, 'b>(
-    confidential_account_info: &'a AccountInfo<'b>,
+fn _validate_zk_token_account<'a, 'b>(
+    zk_token_account_info: &'a AccountInfo<'b>,
     token_account_info: &AccountInfo,
     is_signer: Option<(
         /*owner_info:*/ &AccountInfo,
@@ -88,7 +88,7 @@ fn _validate_confidential_account<'a, 'b>(
     )>,
 ) -> Result<
     (
-        PodAccountInfoData<'a, 'b, ConfidentialAccount>,
+        PodAccountInfoData<'a, 'b, ZkAccount>,
         spl_token::state::Account,
     ),
     ProgramError,
@@ -99,48 +99,47 @@ fn _validate_confidential_account<'a, 'b>(
         validate_spl_token_owner(&token_account.owner, owner_info, signers)?;
     }
 
-    let confidential_account =
-        ConfidentialAccount::from_account_info(confidential_account_info, &id())?;
+    let zk_token_account = ZkAccount::from_account_info(zk_token_account_info, &id())?;
 
-    if confidential_account.mint != token_account.mint {
+    if zk_token_account.mint != token_account.mint {
         msg!("Mint mismatch");
         return Err(ProgramError::InvalidArgument);
     }
 
-    if confidential_account.token_account != *token_account_info.key {
+    if zk_token_account.token_account != *token_account_info.key {
         msg!("Token account mismatch");
         return Err(ProgramError::InvalidArgument);
     }
-    Ok((confidential_account, token_account))
+    Ok((zk_token_account, token_account))
 }
 
-fn validate_confidential_account<'a, 'b>(
-    confidential_account_info: &'a AccountInfo<'b>,
+fn validate_zk_token_account<'a, 'b>(
+    zk_token_account_info: &'a AccountInfo<'b>,
     token_account_info: &AccountInfo,
 ) -> Result<
     (
-        PodAccountInfoData<'a, 'b, ConfidentialAccount>,
+        PodAccountInfoData<'a, 'b, ZkAccount>,
         spl_token::state::Account,
     ),
     ProgramError,
 > {
-    _validate_confidential_account(confidential_account_info, token_account_info, None)
+    _validate_zk_token_account(zk_token_account_info, token_account_info, None)
 }
 
-fn validate_confidential_account_is_signer<'a, 'b>(
-    confidential_account_info: &'a AccountInfo<'b>,
+fn validate_zk_token_account_is_signer<'a, 'b>(
+    zk_token_account_info: &'a AccountInfo<'b>,
     token_account_info: &AccountInfo,
     owner_info: &AccountInfo,
     signers: &[AccountInfo],
 ) -> Result<
     (
-        PodAccountInfoData<'a, 'b, ConfidentialAccount>,
+        PodAccountInfoData<'a, 'b, ZkAccount>,
         spl_token::state::Account,
     ),
     ProgramError,
 > {
-    _validate_confidential_account(
-        confidential_account_info,
+    _validate_zk_token_account(
+        zk_token_account_info,
         token_account_info,
         Some((owner_info, signers)),
     )
@@ -203,15 +202,12 @@ fn create_pda_account<'a>(
 }
 
 /// Processes an [ConfigureMint] instruction.
-fn process_configure_mint(
-    accounts: &[AccountInfo],
-    auditor_pk: Option<&pod::ElGamalPubkey>,
-) -> ProgramResult {
+fn process_configure_mint(accounts: &[AccountInfo], auditor: &state::Auditor) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let funder_info = next_account_info(account_info_iter)?;
     let mint_info = next_account_info(account_info_iter)?;
     let omnibus_info = next_account_info(account_info_iter)?;
-    let auditor_info = next_account_info(account_info_iter)?;
+    let zk_mint_info = next_account_info(account_info_iter)?;
     let system_program_info = next_account_info(account_info_iter)?;
     let spl_token_program_info = next_account_info(account_info_iter)?;
     let rent_sysvar_info = next_account_info(account_info_iter)?;
@@ -233,19 +229,19 @@ fn process_configure_mint(
     } else {
         // If the mint has no freeze authority, anybody may enabled confidential transfers but
         // cannot configure an auditor
-        if auditor_pk.is_some() {
+        if *auditor != state::Auditor::zeroed() {
             msg!("Error: auditor may not be configured on a mint with no freeze authority");
             return Err(ProgramError::InvalidArgument);
         }
     }
 
-    // Ensure omnibus token account address derivation is correct
+    // Ensure omnibus token account address is correct
     let (omnibus_token_address, omnibus_token_bump_seed) =
         get_omnibus_token_address_with_seed(mint_info.key);
 
     if omnibus_token_address != *omnibus_info.key {
-        msg!("Error: Omnibus token address does not match seed derivation");
-        return Err(ProgramError::InvalidSeeds);
+        msg!("Error: Omnibus token address does not match derivation");
+        return Err(ProgramError::InvalidArgument);
     }
 
     let omnibus_token_account_signer_seeds: &[&[_]] = &[
@@ -254,15 +250,15 @@ fn process_configure_mint(
         &[omnibus_token_bump_seed],
     ];
 
-    // Ensure auditor account address derivation is correct
-    let (auditor_address, auditor_bump_seed) = get_auditor_address_with_seed(mint_info.key);
-    if auditor_address != *auditor_info.key {
-        msg!("Error: auditor address does not match seed derivation");
-        return Err(ProgramError::InvalidSeeds);
+    // Ensure zk mint address is correct
+    let (zk_mint_address, zk_mint_bump_seed) = get_zk_mint_address_with_seed(mint_info.key);
+    if zk_mint_address != *zk_mint_info.key {
+        msg!("Error: mint address does not match derivation");
+        return Err(ProgramError::InvalidArgument);
     }
 
     let auditor_account_signer_seeds: &[&[_]] =
-        &[&mint_info.key.to_bytes(), br"auditor", &[auditor_bump_seed]];
+        &[&mint_info.key.to_bytes(), br"zk_mint", &[zk_mint_bump_seed]];
 
     msg!("Creating omnibus token account: {}", omnibus_info.key);
     create_pda_account(
@@ -289,35 +285,27 @@ fn process_configure_mint(
         ],
     )?;
 
-    msg!("Creating auditor account: {}", auditor_info.key);
+    msg!("Creating zk mint account: {}", zk_mint_info.key);
     create_pda_account(
         funder_info,
         rent,
-        Auditor::get_packed_len(),
+        ZkMint::get_packed_len(),
         &id(),
         system_program_info,
-        auditor_info,
+        zk_mint_info,
         auditor_account_signer_seeds,
     )?;
 
-    let mut auditor = Auditor::from_account_info(auditor_info, &id())?.into_mut();
-
-    auditor.mint = *mint_info.key;
-    if let Some(auditor_pk) = auditor_pk {
-        auditor.enabled = true.into();
-        auditor.elgamal_pk = *auditor_pk;
-    }
-
+    let mut zk_mint = ZkMint::from_account_info(zk_mint_info, &id())?.into_mut();
+    zk_mint.mint = *mint_info.key;
+    zk_mint.auditor = *auditor;
     Ok(())
 }
 
 /// Processes an [UpdateAuditor] instruction.
-fn process_update_auditor(
-    accounts: &[AccountInfo],
-    new_auditor_pk: Option<&pod::ElGamalPubkey>,
-) -> ProgramResult {
+fn process_update_auditor(accounts: &[AccountInfo], new_auditor: &state::Auditor) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
-    let auditor_info = next_account_info(account_info_iter)?;
+    let zk_mint_info = next_account_info(account_info_iter)?;
     let mint_info = next_account_info(account_info_iter)?;
 
     validate_account_owner(mint_info, &spl_token::id())?;
@@ -337,26 +325,21 @@ fn process_update_auditor(
         return Err(ProgramError::InvalidArgument);
     }
 
-    let mut auditor = Auditor::from_account_info(auditor_info, &id())?.into_mut();
+    let mut zk_mint = ZkMint::from_account_info(zk_mint_info, &id())?.into_mut();
 
-    if auditor.mint != *mint_info.key {
+    if zk_mint.mint != *mint_info.key {
         msg!("Error: Mint mismatch");
         return Err(ProgramError::InvalidArgument);
     }
 
-    if !bool::from(&auditor.enabled) {
+    if zk_mint.auditor.auditor_enabled() {
+        zk_mint.auditor = *new_auditor;
+        Ok(())
+    } else {
+        // Once the auditor is disabled it cannot be re-enabled
         msg!("Error: auditor is disabled");
-        return Err(ProgramError::InvalidAccountData);
+        Err(ProgramError::InvalidAccountData)
     }
-
-    match new_auditor_pk {
-        Some(new_auditor_pk) => auditor.elgamal_pk = *new_auditor_pk,
-        None => {
-            auditor.enabled = false.into();
-        }
-    }
-
-    Ok(())
 }
 
 /// Processes an [ConfigureAccount] instruction.
@@ -366,7 +349,7 @@ fn process_configure_account(
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let funder_info = next_account_info(account_info_iter)?;
-    let confidential_account_info = next_account_info(account_info_iter)?;
+    let zk_token_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
     let system_program_info = next_account_info(account_info_iter)?;
     let rent_sysvar_info = next_account_info(account_info_iter)?;
@@ -381,41 +364,38 @@ fn process_configure_account(
     )?;
 
     // Ensure confidential account address derivation is correct
-    let (confidential_address, bump_seed) =
-        get_confidential_token_address_with_seed(&token_account.mint, token_account_info.key);
-    if confidential_address != *confidential_account_info.key {
-        msg!("Error: Confidential address does not match seed derivation");
+    let (zk_token_account_address, zk_token_account_bump_seed) =
+        get_zk_token_address_with_seed(&token_account.mint, token_account_info.key);
+    if zk_token_account_address != *zk_token_account_info.key {
+        msg!("Error: zk token address does not match seed derivation");
         return Err(ProgramError::InvalidSeeds);
     }
 
     let confidential_token_account_signer_seeds: &[&[_]] = &[
         &token_account.mint.to_bytes(),
         &token_account_info.key.to_bytes(),
-        br"confidential",
-        &[bump_seed],
+        br"zk_account",
+        &[zk_token_account_bump_seed],
     ];
 
     let rent = &Rent::from_account_info(rent_sysvar_info)?;
 
-    msg!(
-        "Creating confidential account: {}",
-        confidential_account_info.key
-    );
+    msg!("Creating zk account: {}", zk_token_account_info.key);
     create_pda_account(
         funder_info,
         rent,
-        ConfidentialAccount::get_packed_len(),
+        ZkAccount::get_packed_len(),
         &id(),
         system_program_info,
-        confidential_account_info,
+        zk_token_account_info,
         confidential_token_account_signer_seeds,
     )?;
 
-    let mut confidential_account =
-        ConfidentialAccount::from_account_info(confidential_account_info, &id())?.into_mut();
-    confidential_account.mint = token_account.mint;
-    confidential_account.token_account = *token_account_info.key;
-    confidential_account.elgamal_pk = data.elgamal_pk;
+    let mut zk_token_account =
+        ZkAccount::from_account_info(zk_token_account_info, &id())?.into_mut();
+    zk_token_account.mint = token_account.mint;
+    zk_token_account.token_account = *token_account_info.key;
+    zk_token_account.elgamal_pk = data.elgamal_pk;
 
     /*
         An ElGamal ciphertext is of the form
@@ -445,9 +425,9 @@ fn process_configure_account(
 
         This should just be encoded as [0; 64]
     */
-    confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
-    confidential_account.available_balance = pod::ElGamalCiphertext::zeroed();
-    confidential_account.decryptable_available_balance = data.decryptable_zero_balance;
+    zk_token_account.pending_balance = pod::ElGamalCiphertext::zeroed();
+    zk_token_account.available_balance = pod::ElGamalCiphertext::zeroed();
+    zk_token_account.decryptable_available_balance = data.decryptable_zero_balance;
 
     Ok(())
 }
@@ -455,14 +435,14 @@ fn process_configure_account(
 /// Processes an [CloseAccount] instruction.
 fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
-    let confidential_account_info = next_account_info(account_info_iter)?;
+    let zk_token_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
     let reclaim_info = next_account_info(account_info_iter)?;
     let instructions_sysvar_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
-    let (confidential_account, _token_account) = validate_confidential_account_is_signer(
-        confidential_account_info,
+    let (zk_token_account, _token_account) = validate_zk_token_account_is_signer(
+        zk_token_account_info,
         token_account_info,
         owner_info,
         account_info_iter.as_slice(),
@@ -474,25 +454,25 @@ fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
         &previous_instruction,
     )?;
 
-    if confidential_account.pending_balance != pod::ElGamalCiphertext::zeroed() {
+    if zk_token_account.pending_balance != pod::ElGamalCiphertext::zeroed() {
         msg!("Pending balance is not zero");
         return Err(ProgramError::InvalidAccountData);
     }
 
-    if confidential_account.available_balance != data.balance {
+    if zk_token_account.available_balance != data.balance {
         msg!("Available balance mismatch");
         return Err(ProgramError::InvalidInstructionData);
     }
 
     // Zero account data
-    *confidential_account.into_mut() = ConfidentialAccount::zeroed();
+    *zk_token_account.into_mut() = ZkAccount::zeroed();
 
     // Drain lamports
     let dest_starting_lamports = reclaim_info.lamports();
     **reclaim_info.lamports.borrow_mut() = dest_starting_lamports
-        .checked_add(confidential_account_info.lamports())
+        .checked_add(zk_token_account_info.lamports())
         .ok_or(ProgramError::InvalidAccountData)?;
-    **confidential_account_info.lamports.borrow_mut() = 0;
+    **zk_token_account_info.lamports.borrow_mut() = 0;
 
     Ok(())
 }
@@ -502,7 +482,7 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
     let account_info_iter = &mut accounts.iter();
 
     let source_token_account_info = next_account_info(account_info_iter)?;
-    let confidential_account_info = next_account_info(account_info_iter)?;
+    let zk_token_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
     let omnibus_info = next_account_info(account_info_iter)?;
     let mint_info = next_account_info(account_info_iter)?;
@@ -510,15 +490,15 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
     let owner_info = next_account_info(account_info_iter)?;
     let signers = account_info_iter.as_slice();
 
-    let (confidential_account, token_account) =
-        validate_confidential_account(confidential_account_info, token_account_info)?;
+    let (zk_token_account, token_account) =
+        validate_zk_token_account(zk_token_account_info, token_account_info)?;
 
     if token_account.is_frozen() {
         msg!("Error: Account frozen");
         return Err(ProgramError::InvalidAccountData);
     }
 
-    if !bool::from(&confidential_account.allow_balance_credits) {
+    if !bool::from(&zk_token_account.allow_balance_credits) {
         msg!("Error: deposit instruction disabled");
         return Err(ProgramError::InvalidArgument);
     }
@@ -555,13 +535,12 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
         &accounts,
     )?;
 
-    let mut confidential_account = confidential_account.into_mut();
-    confidential_account.pending_balance =
-        ops::add_to(&confidential_account.pending_balance, amount)
-            .ok_or(ProgramError::InvalidInstructionData)?;
+    let mut zk_token_account = zk_token_account.into_mut();
+    zk_token_account.pending_balance = ops::add_to(&zk_token_account.pending_balance, amount)
+        .ok_or(ProgramError::InvalidInstructionData)?;
 
-    confidential_account.pending_balance_credit_counter =
-        (u64::from(confidential_account.pending_balance_credit_counter) + 1).into();
+    zk_token_account.pending_balance_credit_counter =
+        (u64::from(zk_token_account.pending_balance_credit_counter) + 1).into();
 
     Ok(())
 }
@@ -575,7 +554,7 @@ fn process_withdraw(
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
-    let confidential_account_info = next_account_info(account_info_iter)?;
+    let zk_token_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
     let dest_token_account_info = next_account_info(account_info_iter)?;
     let mint_info = next_account_info(account_info_iter)?;
@@ -584,8 +563,8 @@ fn process_withdraw(
     let instructions_sysvar_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
-    let (confidential_account, token_account) = validate_confidential_account_is_signer(
-        confidential_account_info,
+    let (zk_token_account, token_account) = validate_zk_token_account_is_signer(
+        zk_token_account_info,
         token_account_info,
         owner_info,
         account_info_iter.as_slice(),
@@ -602,17 +581,17 @@ fn process_withdraw(
         &previous_instruction,
     )?;
 
-    let mut confidential_account = confidential_account.into_mut();
-    confidential_account.available_balance =
-        ops::subtract_from(&confidential_account.available_balance, amount)
+    let mut zk_token_account = zk_token_account.into_mut();
+    zk_token_account.available_balance =
+        ops::subtract_from(&zk_token_account.available_balance, amount)
             .ok_or(ProgramError::InvalidInstructionData)?;
 
-    if confidential_account.available_balance != data.final_balance_ct {
+    if zk_token_account.available_balance != data.final_balance_ct {
         msg!("Available balance mismatch");
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    confidential_account.decryptable_available_balance = new_decryptable_available_balance;
+    zk_token_account.decryptable_available_balance = new_decryptable_available_balance;
 
     // Ensure omnibus token account address derivation is correct
     let (omnibus_token_address, omnibus_token_bump_seed) =
@@ -658,30 +637,28 @@ fn process_transfer(
     new_source_decryptable_available_balance: pod::AesCiphertext,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
-    let confidential_account_info = next_account_info(account_info_iter)?;
+    let zk_token_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
-    let receiver_confidential_account_info = next_account_info(account_info_iter)?;
+    let receiver_zk_token_account_info = next_account_info(account_info_iter)?;
     let receiver_token_account_info = next_account_info(account_info_iter)?;
-    let auditor_info = next_account_info(account_info_iter)?;
+    let zk_mint_info = next_account_info(account_info_iter)?;
     let instructions_sysvar_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
-    let (confidential_account, token_account) = validate_confidential_account_is_signer(
-        confidential_account_info,
+    let (zk_token_account, token_account) = validate_zk_token_account_is_signer(
+        zk_token_account_info,
         token_account_info,
         owner_info,
         account_info_iter.as_slice(),
     )?;
 
-    let (receiver_confidential_account, receiver_token_account) = validate_confidential_account(
-        receiver_confidential_account_info,
-        receiver_token_account_info,
-    )?;
+    let (receiver_zk_token_account, receiver_token_account) =
+        validate_zk_token_account(receiver_zk_token_account_info, receiver_token_account_info)?;
 
-    let auditor = Auditor::from_account_info(auditor_info, &id())?;
+    let zk_mint = ZkMint::from_account_info(zk_mint_info, &id())?;
 
-    if confidential_account.mint != receiver_confidential_account.mint
-        || confidential_account.mint != auditor.mint
+    if zk_token_account.mint != receiver_zk_token_account.mint
+        || zk_token_account.mint != zk_mint.mint
     {
         msg!("Mint mismatch");
         return Err(ProgramError::InvalidArgument);
@@ -692,7 +669,7 @@ fn process_transfer(
         return Err(ProgramError::InvalidAccountData);
     }
 
-    if !bool::from(&receiver_confidential_account.allow_balance_credits) {
+    if !bool::from(&receiver_zk_token_account.allow_balance_credits) {
         msg!("Error: transfer instruction disabled");
         return Err(ProgramError::InvalidArgument);
     }
@@ -703,10 +680,10 @@ fn process_transfer(
         &previous_instruction,
     )?;
 
-    if data.transfer_public_keys.source_pk != confidential_account.elgamal_pk
-        || data.transfer_public_keys.dest_pk != receiver_confidential_account.elgamal_pk
-        || (bool::from(&auditor.enabled)
-            && data.transfer_public_keys.auditor_pk != auditor.elgamal_pk)
+    if data.transfer_public_keys.source_pk != zk_token_account.elgamal_pk
+        || data.transfer_public_keys.dest_pk != receiver_zk_token_account.elgamal_pk
+        || (zk_mint.auditor.auditor_enabled()
+            && data.transfer_public_keys.auditor_pk != zk_mint.auditor.auditor_pk)
     {
         msg!("Error: ElGamal public key mismatch");
         return Err(ProgramError::InvalidArgument);
@@ -720,7 +697,7 @@ fn process_transfer(
             pod::ElGamalCiphertext::from((data.amount_comms.hi, data.decrypt_handles_hi.source));
 
         ops::subtract_with_lo_hi(
-            &confidential_account.available_balance,
+            &zk_token_account.available_balance,
             &source_lo_ct,
             &source_hi_ct,
         )
@@ -735,7 +712,7 @@ fn process_transfer(
             pod::ElGamalCiphertext::from((data.amount_comms.hi, data.decrypt_handles_hi.dest));
 
         ops::add_with_lo_hi(
-            &receiver_confidential_account.pending_balance,
+            &receiver_zk_token_account.pending_balance,
             &dest_lo_ct,
             &dest_hi_ct,
         )
@@ -743,26 +720,25 @@ fn process_transfer(
     };
 
     let new_receiver_pending_balance_credit_counter =
-        (u64::from(receiver_confidential_account.pending_balance_credit_counter) + 1).into();
+        (u64::from(receiver_zk_token_account.pending_balance_credit_counter) + 1).into();
 
-    let receiver_confidential_account =
-        if confidential_account_info.key == receiver_confidential_account_info.key {
-            drop(receiver_confidential_account);
+    let receiver_zk_token_account =
+        if zk_token_account_info.key == receiver_zk_token_account_info.key {
+            drop(receiver_zk_token_account);
             None
         } else {
-            Some(receiver_confidential_account.into_mut())
+            Some(receiver_zk_token_account.into_mut())
         };
 
-    let mut confidential_account = confidential_account.into_mut();
+    let mut zk_token_account = zk_token_account.into_mut();
 
-    confidential_account.available_balance = new_source_available_balance;
-    confidential_account.decryptable_available_balance = new_source_decryptable_available_balance;
+    zk_token_account.available_balance = new_source_available_balance;
+    zk_token_account.decryptable_available_balance = new_source_decryptable_available_balance;
 
-    let mut receiver_confidential_account =
-        receiver_confidential_account.unwrap_or(confidential_account);
+    let mut receiver_zk_token_account = receiver_zk_token_account.unwrap_or(zk_token_account);
 
-    receiver_confidential_account.pending_balance = new_receiver_pending_balance;
-    receiver_confidential_account.pending_balance_credit_counter =
+    receiver_zk_token_account.pending_balance = new_receiver_pending_balance;
+    receiver_zk_token_account.pending_balance_credit_counter =
         new_receiver_pending_balance_credit_counter;
 
     Ok(())
@@ -776,54 +752,82 @@ fn process_apply_pending_balance(
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
-    let confidential_account_info = next_account_info(account_info_iter)?;
+    let zk_token_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
-    let (confidential_account, _token_account) = validate_confidential_account_is_signer(
-        confidential_account_info,
+    let (zk_token_account, _token_account) = validate_zk_token_account_is_signer(
+        zk_token_account_info,
         token_account_info,
         owner_info,
         account_info_iter.as_slice(),
     )?;
 
-    let mut confidential_account = confidential_account.into_mut();
+    let mut zk_token_account = zk_token_account.into_mut();
 
-    confidential_account.available_balance = ops::add(
-        &confidential_account.available_balance,
-        &confidential_account.pending_balance,
+    zk_token_account.available_balance = ops::add(
+        &zk_token_account.available_balance,
+        &zk_token_account.pending_balance,
     )
     .ok_or(ProgramError::InvalidInstructionData)?;
 
-    confidential_account.actual_pending_balance_credit_counter =
-        confidential_account.pending_balance_credit_counter;
-    confidential_account.expected_pending_balance_credit_counter =
+    zk_token_account.actual_pending_balance_credit_counter =
+        zk_token_account.pending_balance_credit_counter;
+    zk_token_account.expected_pending_balance_credit_counter =
         expected_pending_balance_credit_counter;
-    confidential_account.decryptable_available_balance = new_decryptable_available_balance;
-    confidential_account.pending_balance = pod::ElGamalCiphertext::zeroed();
+    zk_token_account.decryptable_available_balance = new_decryptable_available_balance;
+    zk_token_account.pending_balance = pod::ElGamalCiphertext::zeroed();
 
     Ok(())
 }
 
-/// Processes an [AllowBalanceCredits] or [DisableBalanceCredits] instruction.
-fn process_allow_reject_pending_balance_credits(
-    accounts: &[AccountInfo],
-    allow_balance_credits: bool,
-) -> ProgramResult {
+/// Processes an [EnableBalanceCredits] instruction.
+fn process_enable_balance_credits(accounts: &[AccountInfo]) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
-    let confidential_account_info = next_account_info(account_info_iter)?;
+    let zk_token_account_info = next_account_info(account_info_iter)?;
+    let token_account_info = next_account_info(account_info_iter)?;
+    let zk_mint_info = next_account_info(account_info_iter)?;
+    let owner_info = next_account_info(account_info_iter)?;
+
+    let (zk_token_account, token_account) =
+        validate_zk_token_account(zk_token_account_info, token_account_info)?;
+
+    // Ensure zk mint address is correct
+    let zk_mint_address = get_zk_mint_address(&zk_token_account.mint);
+    if zk_mint_address != *zk_mint_info.key {
+        msg!("Error: zk mint address does not match derivation");
+        return Err(ProgramError::InvalidArgument);
+    }
+
+    let zk_mint = ZkMint::from_account_info(zk_mint_info, &id())?;
+    let authority = zk_mint
+        .auditor
+        .maybe_enable_balance_credits_authority()
+        .unwrap_or(&token_account.owner);
+
+    validate_spl_token_owner(authority, owner_info, account_info_iter.as_slice())?;
+
+    zk_token_account.into_mut().allow_balance_credits = true.into();
+    Ok(())
+}
+
+/// Processes an [DisableBalanceCredits] instruction.
+fn process_disable_balance_credits(accounts: &[AccountInfo]) -> ProgramResult {
+    let account_info_iter = &mut accounts.iter();
+
+    let zk_token_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
     let owner_info = next_account_info(account_info_iter)?;
 
-    let (confidential_account, _token_account) = validate_confidential_account_is_signer(
-        confidential_account_info,
+    let (zk_token_account, _token_account) = validate_zk_token_account_is_signer(
+        zk_token_account_info,
         token_account_info,
         owner_info,
         account_info_iter.as_slice(),
     )?;
 
-    confidential_account.into_mut().allow_balance_credits = allow_balance_credits.into();
+    zk_token_account.into_mut().allow_balance_credits = false.into();
 
     Ok(())
 }
@@ -834,37 +838,31 @@ pub fn process_instruction(
     input: &[u8],
 ) -> ProgramResult {
     match decode_instruction_type(input)? {
-        ConfidentialTokenInstruction::ConfigureMint => {
+        ZkTokenInstruction::ConfigureMint => {
             msg!("ConfigureMint!");
-            let auditor_pk =
-                decode_optional_instruction_data::<ConfigureMintInstructionData>(input)?
-                    .map(|d| &d.auditor_pk);
-            process_configure_mint(accounts, auditor_pk)
+            process_configure_mint(accounts, decode_instruction_data::<state::Auditor>(input)?)
         }
-        ConfidentialTokenInstruction::UpdateAuditor => {
+        ZkTokenInstruction::UpdateAuditor => {
             msg!("UpdateAuditor");
-            let new_auditor_pk =
-                decode_optional_instruction_data::<UpdateAuditorInstructionData>(input)?
-                    .map(|d| &d.new_auditor_pk);
-            process_update_auditor(accounts, new_auditor_pk)
+            process_update_auditor(accounts, decode_instruction_data::<state::Auditor>(input)?)
         }
-        ConfidentialTokenInstruction::ConfigureAccount => {
+        ZkTokenInstruction::ConfigureAccount => {
             msg!("ConfigureAccount");
             process_configure_account(
                 accounts,
                 decode_instruction_data::<ConfigureAccountInstructionData>(input)?,
             )
         }
-        ConfidentialTokenInstruction::CloseAccount => {
+        ZkTokenInstruction::CloseAccount => {
             msg!("CloseAccount");
             process_close_account(accounts)
         }
-        ConfidentialTokenInstruction::Deposit => {
+        ZkTokenInstruction::Deposit => {
             msg!("Deposit");
             let data = decode_instruction_data::<DepositInstructionData>(input)?;
             process_deposit(accounts, data.amount.into(), data.decimals)
         }
-        ConfidentialTokenInstruction::Withdraw => {
+        ZkTokenInstruction::Withdraw => {
             msg!("Withdraw");
             let data = decode_instruction_data::<WithdrawInstructionData>(input)?;
             process_withdraw(
@@ -874,12 +872,12 @@ pub fn process_instruction(
                 data.new_decryptable_available_balance,
             )
         }
-        ConfidentialTokenInstruction::Transfer => {
+        ZkTokenInstruction::Transfer => {
             msg!("Transfer");
             let data = decode_instruction_data::<TransferInstructionData>(input)?;
             process_transfer(accounts, data.new_source_decryptable_available_balance)
         }
-        ConfidentialTokenInstruction::ApplyPendingBalance => {
+        ZkTokenInstruction::ApplyPendingBalance => {
             msg!("ApplyPendingBalance");
 
             let data = decode_instruction_data::<ApplyPendingBalanceData>(input)?;
@@ -890,13 +888,13 @@ pub fn process_instruction(
                 data.new_decryptable_available_balance,
             )
         }
-        ConfidentialTokenInstruction::DisableBalanceCredits => {
+        ZkTokenInstruction::DisableBalanceCredits => {
             msg!("DisableBalanceCredits");
-            process_allow_reject_pending_balance_credits(accounts, false)
+            process_disable_balance_credits(accounts)
         }
-        ConfidentialTokenInstruction::AllowBalanceCredits => {
-            msg!("AllowBalanceCredits");
-            process_allow_reject_pending_balance_credits(accounts, true)
+        ZkTokenInstruction::EnableBalanceCredits => {
+            msg!("EnableBalanceCredits");
+            process_enable_balance_credits(accounts)
         }
     }
 }

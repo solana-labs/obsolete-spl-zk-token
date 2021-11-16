@@ -35,11 +35,17 @@ fn get_zk_token_auditor(
     rpc_client: &RpcClient,
     token_mint: &Pubkey,
 ) -> client_error::Result<ElGamalPubkey> {
-    let zk_auditor = spl_zk_token::get_auditor_address(token_mint);
+    let zk_auditor = spl_zk_token::get_zk_mint_address(token_mint);
     let account = rpc_client.get_account(&zk_auditor)?;
 
-    spl_zk_token::state::Auditor::from_bytes(&account.data)
-        .map(|auditor| auditor.elgamal_pk.try_into().expect("valid elgamal_pk"))
+    spl_zk_token::state::ZkMint::from_bytes(&account.data)
+        .map(|zk_mint| {
+            zk_mint
+                .auditor
+                .auditor_pk
+                .try_into()
+                .expect("valid auditor_pk")
+        })
         .ok_or_else(|| client_error::ClientError {
             request: None,
             kind: client_error::ClientErrorKind::Custom(format!(
@@ -52,10 +58,10 @@ fn get_zk_token_auditor(
 fn get_zk_token_state(
     rpc_client: &RpcClient,
     zk_token_account: &Pubkey,
-) -> client_error::Result<spl_zk_token::state::ConfidentialAccount> {
+) -> client_error::Result<spl_zk_token::state::ZkAccount> {
     let account = rpc_client.get_account(zk_token_account)?;
 
-    spl_zk_token::state::ConfidentialAccount::from_bytes(&account.data)
+    spl_zk_token::state::ZkAccount::from_bytes(&account.data)
         .cloned()
         .ok_or_else(|| client_error::ClientError {
             request: None,
@@ -123,10 +129,8 @@ fn process_demo(
         secret: elgamal_sk_a,
     } = ElGamalKeypair::default();
 
-    let zk_token_account_a = spl_zk_token::get_confidential_token_address(
-        &token_mint.pubkey(),
-        &token_account_a.pubkey(),
-    );
+    let zk_token_account_a =
+        spl_zk_token::get_zk_token_address(&token_mint.pubkey(), &token_account_a.pubkey());
 
     let aes_key_a = AesKey::new(&token_account_a, &zk_token_account_a).unwrap();
 
@@ -135,10 +139,8 @@ fn process_demo(
         public: elgamal_pk_b,
         secret: elgamal_sk_b,
     } = ElGamalKeypair::default();
-    let zk_token_account_b = spl_zk_token::get_confidential_token_address(
-        &token_mint.pubkey(),
-        &token_account_b.pubkey(),
-    );
+    let zk_token_account_b =
+        spl_zk_token::get_zk_token_address(&token_mint.pubkey(), &token_account_b.pubkey());
 
     let aes_key_b = AesKey::new(&token_account_b, &zk_token_account_b).unwrap();
 
@@ -171,12 +173,13 @@ fn process_demo(
                 None,
                 &[],
                 None,
+                None,
             ),
         ],
         &[payer, &token_mint],
     )?;
 
-    let auditor_elgamal_pk = get_zk_token_auditor(rpc_client, &token_mint.pubkey())?;
+    let auditor_pk = get_zk_token_auditor(rpc_client, &token_mint.pubkey())?;
     let mint_amount = 100;
     let omnibus_token_account = spl_zk_token::get_omnibus_token_address(&token_mint.pubkey());
 
@@ -217,10 +220,8 @@ fn process_demo(
             &[payer, token_account, payer],
         )?;
 
-        let zk_token_account = spl_zk_token::get_confidential_token_address(
-            &token_mint.pubkey(),
-            &token_account.pubkey(),
-        );
+        let zk_token_account =
+            spl_zk_token::get_zk_token_address(&token_mint.pubkey(), &token_account.pubkey());
 
         // encrypt zero using AES
         let aes_ciphertext = aes_key.encrypt(0_u64);
@@ -244,10 +245,14 @@ fn process_demo(
         )?;
         send(
             rpc_client,
-            &format!("Activating confidential token account {}", zk_token_account),
-            &spl_zk_token::instruction::allow_balance_credits(
+            &format!(
+                "Enabling credits on confidential token account {}",
+                zk_token_account
+            ),
+            &spl_zk_token::instruction::enable_balance_credits(
                 zk_token_account,
                 token_account.pubkey(),
+                &token_mint.pubkey(),
                 payer.pubkey(),
                 &[],
             ),
@@ -343,7 +348,7 @@ fn process_demo(
         elgamal_pk_a,
         &elgamal_sk_a,
         elgamal_pk_b,
-        auditor_elgamal_pk,
+        auditor_pk,
     );
 
     // Extract transfer amount from `transfer_data` and demonstrate decrypting using
