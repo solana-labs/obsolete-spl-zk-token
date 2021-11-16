@@ -242,6 +242,17 @@ fn process_demo(
             ),
             &[payer],
         )?;
+        send(
+            rpc_client,
+            &format!("Activating confidential token account {}", zk_token_account),
+            &spl_zk_token::instruction::allow_balance_credits(
+                zk_token_account,
+                token_account.pubkey(),
+                payer.pubkey(),
+                &[],
+            ),
+            &[payer],
+        )?;
 
         assert_eq!(
             rpc_client

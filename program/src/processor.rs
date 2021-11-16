@@ -416,7 +416,6 @@ fn process_configure_account(
     confidential_account.mint = token_account.mint;
     confidential_account.token_account = *token_account_info.key;
     confidential_account.elgamal_pk = data.elgamal_pk;
-    confidential_account.allow_pending_balance_credits = true.into();
 
     /*
         An ElGamal ciphertext is of the form
@@ -519,7 +518,7 @@ fn process_deposit(accounts: &[AccountInfo], amount: u64, decimals: u8) -> Progr
         return Err(ProgramError::InvalidAccountData);
     }
 
-    if !bool::from(&confidential_account.allow_pending_balance_credits) {
+    if !bool::from(&confidential_account.allow_balance_credits) {
         msg!("Error: deposit instruction disabled");
         return Err(ProgramError::InvalidArgument);
     }
@@ -693,7 +692,7 @@ fn process_transfer(
         return Err(ProgramError::InvalidAccountData);
     }
 
-    if !bool::from(&receiver_confidential_account.allow_pending_balance_credits) {
+    if !bool::from(&receiver_confidential_account.allow_balance_credits) {
         msg!("Error: transfer instruction disabled");
         return Err(ProgramError::InvalidArgument);
     }
@@ -806,10 +805,10 @@ fn process_apply_pending_balance(
     Ok(())
 }
 
-/// Processes an [AllowPendingBalanceCredits] or [RejectPendingBalanceCredits] instruction.
+/// Processes an [AllowBalanceCredits] or [DisableBalanceCredits] instruction.
 fn process_allow_reject_pending_balance_credits(
     accounts: &[AccountInfo],
-    allow_pending_balance_credits: bool,
+    allow_balance_credits: bool,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
@@ -824,9 +823,7 @@ fn process_allow_reject_pending_balance_credits(
         account_info_iter.as_slice(),
     )?;
 
-    confidential_account
-        .into_mut()
-        .allow_pending_balance_credits = allow_pending_balance_credits.into();
+    confidential_account.into_mut().allow_balance_credits = allow_balance_credits.into();
 
     Ok(())
 }
@@ -893,12 +890,12 @@ pub fn process_instruction(
                 data.new_decryptable_available_balance,
             )
         }
-        ConfidentialTokenInstruction::RejectPendingBalanceCredits => {
-            msg!("RejectPendingBalanceCredits");
+        ConfidentialTokenInstruction::DisableBalanceCredits => {
+            msg!("DisableBalanceCredits");
             process_allow_reject_pending_balance_credits(accounts, false)
         }
-        ConfidentialTokenInstruction::AllowPendingBalanceCredits => {
-            msg!("AllowPendingBalanceCredits");
+        ConfidentialTokenInstruction::AllowBalanceCredits => {
+            msg!("AllowBalanceCredits");
             process_allow_reject_pending_balance_credits(accounts, true)
         }
     }

@@ -142,6 +142,9 @@ pub enum ConfidentialTokenInstruction {
     ///
     /// The instruction fails if the confidential token account already exists.
     ///
+    /// Deposits and transfers are disabled by default, use the `AllowBalanceCredits` instruction
+    /// to enable them.
+    ///
     /// Accounts expected by this instruction:
     ///
     ///   0. `[writeable,signer]` Funding account for rent (must be a system account)
@@ -161,8 +164,7 @@ pub enum ConfidentialTokenInstruction {
 
     /// Close a confidential token account by transferring all lamports it holds to the reclaim
     /// account. The account must not hold any confidential tokens in its pending or available
-    /// balances. Use `RejectPendingBalanceCredits` to block pending balance credits first if
-    /// necessary.
+    /// balances. Use `DisableBalanceCredits` to block balance credits first if necessary.
     ///
     ///   0. `[writable]` The confidential token account to close
     ///   1. `[]` Corresponding SPL Token account
@@ -275,22 +277,6 @@ pub enum ConfidentialTokenInstruction {
     ///
     ApplyPendingBalance,
 
-    /// Reject `Deposit` and `Transfer` instructions for the given confidential token account.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   0. `[writable]` The confidential token account
-    ///   1. `[]` The corresponding SPL Token account
-    ///   2. `[signer]` The single account owner
-    /// or:
-    ///   2. `[]` The multisig account owner
-    ///   3.. `[signer]` Required M signer accounts for the SPL Token Multisig account
-    ///
-    /// Data expected by this instruction:
-    ///   None
-    ///
-    RejectPendingBalanceCredits,
-
     /// Allow `Deposit` and `Transfer` instructions for the given confidential token account.
     ///
     /// Accounts expected by this instruction:
@@ -305,7 +291,23 @@ pub enum ConfidentialTokenInstruction {
     /// Data expected by this instruction:
     ///   None
     ///
-    AllowPendingBalanceCredits,
+    AllowBalanceCredits,
+
+    /// Reject `Deposit` and `Transfer` instructions for the given confidential token account.
+    ///
+    /// Accounts expected by this instruction:
+    ///
+    ///   0. `[writable]` The confidential token account
+    ///   1. `[]` The corresponding SPL Token account
+    ///   2. `[signer]` The single account owner
+    /// or:
+    ///   2. `[]` The multisig account owner
+    ///   3.. `[signer]` Required M signer accounts for the SPL Token Multisig account
+    ///
+    /// Data expected by this instruction:
+    ///   None
+    ///
+    DisableBalanceCredits,
 }
 
 pub fn decode_instruction_type(input: &[u8]) -> Result<ConfidentialTokenInstruction, ProgramError> {
@@ -460,6 +462,56 @@ pub fn configure_account(
             elgamal_pk: elgamal_pk.into(),
             decryptable_zero_balance: decryptable_zero_balance.into(),
         },
+    )]
+}
+
+/// Create a `AllowBalanceCredits` instruction
+#[cfg(not(target_arch = "bpf"))]
+pub fn allow_balance_credits(
+    zk_token_account: Pubkey,
+    token_account: Pubkey,
+    authority: Pubkey,
+    multisig_signers: &[&Pubkey],
+) -> Vec<Instruction> {
+    let mut accounts = vec![
+        AccountMeta::new(zk_token_account, false),
+        AccountMeta::new_readonly(token_account, false),
+        AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
+    ];
+
+    for multisig_signer in multisig_signers.iter() {
+        accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
+    }
+
+    vec![encode_instruction(
+        accounts,
+        ConfidentialTokenInstruction::AllowBalanceCredits,
+        &(),
+    )]
+}
+
+/// Create a `DisableBalanceCredits` instruction
+#[cfg(not(target_arch = "bpf"))]
+pub fn disable_balance_credits(
+    zk_token_account: Pubkey,
+    token_account: Pubkey,
+    authority: Pubkey,
+    multisig_signers: &[&Pubkey],
+) -> Vec<Instruction> {
+    let mut accounts = vec![
+        AccountMeta::new(zk_token_account, false),
+        AccountMeta::new_readonly(token_account, false),
+        AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
+    ];
+
+    for multisig_signer in multisig_signers.iter() {
+        accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
+    }
+
+    vec![encode_instruction(
+        accounts,
+        ConfidentialTokenInstruction::DisableBalanceCredits,
+        &(),
     )]
 }
 
