@@ -283,10 +283,11 @@ pub enum ConfidentialTokenInstruction {
     ///
     ///   0. `[writable]` The confidential token account
     ///   1. `[]` The corresponding SPL Token account
-    ///   2. `[signer]` The single account owner
+    ///   2. `[]` The Auditor account, computed by `get_auditor_address()`
+    ///   3. `[signer]` The single account owner
     /// or:
-    ///   2. `[]` The multisig account owner
-    ///   3.. `[signer]` Required M signer accounts for the SPL Token Multisig account
+    ///   3. `[]` The multisig account owner
+    ///   4.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     /// Data expected by this instruction:
     ///   None
@@ -354,19 +355,16 @@ pub(crate) fn encode_instruction<T: Pod>(
 #[cfg(not(target_arch = "bpf"))]
 pub fn configure_mint(
     funding_address: Pubkey,
-    token_mint_address: Pubkey,
+    mint: Pubkey,
     freeze_authority: Option<Pubkey>,
     freeze_authority_multisig_signers: &[&Pubkey],
     auditor_pk: Option<ElGamalPubkey>,
 ) -> Instruction {
-    let omnibus_token_address = get_omnibus_token_address(&token_mint_address);
-    let auditor_address = get_auditor_address(&token_mint_address);
-
     let mut accounts = vec![
         AccountMeta::new(funding_address, true),
-        AccountMeta::new_readonly(token_mint_address, false),
-        AccountMeta::new(omnibus_token_address, false),
-        AccountMeta::new(auditor_address, false),
+        AccountMeta::new_readonly(mint, false),
+        AccountMeta::new(get_omnibus_token_address(&mint), false),
+        AccountMeta::new(get_auditor_address(&mint), false),
         AccountMeta::new_readonly(solana_program::system_program::id(), false),
         AccountMeta::new_readonly(spl_token::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
@@ -398,16 +396,14 @@ pub fn configure_mint(
 /// Create an `UpdateAuditor` instruction
 #[cfg(not(target_arch = "bpf"))]
 pub fn update_auditor(
-    token_mint_address: Pubkey,
+    mint: Pubkey,
     freeze_authority: Pubkey,
     freeze_authority_multisig_signers: &[&Pubkey],
     auditor_pk: Option<ElGamalPubkey>,
 ) -> Instruction {
-    let auditor_address = get_auditor_address(&token_mint_address);
-
     let mut accounts = vec![
-        AccountMeta::new(auditor_address, false),
-        AccountMeta::new_readonly(token_mint_address, false),
+        AccountMeta::new(get_auditor_address(&mint), false),
+        AccountMeta::new_readonly(mint, false),
         AccountMeta::new(
             freeze_authority,
             freeze_authority_multisig_signers.is_empty(),
@@ -470,12 +466,14 @@ pub fn configure_account(
 pub fn allow_balance_credits(
     zk_token_account: Pubkey,
     token_account: Pubkey,
+    mint: &Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
 ) -> Vec<Instruction> {
     let mut accounts = vec![
         AccountMeta::new(zk_token_account, false),
         AccountMeta::new_readonly(token_account, false),
+        AccountMeta::new_readonly(get_auditor_address(mint), false),
         AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
     ];
 
@@ -691,7 +689,7 @@ pub fn inner_transfer(
         AccountMeta::new_readonly(source_token_account, false),
         AccountMeta::new(destination_zk_token_account, false),
         AccountMeta::new_readonly(destination_token_account, false),
-        AccountMeta::new(get_auditor_address(mint), false),
+        AccountMeta::new_readonly(get_auditor_address(mint), false),
         AccountMeta::new_readonly(sysvar::instructions::id(), false),
         AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
     ];
