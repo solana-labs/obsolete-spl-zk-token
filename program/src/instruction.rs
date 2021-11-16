@@ -20,20 +20,6 @@ use {
 pub use spl_zk_token_sdk::zk_token_proof_instruction::*;
 
 #[derive(Clone, Copy, Pod, Zeroable)]
-#[repr(transparent)]
-pub struct ConfigureMintInstructionData {
-    /// The `auditor` public key.
-    pub auditor_pk: pod::ElGamalPubkey,
-}
-
-#[derive(Clone, Copy, Pod, Zeroable)]
-#[repr(transparent)]
-pub struct UpdateAuditorInstructionData {
-    /// The new `auditor` public key.
-    pub new_auditor_pk: pod::ElGamalPubkey,
-}
-
-#[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct ConfigureAccountInstructionData {
     /// The public key associated with the account
@@ -47,7 +33,7 @@ pub struct ConfigureAccountInstructionData {
 pub struct DepositInstructionData {
     /// The amount of tokens to deposit
     pub amount: PodU64,
-    /// Expected number of base 10 digits to the right of the decimal place.
+    /// Expected number of base 10 digits to the right of the decimal place
     pub decimals: u8,
 }
 
@@ -56,7 +42,7 @@ pub struct DepositInstructionData {
 pub struct WithdrawInstructionData {
     /// The amount of tokens to withdraw
     pub amount: PodU64,
-    /// Expected number of base 10 digits to the right of the decimal place.
+    /// Expected number of base 10 digits to the right of the decimal place
     pub decimals: u8,
     /// The new decryptable balance if the withrawal succeeds
     pub new_decryptable_available_balance: pod::AesCiphertext,
@@ -81,13 +67,13 @@ pub struct ApplyPendingBalanceData {
 
 #[derive(Clone, Copy, Debug, FromPrimitive, ToPrimitive)]
 #[repr(u8)]
-pub enum ConfidentialTokenInstruction {
+pub enum ZkTokenInstruction {
     /// Configures confidential transfers for a given SPL Token mint
     ///
     /// This instruction:
     /// * Creates the omnibus account that will be used to store all SPL Tokens deposited into the
-    ///   confidential accounts this mint.
-    /// * Creates the Auditor account.
+    ///   confidential accounts for this mint.
+    /// * Creates the confidential mint
     ///
     /// If the SPL Token has a freeze authority configured, the freeze authority must be a signer
     /// and an auditor may be optionally configured.  Otherwise this instruction requires
@@ -100,38 +86,37 @@ pub enum ConfidentialTokenInstruction {
     ///   0. `[writeable,signer]` Funding account (must be a system account)
     ///   1. `[]` The SPL Token mint account to enable confidential transfers on
     ///   2. `[writable]` The omnibus SPL Token account to create, computed by `get_omnibus_token_address()`
-    ///   3. `[writable]` The Auditor account to create, computed by `get_auditor_address()`
+    ///   3. `[writable]` The confidential mint to create, computed by `get_zk_mint_address()`
     ///   4. `[]` System program
     ///   5. `[]` SPL Token program
     ///   6. `[]` Rent sysvar (remove once https://github.com/solana-labs/solana-program-library/pull/2282 is deployed)
     ///   7. `[signer]` (optional) The single SPL Token mint freeze authority if not `None`
     /// or:
-    ///   7. `[]` (optiona) The multisig SPL Token freeze authority if not `None`
-    ///   8.. `[signer]` (optiona) Required M signer accounts for the SPL Token Multisig account
+    ///   7. `[]` (optional) The multisig SPL Token freeze authority if not `None`
+    ///   8.. `[signer]` (optional) Required M signer accounts for the SPL Token Multisig account
     ///
     //
     /// Data expected by this instruction:
-    ///   `ConfigureMintInstructionData` (optional) if not provided then the auditor is
-    ///   permanently disabled for this SPL Token mint.
-    ///   A auditor may only be specified when the mint freeze authority if not `None`
+    ///   `state::Auditor` (optional) auditor details may only be specified when the SPL Token mint
+    ///   freeze authority is not `None`
     ///
     ConfigureMint,
 
     /// Updates the auditor ElGamal public key.
-    /// This instruction fails if an auditor is currently `None` for this Token mint.
+    /// This instruction fails if the SPL Token mint freeze authority is `None` or if the auditor
+    /// has been disabled.
     ///
     /// Accounts expected by this instruction:
     ///
-    ///   0. `[writable]` The Auditor account, computed by `get_auditor_address()`
-    ///   1. `[]` The SPL Token mint account
+    ///   0. `[writable]` The confidential mint, computed by `get_zk_mint_address()`
+    ///   1. `[]` The SPL Token mint
     ///   2. `[signer]` The single SPL Token Mint freeze authority
     /// or:
     ///   2. `[]` The multisig SPL Token freeze authority.
     ///   3.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     /// Data expected by this instruction:
-    ///   `UpdateAuditorInstructionData` (optional) if not provided then the auditor is
-    ///   permanently disabled for this SPL Token mint
+    ///   `state::Auditor`
     ///
     UpdateAuditor,
 
@@ -142,13 +127,13 @@ pub enum ConfidentialTokenInstruction {
     ///
     /// The instruction fails if the confidential token account already exists.
     ///
-    /// Deposits and transfers are disabled by default, use the `AllowBalanceCredits` instruction
+    /// Deposits and transfers are disabled by default, use the `EnableBalanceCredits` instruction
     /// to enable them.
     ///
     /// Accounts expected by this instruction:
     ///
     ///   0. `[writeable,signer]` Funding account for rent (must be a system account)
-    ///   1. `[writable]` The new confidential token account to create, as computed by `get_confidential_token_address()`
+    ///   1. `[writable]` The new confidential token account to create, as computed by `get_zk_token_address()`
     ///   2. `[]` Corresponding SPL Token account
     ///   3. `[]` System program
     ///   4. `[]` Rent sysvar (remove once https://github.com/solana-labs/solana-program-library/pull/2282 is deployed)
@@ -238,7 +223,7 @@ pub enum ConfidentialTokenInstruction {
     ///   1. `[]` The source SPL Token account
     ///   2. `[writeable]` The destination confidential token account
     ///   3. `[]` The destination token account
-    ///   4. `[]` The Auditor account, computed by `get_auditor_address()`
+    ///   4. `[]` The confidential mint, computed by `get_zk_mint_address()`
     ///   5. `[]` Instructions sysvar
     ///   6. `[signer]` The single source account owner
     /// or:
@@ -256,10 +241,10 @@ pub enum ConfidentialTokenInstruction {
     /// and/or `Transfer` instructions.
     ///
     /// After submitting `ApplyPendingBalance`, the client should compare
-    /// `ConfidentialAccount::expected_pending_balance_credit_counter` with
-    /// `ConfidentialAccount::actual_applied_pending_balance_instructions`.  If they are equal then the
-    /// `ConfidentialAccount::decryptable_available_balance` is consistent with
-    /// `ConfidentialAccount::available_balance`. If they differ then there is more pending
+    /// `ZkAccount::expected_pending_balance_credit_counter` with
+    /// `ZkAccount::actual_applied_pending_balance_instructions`.  If they are equal then the
+    /// `ZkAccount::decryptable_available_balance` is consistent with
+    /// `ZkAccount::available_balance`. If they differ then there is more pending
     /// balance to be applied.
     ///
     /// Account expected by this instruction:
@@ -277,24 +262,27 @@ pub enum ConfidentialTokenInstruction {
     ///
     ApplyPendingBalance,
 
-    /// Allow `Deposit` and `Transfer` instructions for the given confidential token account.
+    /// Enable `Deposit` and `Transfer` instructions for the given confidential token account.
+    ///
+    /// The required authority for this instruction is conditional on the value of the
+    /// `ZkMint::auditor::enable_balance_credits_authority` field.
     ///
     /// Accounts expected by this instruction:
     ///
     ///   0. `[writable]` The confidential token account
     ///   1. `[]` The corresponding SPL Token account
-    ///   2. `[]` The Auditor account, computed by `get_auditor_address()`
-    ///   3. `[signer]` The single account owner
+    ///   2. `[]` The confidential mint, computed by `get_zk_mint_address()`
+    ///   3. `[signer]` Single authority
     /// or:
-    ///   3. `[]` The multisig account owner
+    ///   3. `[]` Multisig authority
     ///   4.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     /// Data expected by this instruction:
     ///   None
     ///
-    AllowBalanceCredits,
+    EnableBalanceCredits,
 
-    /// Reject `Deposit` and `Transfer` instructions for the given confidential token account.
+    /// Disable `Deposit` and `Transfer` instructions for the given confidential token account.
     ///
     /// Accounts expected by this instruction:
     ///
@@ -311,7 +299,7 @@ pub enum ConfidentialTokenInstruction {
     DisableBalanceCredits,
 }
 
-pub fn decode_instruction_type(input: &[u8]) -> Result<ConfidentialTokenInstruction, ProgramError> {
+pub fn decode_instruction_type(input: &[u8]) -> Result<ZkTokenInstruction, ProgramError> {
     if input.is_empty() {
         Err(ProgramError::InvalidInstructionData)
     } else {
@@ -327,6 +315,7 @@ pub fn decode_instruction_data<T: Pod>(input: &[u8]) -> Result<&T, ProgramError>
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn decode_optional_instruction_data<T: Pod>(
     input: &[u8],
 ) -> Result<Option<&T>, ProgramError> {
@@ -339,7 +328,7 @@ pub(crate) fn decode_optional_instruction_data<T: Pod>(
 
 pub(crate) fn encode_instruction<T: Pod>(
     accounts: Vec<AccountMeta>,
-    instruction_type: ConfidentialTokenInstruction,
+    instruction_type: ZkTokenInstruction,
     instruction_data: &T,
 ) -> Instruction {
     let mut data = vec![ToPrimitive::to_u8(&instruction_type).unwrap()];
@@ -359,12 +348,13 @@ pub fn configure_mint(
     freeze_authority: Option<Pubkey>,
     freeze_authority_multisig_signers: &[&Pubkey],
     auditor_pk: Option<ElGamalPubkey>,
+    enable_balance_credits_authority: Option<Pubkey>,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(funding_address, true),
         AccountMeta::new_readonly(mint, false),
         AccountMeta::new(get_omnibus_token_address(&mint), false),
-        AccountMeta::new(get_auditor_address(&mint), false),
+        AccountMeta::new(get_zk_mint_address(&mint), false),
         AccountMeta::new_readonly(solana_program::system_program::id(), false),
         AccountMeta::new_readonly(spl_token::id(), false),
         AccountMeta::new_readonly(sysvar::rent::id(), false),
@@ -380,17 +370,16 @@ pub fn configure_mint(
         }
     }
 
-    if let Some(auditor_pk) = auditor_pk {
-        encode_instruction(
-            accounts,
-            ConfidentialTokenInstruction::ConfigureMint,
-            &ConfigureMintInstructionData {
-                auditor_pk: auditor_pk.into(),
-            },
-        )
-    } else {
-        encode_instruction(accounts, ConfidentialTokenInstruction::ConfigureMint, &())
-    }
+    let enable_balance_credits_authority = enable_balance_credits_authority.unwrap_or_default();
+    let auditor_pk = auditor_pk.unwrap_or_default();
+    encode_instruction(
+        accounts,
+        ZkTokenInstruction::ConfigureMint,
+        &state::Auditor {
+            enable_balance_credits_authority,
+            auditor_pk: auditor_pk.into(),
+        },
+    )
 }
 
 /// Create an `UpdateAuditor` instruction
@@ -400,9 +389,10 @@ pub fn update_auditor(
     freeze_authority: Pubkey,
     freeze_authority_multisig_signers: &[&Pubkey],
     auditor_pk: Option<ElGamalPubkey>,
+    enable_balance_credits_authority: Option<Pubkey>,
 ) -> Instruction {
     let mut accounts = vec![
-        AccountMeta::new(get_auditor_address(&mint), false),
+        AccountMeta::new(get_zk_mint_address(&mint), false),
         AccountMeta::new_readonly(mint, false),
         AccountMeta::new(
             freeze_authority,
@@ -414,17 +404,16 @@ pub fn update_auditor(
         accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
     }
 
-    if let Some(auditor_pk) = auditor_pk {
-        encode_instruction(
-            accounts,
-            ConfidentialTokenInstruction::UpdateAuditor,
-            &UpdateAuditorInstructionData {
-                new_auditor_pk: auditor_pk.into(),
-            },
-        )
-    } else {
-        encode_instruction(accounts, ConfidentialTokenInstruction::UpdateAuditor, &())
-    }
+    let auditor_pk = auditor_pk.unwrap_or_default();
+    let enable_balance_credits_authority = enable_balance_credits_authority.unwrap_or_default();
+    encode_instruction(
+        accounts,
+        ZkTokenInstruction::UpdateAuditor,
+        &state::Auditor {
+            enable_balance_credits_authority,
+            auditor_pk: auditor_pk.into(),
+        },
+    )
 }
 
 /// Create a `ConfigureAccount` instruction
@@ -453,7 +442,7 @@ pub fn configure_account(
 
     vec![encode_instruction(
         accounts,
-        ConfidentialTokenInstruction::ConfigureAccount,
+        ZkTokenInstruction::ConfigureAccount,
         &ConfigureAccountInstructionData {
             elgamal_pk: elgamal_pk.into(),
             decryptable_zero_balance: decryptable_zero_balance.into(),
@@ -461,9 +450,9 @@ pub fn configure_account(
     )]
 }
 
-/// Create a `AllowBalanceCredits` instruction
+/// Create a `EnableBalanceCredits` instruction
 #[cfg(not(target_arch = "bpf"))]
-pub fn allow_balance_credits(
+pub fn enable_balance_credits(
     zk_token_account: Pubkey,
     token_account: Pubkey,
     mint: &Pubkey,
@@ -473,7 +462,7 @@ pub fn allow_balance_credits(
     let mut accounts = vec![
         AccountMeta::new(zk_token_account, false),
         AccountMeta::new_readonly(token_account, false),
-        AccountMeta::new_readonly(get_auditor_address(mint), false),
+        AccountMeta::new_readonly(get_zk_mint_address(mint), false),
         AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
     ];
 
@@ -483,7 +472,7 @@ pub fn allow_balance_credits(
 
     vec![encode_instruction(
         accounts,
-        ConfidentialTokenInstruction::AllowBalanceCredits,
+        ZkTokenInstruction::EnableBalanceCredits,
         &(),
     )]
 }
@@ -508,7 +497,7 @@ pub fn disable_balance_credits(
 
     vec![encode_instruction(
         accounts,
-        ConfidentialTokenInstruction::DisableBalanceCredits,
+        ZkTokenInstruction::DisableBalanceCredits,
         &(),
     )]
 }
@@ -536,7 +525,7 @@ pub fn inner_close_account(
         accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
     }
 
-    encode_instruction(accounts, ConfidentialTokenInstruction::CloseAccount, &())
+    encode_instruction(accounts, ZkTokenInstruction::CloseAccount, &())
 }
 
 /// Create a `CloseAccount` instruction
@@ -588,7 +577,7 @@ pub fn deposit(
 
     vec![encode_instruction(
         accounts,
-        ConfidentialTokenInstruction::Deposit,
+        ZkTokenInstruction::Deposit,
         &DepositInstructionData {
             amount: amount.into(),
             decimals,
@@ -629,7 +618,7 @@ pub fn inner_withdraw(
 
     encode_instruction(
         accounts,
-        ConfidentialTokenInstruction::Withdraw,
+        ZkTokenInstruction::Withdraw,
         &WithdrawInstructionData {
             amount: amount.into(),
             decimals,
@@ -689,7 +678,7 @@ pub fn inner_transfer(
         AccountMeta::new_readonly(source_token_account, false),
         AccountMeta::new(destination_zk_token_account, false),
         AccountMeta::new_readonly(destination_token_account, false),
-        AccountMeta::new_readonly(get_auditor_address(mint), false),
+        AccountMeta::new_readonly(get_zk_mint_address(mint), false),
         AccountMeta::new_readonly(sysvar::instructions::id(), false),
         AccountMeta::new_readonly(authority, multisig_signers.is_empty()),
     ];
@@ -700,7 +689,7 @@ pub fn inner_transfer(
 
     encode_instruction(
         accounts,
-        ConfidentialTokenInstruction::Transfer,
+        ZkTokenInstruction::Transfer,
         &TransferInstructionData {
             new_source_decryptable_available_balance,
         },
@@ -760,7 +749,7 @@ pub fn inner_apply_pending_balance(
 
     encode_instruction(
         accounts,
-        ConfidentialTokenInstruction::ApplyPendingBalance,
+        ZkTokenInstruction::ApplyPendingBalance,
         &ApplyPendingBalanceData {
             expected_pending_balance_credit_counter: expected_pending_balance_credit_counter.into(),
             new_decryptable_available_balance,
