@@ -347,8 +347,7 @@ pub fn configure_mint(
     mint: Pubkey,
     freeze_authority: Option<Pubkey>,
     freeze_authority_multisig_signers: &[&Pubkey],
-    auditor_pk: Option<ElGamalPubkey>,
-    enable_balance_credits_authority: Option<Pubkey>,
+    auditor: Option<state::Auditor>,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(funding_address, true),
@@ -370,16 +369,9 @@ pub fn configure_mint(
         }
     }
 
-    let enable_balance_credits_authority = enable_balance_credits_authority.unwrap_or_default();
-    let auditor_pk = auditor_pk.unwrap_or_default();
-    encode_instruction(
-        accounts,
-        ZkTokenInstruction::ConfigureMint,
-        &state::Auditor {
-            enable_balance_credits_authority,
-            auditor_pk: auditor_pk.into(),
-        },
-    )
+    //let auditor = auditor.unwrap_or_else(|| state::Auditor::zeroed());
+    let auditor = auditor.unwrap_or_else(state::Auditor::zeroed);
+    encode_instruction(accounts, ZkTokenInstruction::ConfigureMint, &auditor)
 }
 
 /// Create an `UpdateAuditor` instruction

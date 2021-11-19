@@ -173,7 +173,6 @@ fn process_demo(
                 None,
                 &[],
                 None,
-                None,
             ),
         ],
         &[payer, &token_mint],

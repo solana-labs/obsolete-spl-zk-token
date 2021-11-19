@@ -8,7 +8,7 @@ use {
         signature::{Keypair, Signer},
         transaction::Transaction,
     },
-    spl_zk_token::{self, pod::*, *},
+    spl_zk_token::{self, pod::*, state::Auditor, *},
     spl_zk_token_sdk::encryption::{
         aes::AesCiphertext,
         elgamal::{ElGamalCiphertext, ElGamalKeypair, ElGamalPubkey},
@@ -155,7 +155,7 @@ fn add_zk_mint_account(
 
     let zk_mint_state = spl_zk_token::state::ZkMint {
         mint,
-        auditor: spl_zk_token::state::Auditor {
+        auditor: Auditor {
             enable_balance_credits_authority: Pubkey::default(),
             auditor_pk: elgamal_pk.unwrap_or_default().into(),
         },
@@ -284,7 +284,10 @@ async fn test_configure_mint() {
             mint,
             Some(freeze_authority.pubkey()),
             &[],
-            Some(auditor_pk.into()),
+            Some(Auditor {
+                auditor_pk: auditor_pk.into(),
+                enable_balance_credits_authority: Pubkey::default(),
+            }),
         )],
         Some(&payer.pubkey()),
     );
