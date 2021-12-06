@@ -24,7 +24,7 @@ impl PodAccountInfo<'_, '_> for ZkMint {}
 #[repr(C)]
 pub struct Auditor {
     /// * If not Pubkey::default(), this authority must be provided to the `EnableBalanceCredits`
-    /// instruction and effectively provides central control over who may the corresponding
+    /// instruction and effectively provides central control over who may enable the corresponding
     /// confidential token.
     ///
     /// * If Pubkey::default(), the token account owner must be provided to the
