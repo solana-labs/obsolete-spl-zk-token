@@ -124,10 +124,8 @@ fn process_demo(
     let token_mint = Keypair::new();
 
     let token_account_a = Keypair::new();
-    let ElGamalKeypair {
-        public: elgamal_pk_a,
-        secret: elgamal_sk_a,
-    } = ElGamalKeypair::default();
+    let elgamal_keypair_a = ElGamalKeypair::default();
+    let elgamal_pk_a = elgamal_keypair_a.public;
 
     let zk_token_account_a =
         spl_zk_token::get_zk_token_address(&token_mint.pubkey(), &token_account_a.pubkey());
@@ -345,7 +343,7 @@ fn process_demo(
         current_balance_a,
         available_balance_ct_a,
         elgamal_pk_a,
-        &elgamal_sk_a,
+        &elgamal_keypair_a.secret,
         elgamal_pk_b,
         auditor_pk,
     );
@@ -354,7 +352,10 @@ fn process_demo(
     // `elgamal_sk_a` and `elgamal_sk_b`
     assert_eq!(
         transfer_proof_data
-            .decrypt_amount(spl_zk_token::instruction::Role::Source, &elgamal_sk_a,)
+            .decrypt_amount(
+                spl_zk_token::instruction::Role::Source,
+                &elgamal_keypair_a.secret,
+            )
             .unwrap() as u64,
         mint_amount,
     );
@@ -485,8 +486,10 @@ fn process_demo(
     );
 
     // Close account A
-    let close_account_proof_data =
-        spl_zk_token::instruction::CloseAccountData::new(&elgamal_sk_a, available_balance_ct_a);
+    let close_account_proof_data = spl_zk_token::instruction::CloseAccountData::new(
+        &elgamal_keypair_a,
+        available_balance_ct_a,
+    );
 
     send(
         rpc_client,

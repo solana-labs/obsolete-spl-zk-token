@@ -373,10 +373,9 @@ async fn test_configure_account() {
 async fn test_close_account() {
     let owner = Keypair::new();
     let reclaim_account = Keypair::new();
-    let ElGamalKeypair {
-        public: elgamal_pk,
-        secret: elgamal_sk,
-    } = ElGamalKeypair::default();
+
+    let elgamal_keypair = ElGamalKeypair::default();
+    let elgamal_pk = elgamal_keypair.public;
 
     let mut program_test = program_test();
 
@@ -395,7 +394,7 @@ async fn test_close_account() {
 
     let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
     let data =
-        spl_zk_token::instruction::CloseAccountData::new(&elgamal_sk, zk_available_balance_ct);
+        spl_zk_token::instruction::CloseAccountData::new(&elgamal_keypair, zk_available_balance_ct);
 
     let mut transaction = Transaction::new_with_payer(
         &spl_zk_token::instruction::close_account(
