@@ -361,7 +361,10 @@ fn process_demo(
 
     assert_eq!(
         transfer_proof_data
-            .decrypt_amount(spl_zk_token::instruction::Role::Dest, &elgamal_keypair_b.secret,)
+            .decrypt_amount(
+                spl_zk_token::instruction::Role::Dest,
+                &elgamal_keypair_b.secret,
+            )
             .unwrap() as u64,
         mint_amount,
     );
