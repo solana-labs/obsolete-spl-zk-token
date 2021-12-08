@@ -133,10 +133,9 @@ fn process_demo(
     let aes_key_a = AesKey::new(&token_account_a, &zk_token_account_a).unwrap();
 
     let token_account_b = Keypair::new();
-    let ElGamalKeypair {
-        public: elgamal_pk_b,
-        secret: elgamal_sk_b,
-    } = ElGamalKeypair::default();
+    let elgamal_keypair_b = ElGamalKeypair::default();
+    let elgamal_pk_b = elgamal_keypair_b.public;
+
     let zk_token_account_b =
         spl_zk_token::get_zk_token_address(&token_mint.pubkey(), &token_account_b.pubkey());
 
@@ -362,7 +361,7 @@ fn process_demo(
 
     assert_eq!(
         transfer_proof_data
-            .decrypt_amount(spl_zk_token::instruction::Role::Dest, &elgamal_sk_b,)
+            .decrypt_amount(spl_zk_token::instruction::Role::Dest, &elgamal_keypair_b.secret,)
             .unwrap() as u64,
         mint_amount,
     );
@@ -442,8 +441,7 @@ fn process_demo(
             aes_key_b.encrypt(0_u64),
             &spl_zk_token::instruction::WithdrawData::new(
                 current_balance_b,
-                elgamal_pk_a,
-                &elgamal_sk_b,
+                &elgamal_keypair_b,
                 current_balance_b,
                 available_balance_ct_b,
             ),
