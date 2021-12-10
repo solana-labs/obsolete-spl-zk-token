@@ -639,8 +639,7 @@ async fn test_transfer() {
         transfer_amount,
         src_zk_available_balance,
         src_zk_available_balance_ct,
-        src_elgamal.public,
-        &src_elgamal.secret,
+        &src_elgamal,
         dst_elgamal.public,
         auditor_pk,
     );
@@ -727,8 +726,7 @@ async fn test_transfer_self() {
         transfer_amount,
         zk_available_balance,
         zk_available_balance_ct,
-        elgamal.public,
-        &elgamal.secret,
+        &elgamal,
         elgamal.public,
         auditor_pk,
     );

@@ -341,8 +341,7 @@ fn process_demo(
         mint_amount,
         current_balance_a,
         available_balance_ct_a,
-        elgamal_pk_a,
-        &elgamal_keypair_a.secret,
+        &elgamal_keypair_a,
         elgamal_pk_b,
         auditor_pk,
     );
