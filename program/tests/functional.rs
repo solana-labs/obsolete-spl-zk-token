@@ -10,7 +10,7 @@ use {
     },
     spl_zk_token::{self, pod::*, state::Auditor, *},
     spl_zk_token_sdk::encryption::{
-        aes::AesCiphertext,
+        auth_encryption::AeCiphertext,
         elgamal::{ElGamalCiphertext, ElGamalKeypair, ElGamalPubkey},
     },
 };
@@ -344,7 +344,7 @@ async fn test_configure_account() {
             payer.pubkey(),
             zk_token_account,
             elgamal_pk,
-            AesCiphertext::default(),
+            AeCiphertext::default(),
             token_account,
             owner.pubkey(),
             &[],
@@ -509,7 +509,7 @@ async fn test_deposit() {
             owner.pubkey(),
             &[],
             /*expected_pending_balance_credit_counter=*/ 1,
-            AesCiphertext::default(),
+            AeCiphertext::default(),
         ),
         Some(&payer.pubkey()),
     );
@@ -573,7 +573,7 @@ async fn test_withdraw() {
             &[],
             1,
             DECIMALS,
-            AesCiphertext::default(),
+            AeCiphertext::default(),
             &withdraw_data,
         ),
         Some(&payer.pubkey()),
@@ -652,7 +652,7 @@ async fn test_transfer() {
         &mint,
         owner.pubkey(),
         &[],
-        AesCiphertext::default(),
+        AeCiphertext::default(),
         &transfer_data,
     );
 
@@ -684,7 +684,7 @@ async fn test_transfer() {
             owner.pubkey(),
             &[],
             1,
-            AesCiphertext::default(),
+            AeCiphertext::default(),
         ),
         Some(&payer.pubkey()),
     );
@@ -740,7 +740,7 @@ async fn test_transfer_self() {
             &mint,
             owner.pubkey(),
             &[],
-            AesCiphertext::default(),
+            AeCiphertext::default(),
             &transfer_data,
         ),
         Some(&payer.pubkey()),
