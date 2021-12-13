@@ -550,7 +550,7 @@ fn process_withdraw(
     accounts: &[AccountInfo],
     amount: u64,
     decimals: u8,
-    new_decryptable_available_balance: pod::AesCiphertext,
+    new_decryptable_available_balance: pod::AeCiphertext,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
@@ -634,7 +634,7 @@ fn process_withdraw(
 /// Processes a [Transfer] instruction.
 fn process_transfer(
     accounts: &[AccountInfo],
-    new_source_decryptable_available_balance: pod::AesCiphertext,
+    new_source_decryptable_available_balance: pod::AeCiphertext,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let zk_token_account_info = next_account_info(account_info_iter)?;
@@ -748,7 +748,7 @@ fn process_transfer(
 fn process_apply_pending_balance(
     accounts: &[AccountInfo],
     expected_pending_balance_credit_counter: PodU64,
-    new_decryptable_available_balance: pod::AesCiphertext,
+    new_decryptable_available_balance: pod::AeCiphertext,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 

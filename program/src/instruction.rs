@@ -2,7 +2,7 @@
 //!
 
 #[cfg(not(target_arch = "bpf"))]
-use spl_zk_token_sdk::encryption::{aes::AesCiphertext, elgamal::ElGamalPubkey};
+use spl_zk_token_sdk::encryption::{auth_encryption::AeCiphertext, elgamal::ElGamalPubkey};
 pub use spl_zk_token_sdk::zk_token_proof_instruction::*;
 use {
     crate::{pod::*, *},
@@ -24,7 +24,7 @@ pub struct ConfigureAccountInstructionData {
     /// The public key associated with the account
     pub elgamal_pk: pod::ElGamalPubkey,
     /// The decryptable balance (always 0) once the configure account succeeds
-    pub decryptable_zero_balance: pod::AesCiphertext,
+    pub decryptable_zero_balance: pod::AeCiphertext,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -44,14 +44,14 @@ pub struct WithdrawInstructionData {
     /// Expected number of base 10 digits to the right of the decimal place
     pub decimals: u8,
     /// The new decryptable balance if the withrawal succeeds
-    pub new_decryptable_available_balance: pod::AesCiphertext,
+    pub new_decryptable_available_balance: pod::AeCiphertext,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct TransferInstructionData {
     /// The new source decryptable balance if the transfer succeeds
-    pub new_source_decryptable_available_balance: pod::AesCiphertext,
+    pub new_source_decryptable_available_balance: pod::AeCiphertext,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -61,7 +61,7 @@ pub struct ApplyPendingBalanceData {
     /// `ApplyPendingBalance` instruction
     pub expected_pending_balance_credit_counter: PodU64,
     /// The new decryptable balance if the pending balance is applied successfully
-    pub new_decryptable_available_balance: pod::AesCiphertext,
+    pub new_decryptable_available_balance: pod::AeCiphertext,
 }
 
 #[derive(Clone, Copy, Debug, FromPrimitive, ToPrimitive)]
@@ -413,7 +413,7 @@ pub fn configure_account(
     funding_address: Pubkey,
     zk_token_account: Pubkey,
     elgamal_pk: ElGamalPubkey,
-    decryptable_zero_balance: AesCiphertext,
+    decryptable_zero_balance: AeCiphertext,
     token_account: Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
@@ -590,7 +590,7 @@ pub fn inner_withdraw(
     multisig_signers: &[&Pubkey],
     amount: u64,
     decimals: u8,
-    new_decryptable_available_balance: pod::AesCiphertext,
+    new_decryptable_available_balance: pod::AeCiphertext,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
@@ -630,7 +630,7 @@ pub fn withdraw(
     multisig_signers: &[&Pubkey],
     amount: u64,
     decimals: u8,
-    new_decryptable_available_balance: AesCiphertext,
+    new_decryptable_available_balance: AeCiphertext,
     proof_data: &WithdrawData,
 ) -> Vec<Instruction> {
     vec![
@@ -662,7 +662,7 @@ pub fn inner_transfer(
     mint: &Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
-    new_source_decryptable_available_balance: pod::AesCiphertext,
+    new_source_decryptable_available_balance: pod::AeCiphertext,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
@@ -698,7 +698,7 @@ pub fn transfer(
     mint: &Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
-    new_source_decryptable_available_balance: AesCiphertext,
+    new_source_decryptable_available_balance: AeCiphertext,
     proof_data: &TransferData,
 ) -> Vec<Instruction> {
     vec![
@@ -726,7 +726,7 @@ pub fn inner_apply_pending_balance(
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
     expected_pending_balance_credit_counter: u64,
-    new_decryptable_available_balance: pod::AesCiphertext,
+    new_decryptable_available_balance: pod::AeCiphertext,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(zk_token_account, false),
@@ -756,7 +756,7 @@ pub fn apply_pending_balance(
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
     pending_balance_instructions: u64,
-    new_decryptable_available_balance: AesCiphertext,
+    new_decryptable_available_balance: AeCiphertext,
 ) -> Vec<Instruction> {
     vec![inner_apply_pending_balance(
         zk_token_account,
