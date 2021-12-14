@@ -91,7 +91,7 @@ allow the transfer auditor to observe the transfer amount.
 Once confidential transfers are enabled for a SPL Token mint, a token holder can
 opt in to confidential transfers by executing the
 `ConfidentialTokenInstruction::ConfigureAccount` instruction and providing their
-confidential pubic encryption key.
+confidential public encryption key.
 
 The confidential token account address is a PDA derived from their normal token.
 
