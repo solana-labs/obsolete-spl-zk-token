@@ -102,6 +102,7 @@ fn send(
     let mut transaction =
         Transaction::new_unsigned(Message::new(instructions, Some(&signers[0].pubkey())));
 
+    #[allow(deprecated)]
     let (recent_blockhash, _fee_calculator) = rpc_client
         .get_recent_blockhash()
         .map_err(|err| format!("error: unable to get recent blockhash: {}", err))?;
@@ -617,7 +618,7 @@ mod test {
             .add_program("spl_zk_token", spl_zk_token::id())
             .start();
 
-        let (rpc_client, _recent_blockhash, _fee_calculator) = test_validator.rpc_client();
+        let rpc_client = test_validator.get_rpc_client();
         assert!(matches!(process_demo(&rpc_client, &payer), Ok(_)));
     }
 }
