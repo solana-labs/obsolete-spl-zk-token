@@ -33,6 +33,7 @@ fn get_previous_instruction(
     }
     let instruction_sysvar = instruction_sysvar_account_info.data.borrow();
 
+    #[allow(deprecated)]
     let current_instruction = sysvar::instructions::load_current_index(&instruction_sysvar);
     if current_instruction == 0 {
         return Err(ProgramError::InvalidInstructionData);

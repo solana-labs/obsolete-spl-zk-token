@@ -34,6 +34,7 @@ crates=(
   solana-client
   solana-logger
   solana-program
+  solana-program-runtime
   solana-program-test
   solana-remote-wallet
   solana-sdk
