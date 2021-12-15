@@ -16,9 +16,9 @@ jobs:
     - name: Set env vars
       run: |
         source ci/rust-version.sh
-        echo "RUST_STABLE=$rust_stable" >> $GITHUB_ENV
+        echo "RUST_STABLE=$rust_stable" | tee -a $GITHUB_ENV
         source ci/solana-version.sh
-        echo "SOLANA_VERSION=$solana_version" >> $GITHUB_ENV
+        echo "SOLANA_VERSION=$solana_version" | tee -a $GITHUB_ENV
 
     - if: runner.os == 'Linux'
       run: |
