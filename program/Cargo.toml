@@ -11,6 +11,7 @@ publish = false
 [features]
 no-entrypoint = []
 test-bpf = []
+twoxtx = [] # Enable tests that require 2x transaction size
 
 [dependencies]
 bytemuck = { version = "1.7.2", features = ["derive"] }
