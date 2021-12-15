@@ -1,3 +1,5 @@
+#![allow(unused_imports)] // Remove once the `twoxtx` feature no longer exists
+#![allow(dead_code)] // Remove once the `twoxtx` feature no longer exists
 use {
     bytemuck::Zeroable,
     solana_program::{program_pack::Pack, pubkey::Pubkey},
@@ -369,6 +371,7 @@ async fn test_configure_account() {
     assert_eq!(zk_token_state.allow_balance_credits, false.into());
 }
 
+#[cfg(feature = "twoxtx")]
 #[tokio::test]
 async fn test_close_account() {
     let owner = Keypair::new();
@@ -597,6 +600,7 @@ async fn test_withdraw() {
     );
 }
 
+#[cfg(feature = "twoxtx")]
 #[tokio::test]
 async fn test_transfer() {
     let owner = Keypair::new();
@@ -695,6 +699,7 @@ async fn test_transfer() {
     // TODO: Check balance of dst_zk_token_account
 }
 
+#[cfg(feature = "twoxtx")]
 #[tokio::test]
 async fn test_transfer_self() {
     let owner = Keypair::new();
