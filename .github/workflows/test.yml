@@ -72,9 +72,8 @@ jobs:
     - name: Build
       run: ./ci/cargo-build-test.sh
 
-        # TODO: uncomment once Solana 1.7.13 ships
-        #    - name: Build BPF
-        #      run: ./ci/cargo-test-bpf.sh program
+    - name: Build BPF
+      run: ./ci/cargo-test-bpf.sh program
 
     - name: Upload programs
       uses: actions/upload-artifact@v2

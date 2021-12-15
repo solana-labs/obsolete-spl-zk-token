@@ -435,6 +435,7 @@ async fn test_close_account() {
 
 // Mark this test as BPF-only due to current `ProgramTest` limitations when CPIing into the SPL Token program
 #[cfg(feature = "test-bpf")]
+#[cfg(feature = "twoxtx")]
 #[tokio::test]
 async fn test_deposit() {
     let owner = Keypair::new();
@@ -528,6 +529,7 @@ async fn test_deposit() {
 
 // Mark this test as BPF-only due to current `ProgramTest` limitations when CPIing into the SPL Token program
 #[cfg(feature = "test-bpf")]
+#[cfg(feature = "twoxtx")]
 #[tokio::test]
 async fn test_withdraw() {
     let owner = Keypair::new();
@@ -559,8 +561,7 @@ async fn test_withdraw() {
 
     let withdraw_data = spl_zk_token::instruction::WithdrawData::new(
         1,
-        elgamal.public,
-        &elgamal.secret,
+        &elgamal,
         zk_available_balance,
         zk_available_balance_ct,
     );
