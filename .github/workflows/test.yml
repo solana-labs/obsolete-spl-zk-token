@@ -78,6 +78,6 @@ jobs:
     - name: Upload programs
       uses: actions/upload-artifact@v2
       with:
-        name: token-programs
+        name: spl-zk-token-program
         path: "target/deploy/*.so"
         if-no-files-found: error
