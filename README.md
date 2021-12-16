@@ -15,7 +15,7 @@ to confidential token accounts.
 ### Setup
 A specific fork of the Solana monorepo is required for development:
 ```
-$ git clone git@github.com:mvines/solana.git -b zk_token_stable
+$ git clone git@github.com:mvines/solana.git -b zk_token-v1.9
 ```
 
 Then clone this repository as a subdirectory of the Solana monorepo
