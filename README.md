@@ -8,7 +8,9 @@ freeze authority can optionally enable a feature that allows a global auditor to
 also view all confidential transfer balances, and the freeze authority extends
 to confidential token accounts.
 
-
+The overview of the cryptographic protocol can be found in the work-in-progress
+document [overview](/paper/part1.pdf). The formal cryptographic description of
+the protocol and its security proof are coming soon.
 
 ## Development Environment
 
