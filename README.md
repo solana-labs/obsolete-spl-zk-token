@@ -9,8 +9,8 @@ also view all confidential transfer balances, and the freeze authority extends
 to confidential token accounts.
 
 The overview of the cryptographic protocol can be found in the work-in-progress
-document [overview](/paper/part1.pdf). The formal cryptographic description of
-the protocol and its security proof are coming soon.
+document [overview](/paper/part1.pdf). The formal description of the
+cryptographic protocol and the security proofs are coming soon.
 
 ## Development Environment
 
