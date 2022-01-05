@@ -10,15 +10,15 @@ use {
         signature::{Keypair, Signer},
         transaction::Transaction,
     },
-    spl_zk_token::{self, pod::*, state::Auditor, *},
-    spl_zk_token_sdk::encryption::{
+    solana_zk_token_sdk::encryption::{
         auth_encryption::AeCiphertext,
         elgamal::{ElGamalCiphertext, ElGamalKeypair, ElGamalPubkey},
     },
+    spl_zk_token::{self, pod::*, state::Auditor, *},
 };
 #[cfg(feature = "test-bpf")]
 use {
-    spl_zk_token_sdk::encryption::pedersen::PedersenOpening,
+    solana_zk_token_sdk::encryption::pedersen::PedersenOpening,
     std::{borrow::Borrow, convert::TryInto},
 };
 
@@ -29,25 +29,6 @@ fn program_test() -> ProgramTest {
         processor!(processor::process_instruction),
     )
 }
-
-/*
-fn program_test() -> ProgramTest {
-    use spl_zk_token_sdk::zk_token_proof_program;
-    let mut pc = ProgramTest::new(
-        "spl_zk_token",
-        id(),
-        processor!(processor::process_instruction),
-    );
-
-    pc.add_builtin_program(
-        "spl_zk_token_sdk",
-        zk_token_proof_program::id(),
-        spl_zk_token_proof_program::process_instruction,
-    );
-
-    pc
-}
-*/
 
 const ACCOUNT_RENT_EXEMPTION: u64 = 1_000_000_000; // go with something big to be safe
 const DECIMALS: u8 = 0;

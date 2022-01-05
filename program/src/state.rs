@@ -2,10 +2,10 @@ use {
     crate::pod::*,
     bytemuck::{Pod, Zeroable},
     solana_program::pubkey::Pubkey,
-    spl_zk_token_sdk::zk_token_elgamal::pod,
+    solana_zk_token_sdk::zk_token_elgamal::pod,
 };
 #[cfg(not(target_arch = "bpf"))]
-use {spl_zk_token_sdk::encryption::auth_encryption::AeKey, std::convert::TryInto};
+use {solana_zk_token_sdk::encryption::auth_encryption::AeKey, std::convert::TryInto};
 
 /// Mint data
 #[derive(Clone, Copy, Pod, Zeroable)]

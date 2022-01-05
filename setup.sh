@@ -9,7 +9,13 @@ here="$(dirname "$0")"
 cd "$here"
 
 if [[ ! -d solana ]]; then
-  git clone git@github.com:solana-labs/solana.git
+  if [[ -n $CI ]]; then
+    git config --global user.email "you@example.com"
+    git config --global user.name "Your Name"
+    git clone https://github.com/solana-labs/solana.git
+  else
+    git clone git@github.com:solana-labs/solana.git
+  fi
 fi
 
 if [[ ! -f solana/.zk-token-patched ]]; then

@@ -16,11 +16,11 @@ use {
         system_instruction,
         transaction::Transaction,
     },
-    spl_zk_token::pod::*,
-    spl_zk_token_sdk::encryption::{
+    solana_zk_token_sdk::encryption::{
         auth_encryption::{AeCiphertext, AeKey},
         elgamal::*,
     },
+    spl_zk_token::pod::*,
     std::{convert::TryInto, process::exit, sync::Arc},
 };
 

@@ -16,3 +16,4 @@ solana-remote-wallet = { path = "solana/remote-wallet"}
 solana-sdk = { path = "solana/sdk" }
 solana-test-validator = { path = "solana/test-validator"}
 solana-validator = { path = "solana/validator"}
+solana-zk-token-sdk = { path = "solana/zk-token-sdk"}
