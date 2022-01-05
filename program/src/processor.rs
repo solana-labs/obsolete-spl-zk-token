@@ -17,7 +17,7 @@ use {
         system_instruction,
         sysvar::{self, Sysvar},
     },
-    spl_zk_token_sdk::{
+    solana_zk_token_sdk::{
         zk_token_elgamal::{ops, pod},
         zk_token_proof_program,
     },

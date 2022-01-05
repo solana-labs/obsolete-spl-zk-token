@@ -2,8 +2,8 @@
 //!
 
 #[cfg(not(target_arch = "bpf"))]
-use spl_zk_token_sdk::encryption::{auth_encryption::AeCiphertext, elgamal::ElGamalPubkey};
-pub use spl_zk_token_sdk::zk_token_proof_instruction::*;
+use solana_zk_token_sdk::encryption::{auth_encryption::AeCiphertext, elgamal::ElGamalPubkey};
+pub use solana_zk_token_sdk::zk_token_proof_instruction::*;
 use {
     crate::{pod::*, *},
     bytemuck::{Pod, Zeroable},
@@ -15,7 +15,7 @@ use {
         pubkey::Pubkey,
         sysvar,
     },
-    spl_zk_token_sdk::zk_token_elgamal::pod,
+    solana_zk_token_sdk::zk_token_elgamal::pod,
 };
 
 #[derive(Clone, Copy, Pod, Zeroable)]
