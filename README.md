@@ -15,44 +15,31 @@ the work-in-progress documents [part1](/paper/part1.pdf) and
 ## Development Environment
 
 ### Setup
-A specific fork of the Solana monorepo is required for development:
-```
-$ git clone git@github.com:mvines/solana.git -b zk_token-v1.9
-```
+A master branch of the Solana monorepo is required for development.
 
-Then clone this repository as a subdirectory of the Solana monorepo
+Then clone this repository, then run
 ```
-$ cd solana/
-$ git clone git@github.com:solana-labs/spl-zk-token.git zk-token
-```
-
-Finally run the embed script to configure your zk-token and monorepo projects.
-This will modify some `Cargo.toml` files in both projects:
-
-```
-$ cd solana/zk-token/
-$ ./scripts/embed.sh
+$ ./setup.sh
 ```
 
 ### Transfer Demo
 
 To run the simple confidential transfer demo, first build the BPF program:
 ```
-$ cd solana/zk-token/program/
+$ cd ./program/
 $ cargo build-bpf
 ```
 
 Then start the `solana-test-validator`:
 ```
-$ cd solana/
-$ ./validator/solana-test-validator --reset --limit-ledger-size 500000000 \
+$ ./solana/validator/solana-test-validator --reset --limit-ledger-size 500000000 \
     --bpf-program ZkTokenXHhH6t1juaWF74WLcfv4XoNocjXA6sPWHNg1 \
-    zk-token/target/deploy/spl_zk_token.so
+    target/deploy/spl_zk_token.so
 ```
 
 Finally in another shell, run:
 ```
-$ cd solana/zk-token/demo/
+$ cd ./demo/
 $ cargo run -- -ul
 ```
 

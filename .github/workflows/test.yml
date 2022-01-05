@@ -57,6 +57,10 @@ jobs:
         ./ci/install-program-deps.sh
         echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
+    - name: setup.sh
+      run: |
+        ./setup.sh
+
     - name: cargo fmt
       uses: actions-rs/cargo@v1
       with:

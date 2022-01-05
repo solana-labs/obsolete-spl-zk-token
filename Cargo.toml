@@ -1,7 +1,18 @@
 [workspace]
 members = [
-  "sdk",
   "program",
-  "proof-program",
   "demo",
 ]
+
+[patch.crates-io]
+solana-clap-utils = {path = "solana/clap-utils" }
+solana-cli-config = {path = "solana/cli-config" }
+solana-client = { path = "solana/client"}
+solana-logger = { path = "solana/logger"}
+solana-program = { path = "solana/sdk/program" }
+solana-program-test = { path = "solana/program-test" }
+solana-program-runtime = { path = "solana/program-runtime" }
+solana-remote-wallet = { path = "solana/remote-wallet"}
+solana-sdk = { path = "solana/sdk" }
+solana-test-validator = { path = "solana/test-validator"}
+solana-validator = { path = "solana/validator"}
