@@ -15,7 +15,7 @@ use {
         pubkey::Pubkey,
         rent::Rent,
         system_instruction,
-        sysvar::{self, Sysvar},
+        sysvar::{instructions::get_instruction_relative, Sysvar},
     },
     solana_zk_token_sdk::{
         zk_token_elgamal::{ops, pod},
@@ -24,27 +24,6 @@ use {
     std::result::Result,
 };
 
-/// Returns the previous `Instruction` in the currently executing `Transaction`
-fn get_previous_instruction(
-    instruction_sysvar_account_info: &AccountInfo,
-) -> Result<Instruction, ProgramError> {
-    if *instruction_sysvar_account_info.key != sysvar::instructions::id() {
-        return Err(ProgramError::InvalidInstructionData);
-    }
-    let instruction_sysvar = instruction_sysvar_account_info.data.borrow();
-
-    #[allow(deprecated)]
-    let current_instruction = sysvar::instructions::load_current_index(&instruction_sysvar);
-    if current_instruction == 0 {
-        return Err(ProgramError::InvalidInstructionData);
-    }
-
-    #[allow(deprecated)]
-    sysvar::instructions::load_instruction_at(current_instruction as usize - 1, &instruction_sysvar)
-        .map_err(|_| ProgramError::InvalidInstructionData)
-}
-
-/// Returns the previous `Instruction` in the currently executing `Transaction`
 fn decode_proof_instruction<T: Pod>(
     expected: ProofInstruction,
     instruction: &Instruction,
@@ -436,7 +415,7 @@ fn process_configure_account(
 }
 
 /// Processes an [CloseAccount] instruction.
-fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
+fn process_close_account(accounts: &[AccountInfo], proof_instruction_offset: i64) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let zk_token_account_info = next_account_info(account_info_iter)?;
     let token_account_info = next_account_info(account_info_iter)?;
@@ -451,7 +430,8 @@ fn process_close_account(accounts: &[AccountInfo]) -> ProgramResult {
         account_info_iter.as_slice(),
     )?;
 
-    let previous_instruction = get_previous_instruction(instructions_sysvar_info)?;
+    let previous_instruction =
+        get_instruction_relative(proof_instruction_offset, instructions_sysvar_info)?;
     let data = decode_proof_instruction::<CloseAccountData>(
         ProofInstruction::VerifyCloseAccount,
         &previous_instruction,
@@ -554,6 +534,7 @@ fn process_withdraw(
     amount: u64,
     decimals: u8,
     new_decryptable_available_balance: pod::AeCiphertext,
+    proof_instruction_offset: i64,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
 
@@ -578,7 +559,9 @@ fn process_withdraw(
         return Err(ProgramError::InvalidAccountData);
     }
 
-    let previous_instruction = get_previous_instruction(instructions_sysvar_info)?;
+    let previous_instruction =
+        get_instruction_relative(proof_instruction_offset, instructions_sysvar_info)?;
+
     let data = decode_proof_instruction::<WithdrawData>(
         ProofInstruction::VerifyWithdraw,
         &previous_instruction,
@@ -638,6 +621,7 @@ fn process_withdraw(
 fn process_transfer(
     accounts: &[AccountInfo],
     new_source_decryptable_available_balance: pod::AeCiphertext,
+    proof_instruction_offset: i64,
 ) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let zk_token_account_info = next_account_info(account_info_iter)?;
@@ -677,7 +661,8 @@ fn process_transfer(
         return Err(ProgramError::InvalidArgument);
     }
 
-    let previous_instruction = get_previous_instruction(instructions_sysvar_info)?;
+    let previous_instruction =
+        get_instruction_relative(proof_instruction_offset, instructions_sysvar_info)?;
     let data = decode_proof_instruction::<TransferData>(
         ProofInstruction::VerifyTransfer,
         &previous_instruction,
@@ -858,7 +843,8 @@ pub fn process_instruction(
         }
         ZkTokenInstruction::CloseAccount => {
             msg!("CloseAccount");
-            process_close_account(accounts)
+            let data = decode_instruction_data::<CloseInstructionData>(input)?;
+            process_close_account(accounts, data.proof_instruction_offset as i64)
         }
         ZkTokenInstruction::Deposit => {
             msg!("Deposit");
@@ -873,12 +859,17 @@ pub fn process_instruction(
                 data.amount.into(),
                 data.decimals,
                 data.new_decryptable_available_balance,
+                data.proof_instruction_offset as i64,
             )
         }
         ZkTokenInstruction::Transfer => {
             msg!("Transfer");
             let data = decode_instruction_data::<TransferInstructionData>(input)?;
-            process_transfer(accounts, data.new_source_decryptable_available_balance)
+            process_transfer(
+                accounts,
+                data.new_source_decryptable_available_balance,
+                data.proof_instruction_offset as i64,
+            )
         }
         ZkTokenInstruction::ApplyPendingBalance => {
             msg!("ApplyPendingBalance");

@@ -29,6 +29,14 @@ pub struct ConfigureAccountInstructionData {
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
+pub struct CloseInstructionData {
+    /// Relative location of the `ProofInstruction::VerifyCloseAccount` instruction to the
+    /// `CloseAccount` instruction in the transaction
+    pub proof_instruction_offset: i8,
+}
+
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct DepositInstructionData {
     /// The amount of tokens to deposit
     pub amount: PodU64,
@@ -45,6 +53,9 @@ pub struct WithdrawInstructionData {
     pub decimals: u8,
     /// The new decryptable balance if the withrawal succeeds
     pub new_decryptable_available_balance: pod::AeCiphertext,
+    /// Relative location of the `ProofInstruction::VerifyWithdraw` instruction to the `Withdraw`
+    /// instruction in the transaction
+    pub proof_instruction_offset: i8,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -52,6 +63,9 @@ pub struct WithdrawInstructionData {
 pub struct TransferInstructionData {
     /// The new source decryptable balance if the transfer succeeds
     pub new_source_decryptable_available_balance: pod::AeCiphertext,
+    /// Relative location of the `ProofInstruction::VerifyTransfer` instruction to the
+    /// `Transfer` instruction in the transaction
+    pub proof_instruction_offset: i8,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -160,7 +174,7 @@ pub enum ZkTokenInstruction {
     ///   5.. `[signer]` Required M signer accounts for the SPL Token Multisig account
     ///
     /// Data expected by this instruction:
-    ///   None
+    ///   `CloseInstructionData`
     ///
     /// The preceding instruction must be ProofInstruction::VerifyCloseAccount.
     ///
@@ -503,6 +517,7 @@ pub fn inner_close_account(
     reclaim_account: Pubkey,
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
+    proof_instruction_offset: i8,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(zk_token_account, false),
@@ -516,7 +531,13 @@ pub fn inner_close_account(
         accounts.push(AccountMeta::new_readonly(**multisig_signer, true));
     }
 
-    encode_instruction(accounts, ZkTokenInstruction::CloseAccount, &())
+    encode_instruction(
+        accounts,
+        ZkTokenInstruction::CloseAccount,
+        &CloseInstructionData {
+            proof_instruction_offset,
+        },
+    )
 }
 
 /// Create a `CloseAccount` instruction
@@ -536,6 +557,7 @@ pub fn close_account(
             reclaim_account,
             authority,
             multisig_signers,
+            -1,
         ),
     ]
 }
@@ -591,6 +613,7 @@ pub fn inner_withdraw(
     amount: u64,
     decimals: u8,
     new_decryptable_available_balance: pod::AeCiphertext,
+    proof_instruction_offset: i8,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
@@ -614,6 +637,7 @@ pub fn inner_withdraw(
             amount: amount.into(),
             decimals,
             new_decryptable_available_balance,
+            proof_instruction_offset,
         },
     )
 }
@@ -645,6 +669,7 @@ pub fn withdraw(
             amount,
             decimals,
             new_decryptable_available_balance.into(),
+            -1,
         ),
     ]
 }
@@ -663,6 +688,7 @@ pub fn inner_transfer(
     authority: Pubkey,
     multisig_signers: &[&Pubkey],
     new_source_decryptable_available_balance: pod::AeCiphertext,
+    proof_instruction_offset: i8,
 ) -> Instruction {
     let mut accounts = vec![
         AccountMeta::new(source_zk_token_account, false),
@@ -683,6 +709,7 @@ pub fn inner_transfer(
         ZkTokenInstruction::Transfer,
         &TransferInstructionData {
             new_source_decryptable_available_balance,
+            proof_instruction_offset,
         },
     )
 }
@@ -712,6 +739,7 @@ pub fn transfer(
             authority,
             multisig_signers,
             new_source_decryptable_available_balance.into(),
+            -1,
         ),
     ]
 }
