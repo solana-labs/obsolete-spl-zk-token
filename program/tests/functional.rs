@@ -598,7 +598,7 @@ async fn test_transfer() {
     let mut program_test = program_test();
     let mint = add_token_mint_account(&mut program_test, None);
 
-    let auditor_pk = ElGamalPubkey::default();
+    let auditor_pk = ElGamalKeypair::default().public;
     let _zk_auditor_address = add_zk_mint_account(&mut program_test, mint, None);
 
     let src_token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 0);
@@ -689,7 +689,7 @@ async fn test_transfer_self() {
     let mut program_test = program_test();
     let mint = add_token_mint_account(&mut program_test, None);
 
-    let auditor_pk = ElGamalPubkey::default();
+    let auditor_pk = ElGamalKeypair::default().public;
     let _zk_auditor_address = add_zk_mint_account(&mut program_test, mint, None);
 
     let token_account = add_token_account(&mut program_test, mint, owner.pubkey(), 0);
