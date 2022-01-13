@@ -679,10 +679,14 @@ fn process_transfer(
 
     let new_source_available_balance = {
         // Combine commitments and handles
-        let source_lo_ct =
-            pod::ElGamalCiphertext::from((data.amount_comms.lo, data.decrypt_handles_lo.source));
-        let source_hi_ct =
-            pod::ElGamalCiphertext::from((data.amount_comms.hi, data.decrypt_handles_hi.source));
+        let source_lo_ct = pod::ElGamalCiphertext::from((
+            data.encrypted_transfer_amount.amount_comm_lo,
+            data.encrypted_transfer_amount.decrypt_handles_lo.source,
+        ));
+        let source_hi_ct = pod::ElGamalCiphertext::from((
+            data.encrypted_transfer_amount.amount_comm_hi,
+            data.encrypted_transfer_amount.decrypt_handles_hi.source,
+        ));
 
         ops::subtract_with_lo_hi(
             &zk_token_account.available_balance,
@@ -693,11 +697,15 @@ fn process_transfer(
     };
 
     let new_receiver_pending_balance = {
-        let dest_lo_ct =
-            pod::ElGamalCiphertext::from((data.amount_comms.lo, data.decrypt_handles_lo.dest));
+        let dest_lo_ct = pod::ElGamalCiphertext::from((
+            data.encrypted_transfer_amount.amount_comm_lo,
+            data.encrypted_transfer_amount.decrypt_handles_lo.dest,
+        ));
 
-        let dest_hi_ct =
-            pod::ElGamalCiphertext::from((data.amount_comms.hi, data.decrypt_handles_hi.dest));
+        let dest_hi_ct = pod::ElGamalCiphertext::from((
+            data.encrypted_transfer_amount.amount_comm_hi,
+            data.encrypted_transfer_amount.decrypt_handles_hi.dest,
+        ));
 
         ops::add_with_lo_hi(
             &receiver_zk_token_account.pending_balance,
