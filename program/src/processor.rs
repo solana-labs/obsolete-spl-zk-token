@@ -442,7 +442,7 @@ fn process_close_account(accounts: &[AccountInfo], proof_instruction_offset: i64
         return Err(ProgramError::InvalidAccountData);
     }
 
-    if zk_token_account.available_balance != data.balance {
+    if zk_token_account.available_balance != data.ciphertext {
         msg!("Available balance mismatch");
         return Err(ProgramError::InvalidInstructionData);
     }
@@ -572,7 +572,7 @@ fn process_withdraw(
         ops::subtract_from(&zk_token_account.available_balance, amount)
             .ok_or(ProgramError::InvalidInstructionData)?;
 
-    if zk_token_account.available_balance != data.final_balance_ct {
+    if zk_token_account.available_balance != data.final_ciphertext {
         msg!("Available balance mismatch");
         return Err(ProgramError::InvalidInstructionData);
     }
@@ -668,10 +668,10 @@ fn process_transfer(
         &previous_instruction,
     )?;
 
-    if data.transfer_public_keys.source_pk != zk_token_account.elgamal_pk
-        || data.transfer_public_keys.dest_pk != receiver_zk_token_account.elgamal_pk
+    if data.transfer_pubkeys.source != zk_token_account.elgamal_pk
+        || data.transfer_pubkeys.dest != receiver_zk_token_account.elgamal_pk
         || (zk_mint.auditor.auditor_enabled()
-            && data.transfer_public_keys.auditor_pk != zk_mint.auditor.auditor_pk)
+            && data.transfer_pubkeys.auditor != zk_mint.auditor.auditor_pk)
     {
         msg!("Error: ElGamal public key mismatch");
         return Err(ProgramError::InvalidArgument);
@@ -680,12 +680,12 @@ fn process_transfer(
     let new_source_available_balance = {
         // Combine commitments and handles
         let source_lo_ct = pod::ElGamalCiphertext::from((
-            data.encrypted_transfer_amount.amount_comm_lo,
-            data.encrypted_transfer_amount.decrypt_handles_lo.source,
+            data.ciphertext_lo.commitment,
+            data.ciphertext_lo.source,
         ));
         let source_hi_ct = pod::ElGamalCiphertext::from((
-            data.encrypted_transfer_amount.amount_comm_hi,
-            data.encrypted_transfer_amount.decrypt_handles_hi.source,
+            data.ciphertext_hi.commitment,
+            data.ciphertext_hi.source,
         ));
 
         ops::subtract_with_lo_hi(
@@ -697,15 +697,11 @@ fn process_transfer(
     };
 
     let new_receiver_pending_balance = {
-        let dest_lo_ct = pod::ElGamalCiphertext::from((
-            data.encrypted_transfer_amount.amount_comm_lo,
-            data.encrypted_transfer_amount.decrypt_handles_lo.dest,
-        ));
+        let dest_lo_ct =
+            pod::ElGamalCiphertext::from((data.ciphertext_lo.commitment, data.ciphertext_lo.dest));
 
-        let dest_hi_ct = pod::ElGamalCiphertext::from((
-            data.encrypted_transfer_amount.amount_comm_hi,
-            data.encrypted_transfer_amount.decrypt_handles_hi.dest,
-        ));
+        let dest_hi_ct =
+            pod::ElGamalCiphertext::from((data.ciphertext_hi.commitment, data.ciphertext_hi.dest));
 
         ops::add_with_lo_hi(
             &receiver_zk_token_account.pending_balance,

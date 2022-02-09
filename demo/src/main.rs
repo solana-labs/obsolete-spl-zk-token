@@ -125,7 +125,7 @@ fn process_demo(
     let token_mint = Keypair::new();
 
     let token_account_a = Keypair::new();
-    let elgamal_keypair_a = ElGamalKeypair::default();
+    let elgamal_keypair_a = ElGamalKeypair::new_rand();
     let elgamal_pk_a = elgamal_keypair_a.public;
 
     let zk_token_account_a =
@@ -134,7 +134,7 @@ fn process_demo(
     let ae_key_a = AeKey::new(&token_account_a, &zk_token_account_a).unwrap();
 
     let token_account_b = Keypair::new();
-    let elgamal_keypair_b = ElGamalKeypair::default();
+    let elgamal_keypair_b = ElGamalKeypair::new_rand();
     let elgamal_pk_b = elgamal_keypair_b.public;
 
     let zk_token_account_b =
@@ -340,12 +340,11 @@ fn process_demo(
 
     let transfer_proof_data = spl_zk_token::instruction::TransferData::new(
         mint_amount,
-        current_balance_a,
-        available_balance_ct_a,
+        (current_balance_a, &available_balance_ct_a),
         &elgamal_keypair_a,
-        elgamal_pk_b,
-        auditor_pk,
-    );
+        (&elgamal_pk_b, &auditor_pk),
+    )
+    .unwrap();
 
     // Extract transfer amount from `transfer_data` and demonstrate decrypting using
     // `elgamal_sk_a` and `elgamal_sk_b`
@@ -446,8 +445,9 @@ fn process_demo(
                 current_balance_b,
                 &elgamal_keypair_b,
                 current_balance_b,
-                available_balance_ct_b,
-            ),
+                &available_balance_ct_b,
+            )
+            .unwrap(),
         ),
         &[payer],
     )?;
@@ -489,8 +489,9 @@ fn process_demo(
     // Close account A
     let close_account_proof_data = spl_zk_token::instruction::CloseAccountData::new(
         &elgamal_keypair_a,
-        available_balance_ct_a,
-    );
+        &available_balance_ct_a,
+    )
+    .unwrap();
 
     send(
         rpc_client,
