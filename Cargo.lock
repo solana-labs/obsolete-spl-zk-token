@@ -2150,6 +2150,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "merlin"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58c38e2799fc0978b65dfff8023ec7843e2330bb462f19198840b34b6582397d"
+dependencies = [
+ "byteorder",
+ "keccak",
+ "rand_core 0.6.3",
+ "zeroize",
+]
+
+[[package]]
 name = "mime"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3768,7 +3780,7 @@ dependencies = [
  "solana-measure",
  "solana-program-runtime",
  "solana-sdk",
- "solana-zk-token-sdk",
+ "solana-zk-token-sdk 1.10.0",
  "solana_rbpf",
  "thiserror",
 ]
@@ -4429,7 +4441,7 @@ dependencies = [
  "solana-stake-program",
  "solana-vote-program",
  "solana-zk-token-proof-program",
- "solana-zk-token-sdk",
+ "solana-zk-token-sdk 1.10.0",
  "symlink",
  "tar",
  "tempfile",
@@ -4738,7 +4750,37 @@ dependencies = [
  "num-traits",
  "solana-program-runtime",
  "solana-sdk",
- "solana-zk-token-sdk",
+ "solana-zk-token-sdk 1.10.0",
+]
+
+[[package]]
+name = "solana-zk-token-sdk"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9799d68a8e0c6e4a3dff62d9938666c5a710fa88dbd0627524e03695fdd8025b"
+dependencies = [
+ "aes-gcm-siv",
+ "arrayref",
+ "base64 0.13.0",
+ "bincode",
+ "bytemuck",
+ "byteorder",
+ "cipher",
+ "curve25519-dalek",
+ "getrandom 0.1.16",
+ "lazy_static",
+ "merlin 3.0.0",
+ "num-derive",
+ "num-traits",
+ "rand 0.7.3",
+ "serde",
+ "serde_json",
+ "sha3 0.9.1",
+ "solana-program",
+ "solana-sdk",
+ "subtle",
+ "thiserror",
+ "zeroize",
 ]
 
 [[package]]
@@ -4755,7 +4797,7 @@ dependencies = [
  "curve25519-dalek",
  "getrandom 0.1.16",
  "lazy_static",
- "merlin",
+ "merlin 2.0.1",
  "num-derive",
  "num-traits",
  "rand 0.7.3",
@@ -4847,7 +4889,7 @@ dependencies = [
  "solana-program-test",
  "solana-sdk",
  "solana-validator",
- "solana-zk-token-sdk",
+ "solana-zk-token-sdk 0.6.0",
  "spl-memo",
  "spl-token",
 ]
@@ -6177,7 +6219,7 @@ dependencies = [
  "solana-remote-wallet",
  "solana-sdk",
  "solana-test-validator",
- "solana-zk-token-sdk",
+ "solana-zk-token-sdk 0.6.0",
  "spl-token",
  "spl-zk-token",
  "tokio",

@@ -231,7 +231,7 @@ async fn get_zk_token_balance(
 async fn test_configure_mint() {
     let owner = Keypair::new();
     let freeze_authority = Keypair::new();
-    let auditor_pk = ElGamalKeypair::default().public;
+    let auditor_pk = ElGamalKeypair::new_rand().public;
 
     let mut program_test = program_test();
     let mint = add_token_mint_account(&mut program_test, Some(freeze_authority.pubkey()));
@@ -312,7 +312,7 @@ async fn test_update_auditor() {
 #[tokio::test]
 async fn test_configure_account() {
     let owner = Keypair::new();
-    let elgamal_pk = ElGamalKeypair::default().public;
+    let elgamal_pk = ElGamalKeypair::new_rand().public;
 
     let mut program_test = program_test();
 
